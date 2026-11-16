@@ -1,0 +1,14 @@
+{
+  "name": "Registro de ocorrências",
+  "short_name": "Registros",
+  "description": "Registro interno de ocorrências da equipe pedagógica.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F4F8F6",
+  "theme_color": "#00C5BB",
+  "icons": [
+    { "src": "assets/logo.png", "sizes": "440x385", "type": "image/png", "purpose": "any" }
+  ]
+}

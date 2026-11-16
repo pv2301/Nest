@@ -1,0 +1,439 @@
+/* Entrada, login, criação de conta, configuração inicial e biometria.
+   Os formulários NÃO re-renderizam a cada tecla: só o trecho que muda é atualizado,
+   para o foco e a posição do cursor não se perderem enquanto a pessoa digita. */
+
+import { S, app, registrarTela, ir, voltar, toast, render, autenticar, rodape } from './core.js';
+import { Store } from './store.js';
+import {
+  esc, RINGBG, SEAL, ICON, svgIc,
+  validaLogin, validaSenha, requisitosSenha, normalizaLogin, sugereLogin, senhaTemporaria,
+  criptoDisponivel
+} from './util.js';
+import { PAPEIS_CONTA, TURMAS } from './dados.js';
+
+const val = id => (document.getElementById(id) || {}).value || '';
+const marca = () => S.escola.logo
+  ? `<div class="logoplate"><img src="${esc(S.escola.logo)}" alt="${esc(S.escola.nome || 'Logo')}" width="134"></div>`
+  : `<div style="display:grid;place-items:center">${SEAL.replace('class="seal"','class="seal" style="width:92px;height:92px"')}</div>`;
+
+const cabecalhoMarca = () => `
+  <div class="stack s8">
+    ${marca()}
+    <p class="loginsub">${esc(S.escola.subtitulo || 'Registro interno de ocorrência')}</p>
+  </div>`;
+
+const erroBloco = () => S.formErro ? `<div class="notice alert"><span class="ic">!</span><div>${esc(S.formErro)}</div></div>` : '';
+
+/* ---------------------------------------------------------------- entrada */
+registrarTela('entrada', () => `
+  <div class="loginwrap">
+    <div class="ringbg">${RINGBG}</div>
+    <div class="stack s18" style="position:relative">
+      ${cabecalhoMarca()}
+      ${erroBloco()}
+      <div class="card lift stack s8">
+        <button class="btn" onclick="app.ir('entrar')">Entrar</button>
+        <button class="btn ghost" onclick="app.irCriar()">Criar conta</button>
+        <p class="fs11 muted center" style="margin:4px 0 0">
+          Ainda não tem acesso? Crie sua conta — a gestão aprova e você entra.
+        </p>
+      </div>
+      ${rodape()}
+    </div>
+  </div>`);
+
+/* ---------------------------------------------------------------- entrar */
+registrarTela('entrar', () => `
+  <div class="loginwrap">
+    <div class="stack s18">
+      ${cabecalhoMarca()}
+      ${erroBloco()}
+      <form class="card lift stack" onsubmit="app.submeterEntrar(event)">
+        <div class="field">
+          <label for="f-login">Login</label>
+          <input class="input" id="f-login" autocomplete="username" inputmode="text"
+                 placeholder="nome.sobrenome" oninput="app.normaliza('f-login')">
+          <p class="hint">Formato nome.sobrenome, só letras minúsculas.</p>
+        </div>
+        <div class="field">
+          <label for="f-senha">Senha</label>
+          <input class="input" id="f-senha" type="password" autocomplete="current-password">
+        </div>
+        <button class="btn" type="submit" ${S.ocupado ? 'disabled' : ''}>${S.ocupado ? 'Entrando…' : 'Entrar'}</button>
+        <button class="btn ghost sm" type="button" style="width:100%" onclick="app.voltar()">Voltar</button>
+      </form>
+      <p class="fs11 muted center" style="margin:0">Esqueceu a senha? A gestão redefine para você.</p>
+      ${rodape()}
+    </div>
+  </div>`);
+
+app.normaliza = id => {
+  const el = document.getElementById(id);
+  if(!el) return;
+  const pos = el.selectionStart;
+  const antes = el.value;
+  el.value = normalizaLogin(antes);
+  const delta = el.value.length - antes.length;
+  try { el.setSelectionRange(pos + delta, pos + delta); } catch {}
+};
+
+app.submeterEntrar = async ev => {
+  ev.preventDefault();
+  const login = normalizaLogin(val('f-login')), senha = val('f-senha');
+  const e = validaLogin(login);
+  if(e) return erro(e);
+  if(!senha) return erro('Informe a senha.');
+  if(!criptoDisponivel()) return erro('Este navegador não oferece as funções de segurança necessárias. Abra o site por https.');
+  S.ocupado = true; S.formErro = null; render();
+  try {
+    const conta = await Store.entrar(login, senha);
+    S.ocupado = false;
+    if(!Store.aparelhoLembrado()){ S.contaPendenteBio = conta; return ir('biometria'); }
+    await autenticar(conta);
+  } catch(err){
+    S.ocupado = false;
+    erro(err.message || 'Não consegui entrar.');
+  }
+};
+
+function erro(msg){ S.formErro = msg; S.ocupado = false; render(); }
+
+/* ---------------------------------------------------------------- criar conta */
+app.irCriar = () => { S.novaConta = { papel:'assistente', turma:'' }; ir('criar'); };
+
+registrarTela('criar', () => {
+  const n = S.novaConta || (S.novaConta = { papel:'assistente', turma:'' });
+  return `
+  <div class="loginwrap">
+    <div class="stack s18">
+      <div class="stack s8 center">
+        ${SEAL.replace('class="seal"','class="seal" style="width:46px;height:46px;margin:0 auto"')}
+        <h1 style="font-size:19px">Criar conta</h1>
+        <p class="fs12 muted" style="margin:0">Sua conta fica aguardando a aprovação da gestão.</p>
+      </div>
+      ${erroBloco()}
+      <form class="card lift stack" onsubmit="app.submeterCriar(event)">
+        <div class="field">
+          <label for="c-nome">Nome completo</label>
+          <input class="input" id="c-nome" autocomplete="name" oninput="app.sugerir()">
+        </div>
+        <div class="field">
+          <label for="c-login">Login</label>
+          <input class="input" id="c-login" autocomplete="username" placeholder="nome.sobrenome" oninput="app.normaliza('c-login')">
+          <p class="hint">Formato nome.sobrenome, só letras minúsculas. Ex.: ana.paula</p>
+        </div>
+        <div class="field">
+          <label for="c-senha">Senha</label>
+          <input class="input" id="c-senha" type="password" autocomplete="new-password" oninput="app.checarSenha()">
+          <div class="reqs" id="c-reqs">${listaReqs('')}</div>
+        </div>
+        <div class="field">
+          <label for="c-senha2">Repetir a senha</label>
+          <input class="input" id="c-senha2" type="password" autocomplete="new-password">
+        </div>
+        <div>
+          <p class="sec-label">Sua função</p>
+          <div class="chips" data-grupo="papel">
+            ${PAPEIS_CONTA.filter(p => p.id !== 'gestao').map(p => `
+              <button type="button" class="chip" data-valor="${p.id}" aria-pressed="${n.papel === p.id}" onclick="app.campoNova('papel','${p.id}')">${esc(p.nome)}</button>`).join('')}
+          </div>
+          <p class="hint">O perfil de gestão só é concedido pela própria gestão.</p>
+        </div>
+        <div>
+          <p class="sec-label">Turma (opcional)</p>
+          <div class="chips" data-grupo="turma">
+            ${TURMAS.map(t => `<button type="button" class="chip" data-valor="${esc(t)}" aria-pressed="${n.turma === t}" onclick="app.campoNova('turma','${t}')">${esc(t)}</button>`).join('')}
+          </div>
+        </div>
+        <button class="btn" type="submit" ${S.ocupado ? 'disabled' : ''}>${S.ocupado ? 'Enviando…' : 'Enviar para aprovação'}</button>
+        <button class="btn ghost sm" type="button" style="width:100%" onclick="app.voltar()">Voltar</button>
+      </form>
+      ${rodape()}
+    </div>
+  </div>`;
+});
+
+function listaReqs(senha){
+  return requisitosSenha(senha).map(r =>
+    `<div class="req ${r.ok ? 'ok' : ''}"><span class="bx">${r.ok ? '&check;' : ''}</span>${esc(r.texto)}</div>`
+  ).join('');
+}
+
+app.checarSenha = () => {
+  const el = document.getElementById('c-reqs');
+  if(el) el.innerHTML = listaReqs(val('c-senha'));
+};
+
+app.sugerir = () => {
+  const el = document.getElementById('c-login');
+  if(el && !el.dataset.tocado){
+    const s = sugereLogin(val('c-nome'));
+    if(s) el.value = s;
+  }
+};
+
+/* Marca o login como editado à mão para parar de sobrescrever com a sugestão. */
+document.addEventListener('input', ev => {
+  if(ev.target && ev.target.id === 'c-login') ev.target.dataset.tocado = '1';
+});
+
+/* Alterna o chip direto no DOM. Re-renderizar aqui apagaria o que já foi digitado
+   nos campos do formulário, inclusive as senhas. */
+app.campoNova = (campo, valor) => {
+  S.novaConta = S.novaConta || {};
+  const atual = S.novaConta[campo];
+  S.novaConta[campo] = (campo === 'turma' && atual === valor) ? '' : valor;
+  document.querySelectorAll(`[data-grupo="${campo}"] .chip`).forEach(b => {
+    b.setAttribute('aria-pressed', String(b.dataset.valor === S.novaConta[campo]));
+  });
+};
+
+app.submeterCriar = async ev => {
+  ev.preventDefault();
+  const nome = val('c-nome').trim();
+  const login = normalizaLogin(val('c-login'));
+  const senha = val('c-senha'), senha2 = val('c-senha2');
+  const n = S.novaConta || {};
+  if(nome.split(/\s+/).filter(Boolean).length < 2) return erro('Informe o nome completo, com nome e sobrenome.');
+  const eL = validaLogin(login); if(eL) return erro(eL);
+  const eS = validaSenha(senha); if(eS) return erro(eS);
+  if(senha !== senha2) return erro('As duas senhas não são iguais.');
+  if(!criptoDisponivel()) return erro('Este navegador não oferece as funções de segurança necessárias. Abra o site por https.');
+  S.ocupado = true; S.formErro = null; render();
+  try {
+    await Store.criarConta({ nome, login, senha, papel: n.papel || 'assistente', turma: n.turma || null });
+    S.ocupado = false; S.loginCriado = login; S.novaConta = null;
+    ir('criado');
+  } catch(err){
+    erro(err.message || 'Não consegui criar a conta.');
+  }
+};
+
+registrarTela('criado', () => `
+  <div class="loginwrap">
+    <div class="stack s18">
+      <div class="stack s8 center">
+        <div style="width:68px;height:68px;border-radius:50%;background:var(--accent-soft);display:grid;place-items:center;color:var(--accent-text);margin:0 auto">
+          ${svgIc(ICON.ciencia).replace('<svg','<svg width="34" height="34"')}
+        </div>
+        <h1 style="font-size:19px">Conta enviada</h1>
+        <p class="fs13 muted" style="margin:0 8px">
+          O login <b>${esc(S.loginCriado || '')}</b> foi enviado para aprovação da gestão.
+          Assim que for aprovado, você entra normalmente com a senha que acabou de criar.
+        </p>
+      </div>
+      ${S.modo === 'local' ? `<div class="notice info"><span class="ic">◆</span><div>
+        Este aparelho está em <b>modo local</b>: a conta existe só aqui. Para a gestão aprovar de outro
+        aparelho, o backend precisa estar configurado.</div></div>` : ''}
+      <button class="btn" onclick="app.ir('entrada')">Voltar ao início</button>
+      ${rodape()}
+    </div>
+  </div>`);
+
+/* ---------------------------------------------------------------- biometria */
+registrarTela('biometria', () => `
+  <div class="loginwrap">
+    <div class="stack s18">
+      <div class="stack s8 center">
+        <div style="width:68px;height:68px;border-radius:50%;background:var(--accent-soft);display:grid;place-items:center;color:var(--accent-text);margin:0 auto">
+          ${svgIc(ICON.digital).replace('<svg','<svg width="34" height="34"')}
+        </div>
+        <h1 style="font-size:19px">Desbloqueio rápido</h1>
+        <p class="fs12 muted" style="margin:0 10px">
+          Da próxima vez você entra direto neste aparelho, sem digitar a senha.
+          A gestão pode revogar o acesso a qualquer momento.
+        </p>
+      </div>
+      <div class="card lift stack s8">
+        <button class="btn" onclick="app.ativarBiometria(true)">Ativar neste aparelho</button>
+        <button class="btn ghost" onclick="app.ativarBiometria(false)">Agora não</button>
+      </div>
+      ${rodape()}
+    </div>
+  </div>`);
+
+app.ativarBiometria = async ativar => {
+  const conta = S.contaPendenteBio;
+  S.contaPendenteBio = null;
+  if(ativar && conta) Store.lembrarAparelho(conta.login);
+  if(conta) await autenticar(conta);
+  else ir('entrada');
+};
+
+/* ---------------------------------------------------------------- configuração inicial */
+registrarTela('configurar', () => `
+  <div class="loginwrap">
+    <div class="ringbg">${RINGBG}</div>
+    <div class="stack s18" style="position:relative">
+      ${cabecalhoMarca()}
+      <div class="notice calm"><span class="ic">◆</span><div>
+        <b>Configuração inicial.</b> Ainda não existe nenhuma conta de gestão.
+        Crie agora a primeira — é ela que aprova as demais.
+      </div></div>
+      ${erroBloco()}
+      <form class="card lift stack" onsubmit="app.submeterConfig(event)">
+        <div class="field">
+          <label for="g-nome">Nome completo</label>
+          <input class="input" id="g-nome" autocomplete="name" oninput="app.sugerirGestao()">
+        </div>
+        <div class="field">
+          <label for="g-login">Login</label>
+          <input class="input" id="g-login" autocomplete="username" placeholder="nome.sobrenome" oninput="app.normaliza('g-login')">
+        </div>
+        <div class="field">
+          <label for="g-senha">Senha</label>
+          <input class="input" id="g-senha" type="password" autocomplete="new-password" oninput="app.checarSenhaG()">
+          <div class="reqs" id="g-reqs">${listaReqs('')}</div>
+        </div>
+        <div class="field">
+          <label for="g-senha2">Repetir a senha</label>
+          <input class="input" id="g-senha2" type="password" autocomplete="new-password">
+        </div>
+        ${S.modo === 'api' ? `
+        <div class="field">
+          <label for="g-codigo">Código de configuração</label>
+          <input class="input" id="g-codigo" autocomplete="off">
+          <p class="hint">O código que você definiu no Apps Script, em Propriedades do script.</p>
+        </div>` : ''}
+        <button class="btn" type="submit" ${S.ocupado ? 'disabled' : ''}>${S.ocupado ? 'Criando…' : 'Criar conta de gestão'}</button>
+      </form>
+      ${rodape()}
+    </div>
+  </div>`);
+
+app.sugerirGestao = () => {
+  const el = document.getElementById('g-login');
+  if(el && !el.value) el.value = sugereLogin(val('g-nome'));
+};
+app.checarSenhaG = () => {
+  const el = document.getElementById('g-reqs');
+  if(el) el.innerHTML = listaReqs(val('g-senha'));
+};
+
+app.submeterConfig = async ev => {
+  ev.preventDefault();
+  const nome = val('g-nome').trim(), login = normalizaLogin(val('g-login'));
+  const senha = val('g-senha'), senha2 = val('g-senha2'), codigo = val('g-codigo');
+  if(nome.split(/\s+/).filter(Boolean).length < 2) return erro('Informe o nome completo.');
+  const eL = validaLogin(login); if(eL) return erro(eL);
+  const eS = validaSenha(senha); if(eS) return erro(eS);
+  if(senha !== senha2) return erro('As duas senhas não são iguais.');
+  if(S.modo === 'api' && !codigo) return erro('Informe o código de configuração.');
+  if(!criptoDisponivel()) return erro('Este navegador não oferece as funções de segurança necessárias. Abra o site por https.');
+  S.ocupado = true; S.formErro = null; render();
+  try {
+    await Store.configurarPrimeiraGestao({ nome, login, senha, codigo });
+    S.ocupado = false; S.precisaConfigurar = false;
+    const conta = await Store.entrar(login, senha);
+    S.contaPendenteBio = conta;
+    ir('biometria');
+  } catch(err){
+    erro(err.message || 'Não consegui criar a conta de gestão.');
+  }
+};
+
+/* ---------------------------------------------------------------- troca de senha obrigatória */
+registrarTela('trocarSenha', () => `
+  <div class="loginwrap">
+    <div class="stack s18">
+      <div class="stack s8 center">
+        <h1 style="font-size:19px">Defina uma nova senha</h1>
+        <p class="fs12 muted" style="margin:0 10px">Sua senha foi redefinida pela gestão. Escolha uma nova para continuar.</p>
+      </div>
+      ${erroBloco()}
+      <form class="card lift stack" onsubmit="app.submeterTroca(event)">
+        <div class="field">
+          <label for="t-senha">Nova senha</label>
+          <input class="input" id="t-senha" type="password" autocomplete="new-password" oninput="app.checarSenhaT()">
+          <div class="reqs" id="t-reqs">${listaReqs('')}</div>
+        </div>
+        <div class="field">
+          <label for="t-senha2">Repetir a nova senha</label>
+          <input class="input" id="t-senha2" type="password" autocomplete="new-password">
+        </div>
+        <button class="btn" type="submit">Salvar e continuar</button>
+      </form>
+    </div>
+  </div>`);
+
+app.checarSenhaT = () => {
+  const el = document.getElementById('t-reqs');
+  if(el) el.innerHTML = listaReqs(val('t-senha'));
+};
+
+app.submeterTroca = async ev => {
+  ev.preventDefault();
+  const senha = val('t-senha'), senha2 = val('t-senha2');
+  const eS = validaSenha(senha); if(eS) return erro(eS);
+  if(senha !== senha2) return erro('As duas senhas não são iguais.');
+  try {
+    await Store.trocarSenha(S.conta.login, senha);
+    S.conta.trocarSenha = false;
+    toast('Senha atualizada.');
+    ir('home', { guardar:false });
+  } catch(err){ erro(err.message || 'Não consegui trocar a senha.'); }
+};
+
+/* ---------------------------------------------------------------- minha conta */
+registrarTela('conta', () => {
+  const c = S.conta, lembrado = Store.aparelhoLembrado();
+  return `<div class="stack s18">
+    <div class="row">
+      <div class="avatar" style="width:46px;height:46px;font-size:15px">${esc(c.ini)}</div>
+      <div class="grow"><h1 style="font-size:17px">${esc(c.nome)}</h1>
+        <p class="fs12 muted" style="margin:1px 0 0">${esc(c.login)} · ${esc(c.rotulo)}</p></div>
+    </div>
+    <div class="card flat">
+      <dl class="kv">
+        <dt>Perfil</dt><dd>${esc(c.rotulo)}</dd>
+        <dt>Funções</dt><dd>${(c.funcoes||[]).length ? esc(c.funcoes.join(', ')) : '<span class="muted">nenhuma concedida</span>'}</dd>
+        <dt>Aparelho</dt><dd>${lembrado ? 'desbloqueio rápido ativo' : 'sem desbloqueio rápido'}</dd>
+        <dt>Modo</dt><dd>${S.modo === 'api' ? 'compartilhado' : 'local (só este aparelho)'}</dd>
+      </dl>
+    </div>
+    <div class="stack s8">
+      ${lembrado
+        ? `<button class="btn ghost" onclick="app.revogarAparelho()">Desativar desbloqueio rápido</button>`
+        : `<button class="btn soft" onclick="app.lembrarEste()">Ativar desbloqueio rápido</button>`}
+      <button class="btn ghost" onclick="app.ir('trocarSenha')">Trocar minha senha</button>
+      <button class="btn danger" onclick="app.sair()">Sair da conta</button>
+    </div>
+    ${rodape()}
+  </div>`;
+});
+
+app.revogarAparelho = () => { Store.esquecerAparelho(); toast('Desbloqueio rápido desativado.'); render(); };
+app.lembrarEste = () => { Store.lembrarAparelho(S.conta.login); toast('Desbloqueio rápido ativado.'); render(); };
+
+/* ---------------------------------------------------------------- desbloqueio ao abrir */
+registrarTela('desbloquear', () => {
+  const l = Store.aparelhoLembrado();
+  return `
+  <div class="loginwrap">
+    <div class="ringbg">${RINGBG}</div>
+    <div class="stack s18" style="position:relative">
+      ${cabecalhoMarca()}
+      <div class="card lift stack s8 center">
+        <div style="width:62px;height:62px;border-radius:50%;background:var(--accent-soft);display:grid;place-items:center;color:var(--accent-text);margin:0 auto">
+          ${svgIc(ICON.digital).replace('<svg','<svg width="31" height="31"')}
+        </div>
+        <p class="fs13" style="margin:0">Entrar como <b>${esc(l ? l.login : '')}</b></p>
+        <button class="btn" onclick="app.desbloquear()">Desbloquear</button>
+        <button class="btn ghost sm" style="width:100%" onclick="app.usarOutra()">Entrar com outra conta</button>
+      </div>
+      ${rodape()}
+    </div>
+  </div>`;
+});
+
+app.desbloquear = async () => {
+  const conta = await Store.retomarSessao();
+  if(conta) return autenticar(conta);
+  Store.esquecerAparelho();
+  S.formErro = 'A sessão deste aparelho expirou. Entre com a sua senha.';
+  ir('entrar');
+};
+
+app.usarOutra = () => { Store.esquecerAparelho(); Store.sair(); ir('entrada', { guardar:false }); };
+
+export { senhaTemporaria };
