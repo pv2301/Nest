@@ -8,8 +8,25 @@ let pool = null;
 let pronto = null;
 
 /** Permite injetar outro banco nos testes (pg-mem). */
+/* Cada integração batiza a variável de um jeito — POSTGRES_URL, DATABASE_URL, ou um
+   prefixo escolhido na hora de conectar. Em vez de exigir um nome, procuramos no
+   ambiente qualquer variável que seja uma URL de Postgres. */
+function urlDoBanco(){
+  const preferidas = ['POSTGRES_URL', 'DATABASE_URL', 'POSTGRES_PRISMA_URL', 'STORAGE_URL'];
+  for(const nome of preferidas){
+    if(process.env[nome]) return process.env[nome];
+  }
+  for(const [nome, valor] of Object.entries(process.env)){
+    if(typeof valor === 'string' && /^postgres(ql)?:\/\//.test(valor) && !/_UNPOOLED$/.test(nome)){
+      console.log('usando banco da variável', nome);
+      return valor;
+    }
+  }
+  return undefined;
+}
+
 let fabrica = () => new Pool({
-  connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL,
+  connectionString: urlDoBanco(),
   ssl: { rejectUnauthorized: false },
   max: 1,                       // serverless: uma conexão por instância
   idleTimeoutMillis: 10000,
@@ -91,6 +108,12 @@ const ESQUEMA = [
 ];
 
 async function migrar(){
+  if(!urlDoBanco()){
+    const e = new Error('Banco de dados não configurado: nenhuma variável de ambiente com URL de Postgres foi encontrada. No Vercel, conecte o banco ao projeto e faça um novo deploy.');
+    e.codigo = 'sem_banco';
+    e.http = 503;
+    throw e;
+  }
   const p = obterPool();
   for(const sql of ESQUEMA) await p.query(sql);
 }

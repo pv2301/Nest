@@ -368,11 +368,14 @@ module.exports = async function handler(req, res){
     const dados = await despachar(String(corpo.acao || ''), corpo.dados || {}, req, res);
     res.status(200).end(JSON.stringify({ ok:true, dados }));
   } catch(e){
-    const http = e instanceof ErroApi ? e.http : 500;
+    const http = e.http || (e instanceof ErroApi ? e.http : 500);
     if(http >= 500) console.error('erro na API:', e);
+    /* Erro de configuração tem mensagem própria: "falha no servidor" não ajudaria
+       ninguém a descobrir que falta conectar o banco. */
+    const explicavel = e instanceof ErroApi || e.codigo === 'sem_banco';
     res.status(http).end(JSON.stringify({
       ok: false,
-      erro: e instanceof ErroApi ? e.message : 'Falha no servidor.',
+      erro: explicavel ? e.message : 'Falha no servidor.',
       codigo: e.codigo || 'erro'
     }));
   }
