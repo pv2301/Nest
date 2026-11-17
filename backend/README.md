@@ -36,10 +36,18 @@ os dados e siga daqui.
 
 ## 3. Preparar a planilha e os segredos
 
-1. No editor, escolha a função **`prepararPlanilha`** na lista e clique em **Executar**.
-2. Autorize quando o Google pedir (é o seu próprio script acessando a sua planilha).
-3. Abra **Ver → Registro de execução**: ele mostra o `CODIGO_CONFIG`, um número de 6
-   dígitos. **Anote**: é ele que libera a criação da primeira conta de gestão.
+1. Salve o código (ícone de disquete) — o editor não roda o que não foi salvo.
+2. Na barra acima do código, escolha **`prepararPlanilha`** na lista de funções e
+   clique em **Executar**.
+3. Autorize quando o Google pedir (é o seu próprio script acessando a sua planilha).
+4. Confira que deu certo: a planilha passa a ter sete abas na parte de baixo
+   (`contas`, `alunos`, `turmas`, `ocorrencias`, `sessoes`, `log`, `config`).
+5. Pegue o `CODIGO_CONFIG`, um número de 6 dígitos que libera a criação da primeira
+   conta de gestão, em **Configurações do projeto** (a engrenagem na barra lateral
+   esquerda) → **Propriedades do script**. **Anote.**
+
+> O editor antigo tinha um menu *Ver → Registro de execução*; o atual não tem. Para
+> ver o log de uma execução, use o ícone **Execuções** na barra lateral esquerda.
 
 Isso cria as abas `contas`, `alunos`, `turmas`, `ocorrencias`, `sessoes`, `log` e
 `config`, e gera dois segredos em **Configurações do projeto → Propriedades do
