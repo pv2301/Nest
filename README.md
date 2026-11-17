@@ -45,17 +45,26 @@ cerca de 10 minutos, uma vez só.
 
 ## Publicar o site
 
-O repositório precisa ser **público** (GitHub Pages só publica repositório privado
-em planos pagos).
+A publicação é automática: todo push na `main` dispara o workflow
+[`.github/workflows/pages.yml`](.github/workflows/pages.yml), que empacota a raiz do
+repositório e publica no GitHub Pages. Na primeira execução ele **ativa o Pages
+sozinho**, sem ninguém precisar abrir Settings → Pages.
 
-1. **Settings → Pages**
-2. **Source:** Deploy from a branch
-3. **Branch:** a branch deste projeto, pasta `/ (root)`
-4. Salve. Em um ou dois minutos o site fica em
-   `https://<usuario>.github.io/<repositorio>/`
+O repositório precisa ser **público** (o Pages só publica repositório privado em
+planos pagos).
 
-Esse é o link para distribuir. No celular, **Adicionar à tela de início** deixa o
-app com ícone próprio, em tela cheia.
+O endereço fica em `https://<usuario>.github.io/<repositorio>/`. Esse é o link para
+distribuir — no celular, **Adicionar à tela de início** deixa o app com ícone
+próprio, em tela cheia.
+
+A aba **Actions** mostra cada publicação e quanto ela demorou.
+
+### Se a publicação falhar
+
+Erro **403 no passo "Configurar o Pages"** significa que o Actions está sem permissão
+de escrita. Em **Settings → Actions → General → Workflow permissions**, marque
+*Read and write permissions*, salve e rode o workflow de novo em **Actions →
+Publicar site → Run workflow**.
 
 ---
 
