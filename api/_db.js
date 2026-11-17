@@ -33,7 +33,10 @@ let fabrica = () => new Pool({
   connectionTimeoutMillis: 8000
 });
 
-function usarFabrica(f){ fabrica = f; pool = null; pronto = null; }
+/* Quando os testes injetam o próprio banco, não há variável de ambiente para
+   verificar — e não deve haver. */
+let fabricaPropria = false;
+function usarFabrica(f){ fabrica = f; fabricaPropria = true; pool = null; pronto = null; }
 
 function obterPool(){
   if(!pool) pool = fabrica();
@@ -108,7 +111,7 @@ const ESQUEMA = [
 ];
 
 async function migrar(){
-  if(!urlDoBanco()){
+  if(!fabricaPropria && !urlDoBanco()){
     const e = new Error('Banco de dados não configurado: nenhuma variável de ambiente com URL de Postgres foi encontrada. No Vercel, conecte o banco ao projeto e faça um novo deploy.');
     e.codigo = 'sem_banco';
     e.http = 503;
