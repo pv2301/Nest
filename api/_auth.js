@@ -107,6 +107,7 @@ function contaPublica(c){
     turma: c.turma || null,
     funcoes: c.funcoes ? String(c.funcoes).split(',').filter(Boolean) : [],
     status: c.status,
+    demo: !!c.demo,
     criadoEm: c.criado_em ? new Date(c.criado_em).toISOString() : '',
     aprovadoPor: c.aprovado_por || '',
     aprovadoEm: c.aprovado_em ? new Date(c.aprovado_em).toISOString() : '',

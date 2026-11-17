@@ -26,7 +26,7 @@ export const S = {
   rascunho: null, passo: 1, modoRegistro: null,
   detalhe: null, usuarioSel: null,
   formErro: null, ocupado: false, toastMsg: null,
-  sincronizando: false, salvando: false
+  sincronizando: false, salvando: false, contagemDemo: null, confirmarLimpeza: false
 };
 
 /* Ações chamadas pelos onclick dos templates. Cada módulo de tela acrescenta as suas. */
@@ -138,6 +138,10 @@ export async function recarregar({ silencioso = false } = {}){
     S.turmas = d.turmas || [];
     S.contas = d.contas || [];
     if(d.conta) S.conta = perfil({ ...S.conta, ...d.conta });
+    /* Quantos registros fictícios existem — a aba Alunos mostra antes de limpar. */
+    if(S.conta.papel === 'gestao'){
+      try { S.contagemDemo = await Store.contarDemo(); } catch { S.contagemDemo = null; }
+    }
   } catch(e){
     toast(e.message || 'Não consegui falar com o servidor.');
   } finally {

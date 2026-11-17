@@ -13,13 +13,13 @@ const listaFuncoes = f => Array.isArray(f) ? f.join(',') : String(f || '');
 const alunoPublico = a => ({
   id: a.id, nome: a.nome, turma: a.turma || '',
   nascimento: a.nascimento || '', saude: a.saude || '',
-  ativo: a.ativo !== false, avulso: !!a.avulso,
+  ativo: a.ativo !== false, avulso: !!a.avulso, demo: !!a.demo,
   criadoEm: a.criado_em ? new Date(a.criado_em).toISOString() : ''
 });
 
 const turmaPublica = t => ({
   id: t.id, nome: t.nome, faixa: t.faixa || '',
-  missResponsavel: t.miss_responsavel || ''
+  missResponsavel: t.miss_responsavel || '', demo: !!t.demo
 });
 
 /** Ocorrências que esta pessoa pode ver. Gestão vê tudo; Miss vê o que criou, o que
@@ -205,8 +205,11 @@ async function salvarAluno(eu, d){
 
   if(existe){
     await consultar(
+      /* Salvar pela gestão confirma o cadastro: deixa de ser avulso e deixa de ser
+         demonstração — quem adotou um registro fictício não quer perdê-lo na limpeza. */
       `UPDATE alunos SET nome=$1, turma=$2, nascimento=$3, saude=$4, ativo=$5,
-         avulso = CASE WHEN $6 THEN false ELSE avulso END
+         avulso = CASE WHEN $6 THEN false ELSE avulso END,
+         demo   = CASE WHEN $6 THEN false ELSE demo   END
        WHERE id=$7`,
       [a.nome ?? existe.nome, a.turma ?? existe.turma, a.nascimento ?? existe.nascimento,
        a.saude ?? existe.saude, a.ativo === false ? false : true,
@@ -227,7 +230,7 @@ async function salvarTurma(eu, d){
   if(!t || !t.nome) throw new ErroApi('Turma sem nome.', 'dados');
   const existe = await uma('SELECT * FROM turmas WHERE id=$1', [t.id]);
   if(existe){
-    await consultar('UPDATE turmas SET nome=$1, faixa=$2, miss_responsavel=$3 WHERE id=$4',
+    await consultar('UPDATE turmas SET nome=$1, faixa=$2, miss_responsavel=$3, demo=false WHERE id=$4',
       [t.nome, t.faixa || null, t.missResponsavel || null, t.id]);
   } else {
     const repetida = await uma('SELECT 1 FROM turmas WHERE lower(nome)=lower($1)', [t.nome]);
@@ -273,14 +276,14 @@ async function carregarDemo(eu, d){
   const { turmas = [], alunos = [], ocorrencias = [], contas = [] } = d || {};
   for(const t of turmas){
     const ja = await uma('SELECT 1 FROM turmas WHERE lower(nome)=lower($1)', [t.nome]);
-    if(!ja) await consultar('INSERT INTO turmas (id,nome,faixa) VALUES ($1,$2,$3)',
+    if(!ja) await consultar('INSERT INTO turmas (id,nome,faixa,demo) VALUES ($1,$2,$3,true)',
       [t.id, t.nome, t.faixa || null]);
   }
   for(const a of alunos){
     const ja = await uma('SELECT 1 FROM alunos WHERE id=$1', [a.id]);
     if(!ja) await consultar(
-      `INSERT INTO alunos (id,nome,turma,nascimento,saude,ativo,avulso)
-       VALUES ($1,$2,$3,$4,$5,true,false)`,
+      `INSERT INTO alunos (id,nome,turma,nascimento,saude,ativo,avulso,demo)
+       VALUES ($1,$2,$3,$4,$5,true,false,true)`,
       [a.id, a.nome, a.turma || null, a.nascimento || null, a.saude || null]);
   }
   for(const o of ocorrencias){
@@ -293,8 +296,8 @@ async function carregarDemo(eu, d){
   for(const c of contas){
     const ja = await uma('SELECT 1 FROM contas WHERE login=$1', [c.login]);
     if(!ja) await consultar(
-      `INSERT INTO contas (login,nome,papel,turma,funcoes,status,senha_hash,aprovado_por)
-       VALUES ($1,$2,$3,$4,$5,$6,'!',  'demonstração')`,
+      `INSERT INTO contas (login,nome,papel,turma,funcoes,status,senha_hash,aprovado_por,demo)
+       VALUES ($1,$2,$3,$4,$5,$6,'!','demonstração',true)`,
       [c.login, c.nome, c.papel === 'gestao' ? 'gestao' : 'miss',
        c.turma || null, listaFuncoes(c.funcoes), c.status || 'ativo']);
   }
@@ -303,15 +306,29 @@ async function carregarDemo(eu, d){
   return true;
 }
 
+/** Quantos registros de demonstração existem. A tela mostra antes de limpar. */
+async function contarDemo(){
+  const [o, c, a, t] = await Promise.all([
+    uma(`SELECT count(*)::int n FROM ocorrencias WHERE (dados->>'demo') = 'true'`),
+    uma(`SELECT count(*)::int n FROM contas WHERE demo = true`),
+    uma(`SELECT count(*)::int n FROM alunos WHERE demo = true`),
+    uma(`SELECT count(*)::int n FROM turmas WHERE demo = true`)
+  ]);
+  return { ocorrencias:o.n, contas:c.n, alunos:a.n, turmas:t.n,
+           total:o.n + c.n + a.n + t.n };
+}
+
+/* Apaga EXCLUSIVAMENTE o que está marcado como demonstração. Nada de adivinhar pelo
+   formato do id: um registro sem a marca não é tocado em hipótese alguma. */
 async function limparDemo(eu){
+  const antes = await contarDemo();
   await consultar(`DELETE FROM ocorrencias WHERE (dados->>'demo') = 'true'`);
-  await consultar(`DELETE FROM contas WHERE aprovado_por = 'demonstração'`);
-  await consultar(`DELETE FROM alunos WHERE id LIKE 'c%' AND id NOT IN (
-                     SELECT DISTINCT jsonb_array_elements(dados->'envolvidos')->>'kid'
-                     FROM ocorrencias)`);
-  await consultar(`DELETE FROM turmas WHERE id LIKE 't_' AND nome NOT IN (SELECT DISTINCT turma FROM alunos WHERE turma IS NOT NULL)`);
-  await registrar(eu.login, 'demo_limpa', '');
-  return true;
+  await consultar(`DELETE FROM contas WHERE demo = true`);
+  await consultar(`DELETE FROM alunos WHERE demo = true`);
+  await consultar(`DELETE FROM turmas WHERE demo = true`);
+  await registrar(eu.login, 'demo_limpa',
+    `${antes.turmas} turmas, ${antes.alunos} alunos, ${antes.ocorrencias} registros, ${antes.contas} contas`);
+  return antes;
 }
 
 /* ============================ despacho ============================ */
@@ -341,6 +358,7 @@ async function despachar(acao, dados, req, res){
     case 'removerTurma':     return removerTurma(await A.exigeGestao(req), dados);
     case 'carregarDemo':     return carregarDemo(await A.exigeGestao(req), dados);
     case 'limparDemo':       return limparDemo(await A.exigeGestao(req));
+    case 'contarDemo':       return (await A.exigeGestao(req)) && contarDemo();
     default: throw new ErroApi('Ação desconhecida: ' + acao, 'acao', 404);
   }
 }

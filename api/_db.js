@@ -104,6 +104,19 @@ const ESQUEMA = [
      chave TEXT PRIMARY KEY,
      valor TEXT
    )`,
+  /* Marca explícita de demonstração. Antes a limpeza adivinhava pelo formato do id,
+     o que um dia apagaria dado real. */
+  `ALTER TABLE alunos ADD COLUMN IF NOT EXISTS demo BOOLEAN NOT NULL DEFAULT false`,
+  `ALTER TABLE turmas ADD COLUMN IF NOT EXISTS demo BOOLEAN NOT NULL DEFAULT false`,
+  `ALTER TABLE contas ADD COLUMN IF NOT EXISTS demo BOOLEAN NOT NULL DEFAULT false`,
+
+  /* Corrige o passado, uma vez só: quem carregou demonstração antes desta mudança
+     tem registros sem marca. É o ÚNICO lugar onde o padrão de id ainda aparece —
+     nunca mais para decidir o que apagar. */
+  `UPDATE contas SET demo = true WHERE demo = false AND aprovado_por = 'demonstração'`,
+  `UPDATE alunos SET demo = true WHERE demo = false AND id IN ('c1','c2','c3','c4','c5','c6')`,
+  `UPDATE turmas SET demo = true WHERE demo = false AND id IN ('t1','t2','t3')`,
+
   `CREATE INDEX IF NOT EXISTS idx_ocorrencias_criado ON ocorrencias (criado_em DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_sessoes_expira ON sessoes (expira_em)`,
   `CREATE INDEX IF NOT EXISTS idx_anexos_expira ON anexos (expira_em)`,

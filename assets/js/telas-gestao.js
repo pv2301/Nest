@@ -22,7 +22,7 @@ function linhaUsuario(c){
       <span style="display:block;font-size:13.5px;font-weight:600">${esc(c.nome)}</span>
       <span class="fs11 muted">${esc(c.login)} · ${esc(rotuloPapel(c.papel))}${c.turma ? ' · ' + esc(c.turma) : ''}</span>
     </span>
-    ${sel}
+    ${c.demo ? '<span class="pill demo">demonstração</span>' : ''}${sel}
   </button>`;
 }
 
@@ -92,12 +92,19 @@ app.recusar = login => patch(login, { status:'recusado', aprovadoPor:S.conta.log
   'Cadastro de ' + login + ' recusado.');
 
 app.demo = async carregar => {
+  S.confirmarLimpeza = false;
   try {
-    if(carregar) await Store.carregarDemo(); else await Store.limparDemo();
+    const r = carregar ? await Store.carregarDemo() : await Store.limparDemo();
     await recarregar();
-    toast(carregar ? 'Dados de demonstração carregados.' : 'Dados de demonstração removidos.');
+    await atualizarContagemDemo();
+    toast(carregar ? 'Dados de demonstração carregados.'
+      : `Removidos ${(r && r.total) || 0} registros de demonstração.`);
   } catch(e){ toast(e.message); }
 };
+
+export async function atualizarContagemDemo(){
+  try { S.contagemDemo = await Store.contarDemo(); } catch { S.contagemDemo = null; }
+}
 
 /* ---------------------------------------------------------------- ficha do usuário */
 registrarTela('usuario', () => {
@@ -296,6 +303,7 @@ registrarTela('alunos', () => {
           const misses = (S.diretorio || []).filter(d => d.papel === 'miss');
           return `<div class="card flat" style="padding:11px 12px">
             <div class="row"><b class="fs13 grow">${esc(t.nome)}</b>
+              ${t.demo ? '<span class="pill demo">demonstração</span>' : ''}
               <span class="pill">${n} aluno${n === 1 ? '' : 's'}</span>
               <button class="btn ghost sm" style="padding:4px 9px;min-height:0" onclick="app.removerTurma('${esc(t.id)}')">Remover</button></div>
             <p class="fs11 muted" style="margin:7px 0 5px">Quem recebe a ciência desta turma</p>
@@ -334,6 +342,7 @@ registrarTela('alunos', () => {
             <span style="display:block;font-size:13.5px;font-weight:600">${esc(a.nome)}</span>
             <span class="fs11 muted">${esc(a.turma || 'sem turma')}${a.saude ? ' · ' + esc(a.saude) : ''}</span>
           </span>
+          ${a.demo ? '<span class="pill demo">demonstração</span>' : ''}
           ${a.avulso ? '<span class="pill wait">confirmar</span>' : ''}
           ${a.ativo === false ? '<span class="pill off">arquivado</span>' : ''}
         </button>`).join('')
@@ -341,18 +350,42 @@ registrarTela('alunos', () => {
       </div>
     </div>
 
-    <div class="card flat stack s8">
-      <p class="sec-label" style="margin:0">Dados de demonstração</p>
-      <p class="fs12 muted" style="margin:0">Carrega turmas, alunos, contas e registros fictícios para experimentar o painel.
-        As contas de demonstração nascem sem senha: use <b>Redefinir senha</b> na ficha do usuário para entrar como uma delas.</p>
-      <div class="row" style="gap:8px">
-        <button class="btn soft sm" style="flex:1" onclick="app.demo(true)">Carregar</button>
-        <button class="btn ghost sm" style="flex:1" onclick="app.demo(false)">Limpar</button>
-      </div>
-    </div>
+    ${blocoDemo()}
     ${rodape()}
   </div>`;
 });
+
+/* Tudo que a carga cria fica marcado e aparece com selo. A limpeza apaga só o que
+   está marcado — dado real nunca é tocado, nem se tiver nome ou id parecido. */
+function blocoDemo(){
+  const n = S.contagemDemo || { total:0 };
+  const existe = n.total > 0;
+  return `<div class="card flat stack s8">
+    <p class="sec-label" style="margin:0">Dados de demonstração</p>
+    <p class="fs12 muted" style="margin:0">Turmas, alunos, contas e registros fictícios para experimentar o painel.
+      Tudo o que entra por aqui fica com o selo <span class="pill demo">demonstração</span> na lista.
+      As contas nascem sem senha: use <b>Redefinir senha</b> na ficha do usuário para entrar como uma delas.</p>
+    ${existe ? `<div class="notice info"><span class="ic">◆</span><div>
+      Hoje há <b>${n.total}</b> ${n.total === 1 ? 'registro fictício' : 'registros fictícios'} no sistema:
+      ${[[n.turmas,'turma','turmas'],[n.alunos,'aluno','alunos'],[n.ocorrencias,'registro','registros'],[n.contas,'conta','contas']]
+        .filter(([q]) => q > 0).map(([q, s1, s2]) => `${q} ${q === 1 ? s1 : s2}`).join(', ')}.
+      Limpar remove só esses.</div></div>` : ''}
+    ${S.confirmarLimpeza ? `<div class="notice alert"><span class="ic">!</span><div>
+      Apagar ${n.total} ${n.total === 1 ? 'registro de demonstração' : 'registros de demonstração'}?
+      Nada que você criou é afetado.</div></div>
+      <div class="row" style="gap:8px">
+        <button class="btn danger sm" style="flex:1" onclick="app.demo(false)">Sim, apagar</button>
+        <button class="btn ghost sm" style="flex:1" onclick="app.cancelarLimpeza()">Cancelar</button>
+      </div>`
+    : `<div class="row" style="gap:8px">
+        <button class="btn soft sm" style="flex:1" onclick="app.demo(true)">Carregar</button>
+        <button class="btn ghost sm" style="flex:1" ${existe ? '' : 'disabled'} onclick="app.pedirLimpeza()">${existe ? 'Limpar' : 'Nada a limpar'}</button>
+      </div>`}
+  </div>`;
+}
+
+app.pedirLimpeza = () => { S.confirmarLimpeza = true; render(); };
+app.cancelarLimpeza = () => { S.confirmarLimpeza = false; render(); };
 
 app.buscaAlunoGestao = v => {
   S.buscaAluno = v; render();

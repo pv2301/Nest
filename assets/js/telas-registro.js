@@ -32,7 +32,8 @@ function itemHTML(o, prazo){
     <div class="fs12 muted" style="margin-bottom:7px">${esc(nomes)} · ${esc(localDe(o))} · ${esc(quandoTexto(o))}</div>
     <div class="row" style="gap:6px;flex-wrap:wrap">${statusPill(o)}
       ${prazo && o.prazo ? `<span class="pill">${esc(o.prazo)}</span>` : ''}
-      ${o.duas ? '<span class="pill">2 turmas</span>' : ''}</div>
+      ${o.duas ? '<span class="pill">2 turmas</span>' : ''}
+      ${o.demo ? '<span class="pill demo">demonstração</span>' : ''}</div>
   </button>`;
 }
 
@@ -704,7 +705,7 @@ registrarTela('detalhe', () => {
 
   return `<div class="stack s18">
     <div>
-      <div class="row" style="gap:8px;margin-bottom:7px;flex-wrap:wrap">${sevTag(o.sev)}${statusPill(o)}${o.duas ? '<span class="pill">2 turmas</span>' : ''}</div>
+      <div class="row" style="gap:8px;margin-bottom:7px;flex-wrap:wrap">${sevTag(o.sev)}${statusPill(o)}${o.duas ? '<span class="pill">2 turmas</span>' : ''}${o.demo ? '<span class="pill demo">demonstração</span>' : ''}</div>
       <h1 style="font-size:19px">${esc(tipoDe(o))}</h1>
       <p class="fs12 muted" style="margin:4px 0 0">#${esc(o.id)} · ${esc(o.categoria || '—')} · ${esc(localDe(o))} · ${esc(quandoTexto(o))}</p>
       <p class="fs12 muted" style="margin:2px 0 0">Registrado por ${esc(o.autor)}${o.presenciou

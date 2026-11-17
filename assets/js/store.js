@@ -248,7 +248,7 @@ export const Store = {
     if(temApi()) return await api('salvarAluno', { aluno });
     const as = LS.ler(K.alunos, []);
     const i = as.findIndex(a => a.id === aluno.id);
-    if(i >= 0) as[i] = { ...as[i], ...aluno }; else as.push(aluno);
+    if(i >= 0) as[i] = { ...as[i], ...aluno, demo:false, avulso:false }; else as.push(aluno);
     LS.gravar(K.alunos, as);
     return aluno;
   },
@@ -270,7 +270,7 @@ export const Store = {
     if(temApi()) return await api('salvarTurma', { turma });
     const ts = LS.ler(K.turmas, []);
     const i = ts.findIndex(t => t.id === turma.id);
-    if(i >= 0) ts[i] = { ...ts[i], ...turma }; else ts.push(turma);
+    if(i >= 0) ts[i] = { ...ts[i], ...turma, demo:false }; else ts.push(turma);
     LS.gravar(K.turmas, ts);
     return turma;
   },
@@ -321,12 +321,23 @@ export const Store = {
     LS.gravar(K.ocs, os);
   },
 
+  /** Conta o que está marcado como demonstração, para a tela avisar antes de limpar. */
+  async contarDemo(){
+    if(temApi()) return await api('contarDemo');
+    const marcado = l => l.filter(x => x.demo).length;
+    const n = { turmas: marcado(LS.ler(K.turmas, [])), alunos: marcado(LS.ler(K.alunos, [])),
+                ocorrencias: marcado(LS.ler(K.ocs, [])), contas: marcado(contasLocais()) };
+    return { ...n, total: n.turmas + n.alunos + n.ocorrencias + n.contas };
+  },
+
   async limparDemo(){
     if(temApi()) return await api('limparDemo');
+    const antes = await this.contarDemo();
     gravarContasLocais(contasLocais().filter(c => !c.demo));
     LS.gravar(K.ocs, LS.ler(K.ocs, []).filter(o => !o.demo));
     LS.gravar(K.alunos, LS.ler(K.alunos, []).filter(a => !a.demo));
     LS.gravar(K.turmas, LS.ler(K.turmas, []).filter(t => !t.demo));
+    return antes;
   },
 
   /* ---------- foto ----------
