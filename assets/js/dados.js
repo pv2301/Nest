@@ -2,16 +2,16 @@
    Alunos e turmas NÃO moram mais aqui: são dados geridos pela gestão, guardados no
    Store. O que fica são as listas fixas do formulário e as sementes de demonstração. */
 
+/* Dois perfis: quem registra (Miss) e quem toma ciência e decide (Gestão). */
 export const PAPEIS_CONTA = [
-  { id:'assistente', nome:'Assistente' },
-  { id:'miss',       nome:'Miss' },
-  { id:'gestao',     nome:'Gestão' }
+  { id:'miss',   nome:'Miss' },
+  { id:'gestao', nome:'Gestão' }
 ];
 
 export const FUNCOES = [
   { id:'painel',   nome:'Painel de estatísticas', desc:'Heatmap, recorrência e qualidade do processo', pronta:true },
   { id:'horario',  nome:'Quadro horário',         desc:'Quem está em qual turma e turno',              pronta:false },
-  { id:'relacoes', nome:'Relações',               desc:'Vínculo entre Miss, assistente, turma e crianças', pronta:false }
+  { id:'relacoes', nome:'Relações',               desc:'Vínculo entre Miss, turma e crianças', pronta:false }
 ];
 
 /* Categoria é a PRIMEIRA escolha do registro. Acidente, doença e incidente são as três
@@ -94,10 +94,10 @@ export const SEMENTE_ALUNOS = [
 ];
 
 export const DEMO_CONTAS = [
-  { login:'ana.paula',       nome:'Ana Paula Ribeiro', papel:'assistente', turma:'Verde', funcoes:[],         status:'ativo',    resumo:null, criadoEm:'2026-11-01T12:00:00.000Z', aprovadoPor:'demonstração' },
+  { login:'ana.paula',       nome:'Ana Paula Ribeiro', papel:'miss', turma:'Verde', funcoes:[],         status:'ativo',    resumo:null, criadoEm:'2026-11-01T12:00:00.000Z', aprovadoPor:'demonstração' },
   { login:'carolina.mendes', nome:'Carolina Mendes',   papel:'miss',       turma:'Verde', funcoes:['painel'], status:'ativo',    resumo:null, criadoEm:'2026-11-01T12:00:00.000Z', aprovadoPor:'demonstração' },
   { login:'beatriz.souza',   nome:'Beatriz Souza',     papel:'miss',       turma:'Azul',  funcoes:[],         status:'ativo',    resumo:null, criadoEm:'2026-11-01T12:00:00.000Z', aprovadoPor:'demonstração' },
-  { login:'marina.alves',    nome:'Marina Alves',      papel:'assistente', turma:'Azul',  funcoes:[],         status:'pendente', resumo:null, criadoEm:'2026-11-14T13:20:00.000Z' }
+  { login:'marina.alves',    nome:'Marina Alves',      papel:'miss', turma:'Azul',  funcoes:[],         status:'pendente', resumo:null, criadoEm:'2026-11-14T13:20:00.000Z' }
 ];
 
 const MC = 'Carolina Mendes (Turma Verde)';
@@ -113,14 +113,14 @@ function hLantes(dias, hora, min){
 
 export const DEMO_OCORRENCIAS = [
   { id:'0412', categoria:'Incidente', tipo:'Mordida', sev:2, local:'Pátio externo', quandoISO:hLantes(0,10,18),
-    autor:'Ana Paula Ribeiro', autorLogin:'ana.paula', autorPapel:'assistente',
+    autor:'Ana Paula Ribeiro', autorLogin:'ana.paula', autorPapel:'miss',
     envolvidos:[{kid:'c1',papel:'Sofreu',cond:'Permaneceu chorosa',lesao:'Mão direita'},{kid:'c2',papel:'Causou',cond:'Retornou às atividades',lesao:''}],
     desc:'Durante o brincar livre no pátio, Helena e Theo disputavam o mesmo balde de areia. Theo mordeu a mão direita de Helena. Separei as duas imediatamente e acolhi Helena, que chorou por cerca de três minutos.',
     prov:['Intervenção imediata','Acolhimento','Higienização'], foto:true, fotoDias:90, presenciou:true,
     chain:[{nivel:MC,st:'now'},{nivel:'Gestão',st:'wait'}], status:'aguarda_miss', prazo:'22h restantes' },
 
   { id:'0410', categoria:'Acidente', tipo:'Batida / colisão', sev:3, local:'Corredor', quandoISO:hLantes(0,9,5),
-    autor:'Ana Paula Ribeiro', autorLogin:'ana.paula', autorPapel:'assistente',
+    autor:'Ana Paula Ribeiro', autorLogin:'ana.paula', autorPapel:'miss',
     envolvidos:[{kid:'c4',papel:'Sofreu',cond:'Relatou dor/desconforto',lesao:'Cabeça / rosto'}],
     desc:'Alice correu no corredor durante a transição para o parque e bateu a testa na quina da porta aberta. Apliquei compressa fria por cinco minutos. Formou-se marca avermelhada, sem corte.',
     prov:['Primeiros cuidados','Acolhimento','Comunicação à coordenação'], foto:true, fotoDias:90, presenciou:true,
@@ -128,7 +128,7 @@ export const DEMO_OCORRENCIAS = [
     status:'aguarda_gestao', prazo:'3h restantes' },
 
   { id:'0408', categoria:'Incidente', tipo:'Conflito por objeto', sev:2, local:'Refeitório', quandoISO:hLantes(1,11,40),
-    autor:'Ana Paula Ribeiro', autorLogin:'ana.paula', autorPapel:'assistente',
+    autor:'Ana Paula Ribeiro', autorLogin:'ana.paula', autorPapel:'miss',
     envolvidos:[{kid:'c6',papel:'Envolvida',cond:'Retornou às atividades',lesao:''},{kid:'c2',papel:'Envolvida',cond:'Retornou às atividades',lesao:''}],
     desc:'Cecília e Theo puxaram o mesmo livro durante a espera do almoço. Houve choro de ambos, sem contato físico. Mediei a situação e combinamos o revezamento.',
     prov:['Mediação do conflito','Orientação pedagógica'], foto:false, presenciou:true,
@@ -144,7 +144,7 @@ export const DEMO_OCORRENCIAS = [
     status:'acompanhamento', acomp:'Observar marcha por uma semana · Carolina Mendes' },
 
   { id:'0409', categoria:'Comportamento e emocional', tipo:'Choro intenso', sev:1, local:'Sala de aula', quandoISO:hLantes(1,8,12),
-    autor:'Ana Paula Ribeiro', autorLogin:'ana.paula', autorPapel:'assistente',
+    autor:'Ana Paula Ribeiro', autorLogin:'ana.paula', autorPapel:'miss',
     envolvidos:[{kid:'c5',papel:'Envolvida',cond:'Retornou às atividades',lesao:''}],
     desc:'Lara chorou na despedida da mãe por cerca de dez minutos. Foi acolhida no canto da leitura e retornou à roda com o grupo.',
     prov:['Acolhimento'], foto:false, presenciou:true,
@@ -168,7 +168,7 @@ export const DEMO_OCORRENCIAS = [
     status:'concluido' },
 
   { id:'0390', categoria:'Incidente', tipo:'Empurrão', sev:1, local:'Parque de areia', quandoISO:hLantes(16,10,50),
-    autor:'Ana Paula Ribeiro', autorLogin:'ana.paula', autorPapel:'assistente',
+    autor:'Ana Paula Ribeiro', autorLogin:'ana.paula', autorPapel:'miss',
     envolvidos:[{kid:'c2',papel:'Causou',cond:'Retornou às atividades',lesao:''},{kid:'c3',papel:'Sofreu',cond:'Retornou às atividades',lesao:''}],
     desc:'Na fila para o lanche, Theo empurrou Benício para passar à frente. Nenhum dos dois caiu. Conversei com ambos sobre a espera.',
     prov:['Mediação do conflito','Orientação pedagógica'], foto:false, presenciou:true,
@@ -183,7 +183,7 @@ export const DEMO_OCORRENCIAS = [
     status:'concluido' },
 
   { id:'0372', categoria:'Rotina e cuidados', tipo:'Alimentação', sev:1, local:'Refeitório', quandoISO:hLantes(45,11,45),
-    autor:'Ana Paula Ribeiro', autorLogin:'ana.paula', autorPapel:'assistente',
+    autor:'Ana Paula Ribeiro', autorLogin:'ana.paula', autorPapel:'miss',
     envolvidos:[{kid:'c5',papel:'Envolvida',cond:'Retornou às atividades',lesao:''}],
     desc:'Lara recusou o prato principal e comeu apenas a fruta. Ofereci novamente em porção menor, sem insistir.',
     prov:['Observação posterior'], foto:false, presenciou:true,

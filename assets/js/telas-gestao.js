@@ -1,7 +1,7 @@
 /* Gestão de usuários: aprovar cadastros, trocar perfis, conceder funções.
    Visível apenas para quem tem papel 'gestao'. */
 
-import { S, app, registrarTela, ir, toast, render, recarregar, rodape, pendentes } from './core.js';
+import { S, app, registrarTela, ir, toast, render, recarregar, rodape, pendentes, otimista } from './core.js';
 import { Store } from './store.js';
 import { esc, ICON, svgIc, iniciais, quandoLegivel, senhaTemporaria, semAcento } from './util.js';
 import { PAPEIS_CONTA, FUNCOES } from './dados.js';
@@ -84,21 +84,12 @@ registrarTela('usuarios', () => {
 
 app.abrirUsuario = login => { S.usuarioSel = login; ir('usuario'); };
 
-app.aprovar = async login => {
-  try {
-    await Store.atualizarConta(login, { status:'ativo', aprovadoPor:S.conta.login, aprovadoEm:new Date().toISOString() });
-    await recarregar();
-    toast(login + ' aprovado. Já pode entrar.');
-  } catch(e){ toast(e.message); }
-};
+app.aprovar = login => patch(login,
+  { status:'ativo', aprovadoPor:S.conta.login, aprovadoEm:new Date().toISOString() },
+  login + ' aprovado. Já pode entrar.');
 
-app.recusar = async login => {
-  try {
-    await Store.atualizarConta(login, { status:'recusado', aprovadoPor:S.conta.login });
-    await recarregar();
-    toast('Cadastro de ' + login + ' recusado.');
-  } catch(e){ toast(e.message); }
-};
+app.recusar = login => patch(login, { status:'recusado', aprovadoPor:S.conta.login },
+  'Cadastro de ' + login + ' recusado.');
 
 app.demo = async carregar => {
   try {
@@ -194,9 +185,12 @@ registrarTela('usuario', () => {
   </div>`;
 });
 
-async function patch(login, p, msg){
-  try { await Store.atualizarConta(login, p); await recarregar(); if(msg) toast(msg); else render(); }
-  catch(e){ toast(e.message); }
+function patch(login, p, msg){
+  return otimista(
+    () => { const c = S.contas.find(x => x.login === login); if(c) Object.assign(c, p); },
+    () => Store.atualizarConta(login, p),
+    msg
+  );
 }
 
 app.mudarPapel = (login, papel) => {
@@ -225,12 +219,16 @@ app.desativar = (login, desativar) =>
 
 app.redefinir = async login => {
   const senha = senhaTemporaria();
-  try {
-    await Store.redefinirSenha(login, senha);
-    await Store.atualizarConta(login, { trocarSenha:true });
-    S.senhaGerada = { login, senha };
-    await recarregar();
-  } catch(e){ toast(e.message); }
+  await otimista(
+    () => {
+      S.senhaGerada = { login, senha };
+      const c = S.contas.find(x => x.login === login); if(c) c.trocarSenha = true;
+    },
+    async () => {
+      await Store.redefinirSenha(login, senha);
+      await Store.atualizarConta(login, { trocarSenha:true });
+    }
+  );
 };
 
 /* ---------------------------------------------------------------- funções ainda não construídas */
@@ -362,10 +360,8 @@ app.novaTurma = async () => {
   const nome = ((document.getElementById('t-nova') || {}).value || '').trim();
   if(!nome) return toast('Informe o nome da turma.');
   if(S.turmas.some(t => t.nome.toLowerCase() === nome.toLowerCase())) return toast('Essa turma já existe.');
-  try {
-    await Store.salvarTurma({ id:'t' + Date.now().toString(36), nome, faixa:'' });
-    await recarregar(); toast('Turma criada.');
-  } catch(e){ toast(e.message); }
+  const t = { id:'t' + Date.now().toString(36), nome, faixa:'' };
+  await otimista(() => { S.turmas.push(t); }, () => Store.salvarTurma(t), 'Turma criada.');
 };
 
 app.removerTurma = async id => {
@@ -373,8 +369,8 @@ app.removerTurma = async id => {
   if(!t) return;
   if(S.alunos.some(a => a.turma === t.nome && a.ativo !== false))
     return toast('Há alunos nesta turma. Mova-os antes de remover.');
-  try { await Store.removerTurma(id); await recarregar(); toast('Turma removida.'); }
-  catch(e){ toast(e.message); }
+  await otimista(() => { S.turmas = S.turmas.filter(x => x.id !== id); },
+    () => Store.removerTurma(id), 'Turma removida.');
 };
 
 app.novoAluno = () => { S.alunoSel = { id:'a' + Date.now().toString(36), nome:'', turma:'', nascimento:'', saude:'', ativo:true, novo:true }; ir('aluno'); };
@@ -435,19 +431,25 @@ app.salvarAlunoFicha = async () => {
     saude:((document.getElementById('al-saude') || {}).value || '').trim(),
     ativo:a.ativo !== false
   };
-  try {
-    await Store.salvarAluno(dados);
-    await recarregar();
-    toast(a.novo ? 'Aluno adicionado.' : 'Aluno salvo.');
-    ir('alunos', { guardar:false });
-  } catch(e){ toast(e.message); }
+  await otimista(
+    () => {
+      const i = S.alunos.findIndex(x => x.id === dados.id);
+      if(i >= 0) S.alunos[i] = { ...S.alunos[i], ...dados, avulso:false }; else S.alunos.push(dados);
+      ir('alunos', { guardar:false });
+    },
+    () => Store.salvarAluno(dados),
+    a.novo ? 'Aluno adicionado.' : 'Aluno salvo.'
+  );
 };
 
 app.arquivarAluno = async arquivar => {
-  try {
-    await Store.arquivarAluno(S.alunoSel.id, arquivar);
-    await recarregar();
-    toast(arquivar ? 'Aluno arquivado.' : 'Aluno reativado.');
-    ir('alunos', { guardar:false });
-  } catch(e){ toast(e.message); }
+  const id = S.alunoSel.id;
+  await otimista(
+    () => {
+      const a = S.alunos.find(x => x.id === id); if(a) a.ativo = !arquivar;
+      ir('alunos', { guardar:false });
+    },
+    () => Store.arquivarAluno(id, arquivar),
+    arquivar ? 'Aluno arquivado.' : 'Aluno reativado.'
+  );
 };

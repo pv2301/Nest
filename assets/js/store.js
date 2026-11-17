@@ -12,7 +12,8 @@ import { derivarChave, resumoLocal, carimbo, iniciais, primeiroNome } from './ut
 import { DEMO_CONTAS, DEMO_OCORRENCIAS, SEMENTE_ALUNOS, SEMENTE_TURMAS } from './dados.js';
 
 const K = { contas:'reg.contas', ocs:'reg.ocorrencias', sessao:'reg.sessao',
-            aparelho:'reg.aparelho', alunos:'reg.alunos', turmas:'reg.turmas' };
+            aparelho:'reg.aparelho', alunos:'reg.alunos', turmas:'reg.turmas',
+            rascunho:'reg.rascunho' };
 
 /* localStorage pode lançar (janela anônima, dados bloqueados): nunca deixar quebrar. */
 const memoria = {};
@@ -136,7 +137,7 @@ export const Store = {
     const cs = contasLocais();
     if(cs.some(c => c.login === login)) throw new ErroStore('Esse login já está em uso. Escolha outro.', 'duplicado');
     const conta = {
-      login, nome, papel: papel || 'assistente', turma: turma || null,
+      login, nome, papel: papel === 'gestao' ? 'gestao' : 'miss', turma: turma || null,
       funcoes: [], status:'pendente', resumo: await resumoLocal(chave), criadoEm: carimbo()
     };
     cs.push(conta); gravarContasLocais(cs);
@@ -162,6 +163,31 @@ export const Store = {
     c.resumo = await resumoLocal(chave); delete c.trocarSenha;
     gravarContasLocais(cs);
   },
+
+  /** Tudo numa ida só. Cada chamada custa ~2,5s no Apps Script, então buscar as
+      cinco coleções separadamente custava mais de 12 segundos por sincronização. */
+  async sincronizar(){
+    if(temApi()) return await api('sincronizar');
+    const contas = contasLocais();
+    const eu = this.sessao();
+    const minha = eu ? contas.find(c => c.login === eu.login) : null;
+    return {
+      conta: publica(minha),
+      ocorrencias: LS.ler(K.ocs, []),
+      diretorio: contas.filter(c => c.status === 'ativo')
+        .map(c => ({ login:c.login, nome:c.nome, papel:c.papel, turma:c.turma, status:c.status })),
+      alunos: LS.ler(K.alunos, []),
+      turmas: LS.ler(K.turmas, []),
+      contas: minha && minha.papel === 'gestao' ? contas.map(publica) : []
+    };
+  },
+
+  /* ---------- rascunho do formulário ----------
+     Fica no aparelho: é trabalho em andamento, não registro. Sem isto, fechar a aba
+     no meio do preenchimento perde tudo. */
+  rascunho(){ return LS.ler(K.rascunho, null); },
+  guardarRascunho(r){ LS.gravar(K.rascunho, r); },
+  descartarRascunho(){ LS.apagar(K.rascunho); },
 
   /** Lista enxuta do pessoal ativo (nome, papel, turma), para rotear a cadeia de
       ciência. Qualquer pessoa autenticada pode ler: não traz situação nem senha. */
@@ -295,7 +321,7 @@ export const Store = {
 /** Enriquece a conta com campos de exibição que o app usa em várias telas. */
 export function perfil(conta){
   if(!conta) return null;
-  const rotulos = { assistente:'Assistente', miss:'Miss', gestao:'Gestão' };
+  const rotulos = { miss:'Miss', gestao:'Gestão' };
   const base = rotulos[conta.papel] || conta.papel;
   return {
     ...conta,

@@ -1,7 +1,8 @@
 /* Telas do registro: início, novo, wizard, listas, fila de ciência, detalhe e painel. */
 
-import { S, app, registrarTela, ir, toast, render, recarregar, rodape,
-         filaDe, meusRegistros, visiveis, posRender, temFuncao, aluno, nomesTurmas } from './core.js';
+import { S, app, registrarTela, ir, toast, render, recarregar, rodape, otimista,
+         filaDe, meusRegistros, visiveis, posRender, temFuncao, aluno, nomesTurmas,
+         avancarPasso, voltar, rascunhoGuardado } from './core.js';
 import { Store } from './store.js';
 import { esc, semAcento, quandoLegivel, agoraHora, iniciais, ICON, svgIc } from './util.js';
 import { CONFIG } from '../../config.js';
@@ -37,6 +38,25 @@ function itemHTML(o, prazo){
 
 app.abrirOc = id => { S.detalhe = id; ir('detalhe'); };
 
+/* Primeiro acesso da gestão caía numa tela vazia sem rumo. */
+function primeirosPassos(u){
+  if(u.papel !== 'gestao') return '';
+  const passos = [
+    { ok: S.turmas.length > 0,  txt:'Cadastre as turmas',           tela:'alunos' },
+    { ok: S.alunos.length > 0,  txt:'Cadastre os alunos',           tela:'alunos' },
+    { ok: S.contas.filter(c => c.status === 'ativo').length > 1, txt:'Compartilhe o link com a equipe', tela:'usuarios' }
+  ];
+  if(passos.every(p => p.ok)) return '';
+  return `<div class="card flat stack s8">
+    <p class="sec-label" style="margin:0">Para começar</p>
+    ${passos.map(p => `<button class="row" style="gap:9px;width:100%;text-align:left" onclick="app.ir('${p.tela}')">
+      <span class="bx-passo ${p.ok ? 'ok' : ''}">${p.ok ? '&check;' : ''}</span>
+      <span class="fs13 grow" style="${p.ok ? 'opacity:.55;text-decoration:line-through' : ''}">${p.txt}</span>
+      ${p.ok ? '' : '<span class="fs11 muted">abrir</span>'}
+    </button>`).join('')}
+  </div>`;
+}
+
 const vazio = (titulo, texto) =>
   `<div class="empty"><div class="big">${esc(titulo)}</div><p class="fs12" style="margin:0">${esc(texto)}</p></div>`;
 
@@ -45,6 +65,17 @@ registrarTela('home', () => {
   const u = S.conta, fila = filaDe(u), meus = meusRegistros(u).slice(0, 3);
   let out = '<div class="stack s18">';
   if(u.trocarSenha) out += `<div class="notice info"><span class="ic">◆</span><div>Sua senha é temporária. <b onclick="app.ir('trocarSenha')" style="text-decoration:underline;cursor:pointer">Defina uma nova</b>.</div></div>`;
+
+  out += primeirosPassos(u);
+
+  /* Rascunho interrompido: o preenchimento é salvo sozinho, então dá para retomar. */
+  const r = rascunhoGuardado();
+  if(r) out += `<button class="rascunho" onclick="app.retomarRascunho()">
+    <span class="grow"><b>Continuar registro</b>
+      <span class="fs11">${esc(r.rascunho.tipo || r.rascunho.categoria || 'sem tipo ainda')} · começado ${esc(quandoLegivel(r.em))}</span></span>
+    <span class="chip sm" onclick="event.stopPropagation();app.descartarRascunho()">Descartar</span>
+  </button>`;
+
   out += `<button class="btn" style="padding:16px" onclick="app.ir('novo')">+ &nbsp;Registrar ocorrência</button>`;
   if(fila.length) out += `<div><p class="sec-label">Aguardando sua ciência</p>
       <div class="stack s8">${fila.map(o => itemHTML(o, true)).join('')}</div></div>`;
@@ -481,12 +512,7 @@ registrarTela('wizard', () => {
   return corpo + nav;
 });
 
-app.passo = delta => {
-  S.passo = Math.max(1, Math.min(5, S.passo + delta));
-  S.faltas = null;
-  const sc = document.getElementById('scroll'); if(sc) sc.scrollTop = 0;
-  render();
-};
+app.passo = delta => { delta > 0 ? avancarPasso() : voltar(); };
 
 /* ---------------------------------------------------------------- roteamento da ciência */
 function missDaTurma(turma){
@@ -547,13 +573,16 @@ app.enviar = async () => {
     oc.chain = [{ nivel:'Gestão', st:'ok', quando:agoraHora(), parecer:'Registrado e encerrado pela gestão.' }];
     oc.status = 'concluido'; oc.prazo = null;
   }
-  try {
-    await Store.salvarOcorrencia(oc);
-    await recarregar();
-    S.rascunho = null; S.passo = 1; S.faltas = null; S.pilha = [];
-    ir('home', { guardar:false });
-    toast(u.papel === 'gestao' ? `Registro #${id} criado e encerrado` : `Registro #${id} enviado para ciência`);
-  } catch(e){ toast(e.message || 'Não consegui salvar.'); }
+  await otimista(
+    () => {
+      S.ocs = [oc, ...S.ocs];
+      S.rascunho = null; S.passo = 1; S.faltas = null; S.pilha = [];
+      Store.descartarRascunho();
+      ir('home', { guardar:false });
+    },
+    () => Store.salvarOcorrencia(oc),
+    u.papel === 'gestao' ? `Registro #${id} criado e encerrado` : `Registro #${id} enviado para ciência`
+  );
 };
 
 /* ---------------------------------------------------------------- listas */
@@ -568,7 +597,7 @@ registrarTela('lista', () => {
   return `<div class="stack s18">
     <p class="fs12 muted" style="margin:0">${u.papel === 'gestao'
       ? 'A gestão vê todos os registros da escola.'
-      : 'Você vê os registros que criou' + (u.papel === 'miss' ? ' e os que passaram pela sua ciência.' : '. Os registros de outras pessoas não aparecem aqui.')}</p>
+      : 'Você vê os registros que criou e os que passaram pela sua ciência.'}</p>
     <div class="busca">
       <span class="ic">${svgIc(ICON.busca)}</span>
       <input class="input" id="b-lista" placeholder="Buscar por aluno, turma ou tipo" value="${esc(S.buscaLista || '')}"
@@ -672,13 +701,14 @@ registrarTela('detalhe', () => {
   </div>`;
 });
 
-async function salvar(o, msg, voltarPara){
-  try {
-    await Store.salvarOcorrencia(o);
-    await recarregar();
-    if(voltarPara){ S.detalhe = null; ir(voltarPara, { guardar:false }); }
-    toast(msg);
-  } catch(e){ toast(e.message || 'Não consegui salvar.'); }
+/* O registro já está alterado em memória: basta gravá-lo. Buscar tudo de novo aqui
+   custava mais de 12 segundos por causa das idas ao Apps Script. */
+function salvar(o, msg, voltarPara){
+  return otimista(
+    () => { if(voltarPara){ S.detalhe = null; ir(voltarPara, { guardar:false }); } },
+    () => Store.salvarOcorrencia(o),
+    msg
+  );
 }
 
 app.mudarSev = (id, n) => {

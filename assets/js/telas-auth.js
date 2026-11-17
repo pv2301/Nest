@@ -104,10 +104,10 @@ app.submeterEntrar = async ev => {
 function erro(msg){ S.formErro = msg; S.ocupado = false; render(); }
 
 /* ---------------------------------------------------------------- criar conta */
-app.irCriar = () => { S.novaConta = { papel:'assistente', turma:'' }; ir('criar'); };
+app.irCriar = () => { S.novaConta = { papel:'miss', turma:'' }; ir('criar'); };
 
 registrarTela('criar', () => {
-  const n = S.novaConta || (S.novaConta = { papel:'assistente', turma:'' });
+  const n = S.novaConta || (S.novaConta = { papel:'miss', turma:'' });
   return `
   <div class="loginwrap">
     <div class="stack s18">
@@ -216,7 +216,7 @@ app.submeterCriar = async ev => {
   if(!criptoDisponivel()) return erro('Este navegador não oferece as funções de segurança necessárias. Abra o site por https.');
   S.ocupado = true; S.formErro = null; render();
   try {
-    await Store.criarConta({ nome, login, senha, papel: n.papel || 'assistente', turma: n.turma || null });
+    await Store.criarConta({ nome, login, senha, papel: n.papel || 'miss', turma: n.turma || null });
     S.ocupado = false; S.loginCriado = login; S.novaConta = null;
     ir('criado');
   } catch(err){

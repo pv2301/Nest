@@ -54,6 +54,7 @@ function executar(acao, d, token){
     case 'eu':              return publica(exigeSessao(token));
     case 'diretorio':       return diretorio(exigeSessao(token));
     case 'trocarSenha':     return trocarSenha(exigeSessao(token), d);
+    case 'sincronizar':     return sincronizar(exigeSessao(token));
     case 'alunos':          return alunos(exigeSessao(token));
     case 'turmas':          return turmas();
     case 'salvarAluno':     return salvarAluno(exigeGestaoOuAutor(token), d);
@@ -240,7 +241,7 @@ function criarConta(d){
     validaLogin_(d.login);
     if(!d.nome || String(d.nome).trim().split(/\s+/).length < 2) throw erro('Informe o nome completo.', 'nome');
     if(acharConta(d.login)) throw erro('Esse login já está em uso. Escolha outro.', 'duplicado');
-    var papel = (d.papel === 'miss' || d.papel === 'assistente') ? d.papel : 'assistente';
+    var papel = (d.papel === 'gestao') ? 'gestao' : 'miss';
     acrescentar('contas', {
       login: d.login, nome: d.nome, papel: papel, turma: d.turma || '',
       funcoes: '', status: 'pendente', resumo: resumoDaChave(d.chave),
@@ -323,6 +324,21 @@ function redefinirSenha(eu, d){
   atualizarLinha('contas', c._linha, { resumo: resumoDaChave(d.chave), trocarSenha: true });
   registrar(eu.login, 'redefine_senha', String(d.login));
   return true;
+}
+
+/* Tudo o que o app precisa numa única ida ao servidor.
+   Cada chamada ao Apps Script custa ~2,5s, então buscar ocorrências, diretório,
+   alunos, turmas e contas em cinco chamadas separadas custava mais de 12 segundos.
+   Aqui as abas são lidas na mesma execução. */
+function sincronizar(eu){
+  return {
+    conta: publica(eu),
+    ocorrencias: ocorrencias(eu),
+    diretorio: diretorio(eu),
+    alunos: alunos(eu),
+    turmas: turmas(),
+    contas: eu.papel === 'gestao' ? contas(eu) : []
+  };
 }
 
 /* ============================= alunos e turmas ============================= */
@@ -421,8 +437,8 @@ function ocorrencias(eu){
 
   if(eu.papel === 'gestao') return todas;
 
-  /* Miss e assistente veem o que criaram, o que aguarda a sua ciência e o que já
-     passou por ela. É a regra de sigilo combinada no desenho. */
+  /* A Miss vê o que criou, o que aguarda a sua ciência e o que já passou por ela.
+     É a regra de sigilo combinada no desenho. */
   return todas.filter(function(o){
     if(String(o.autorLogin) === String(eu.login)) return true;
     if(eu.papel === 'miss' && eu.turma){

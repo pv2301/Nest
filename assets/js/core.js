@@ -25,7 +25,8 @@ export const S = {
   filtroTurma: '',
   rascunho: null, passo: 1, modoRegistro: null,
   detalhe: null, usuarioSel: null,
-  formErro: null, ocupado: false, toastMsg: null
+  formErro: null, ocupado: false, toastMsg: null,
+  sincronizando: false, salvando: false
 };
 
 /* Ações chamadas pelos onclick dos templates. Cada módulo de tela acrescenta as suas. */
@@ -40,9 +41,26 @@ export const posRender = [];
 
 const SEM_CHROME = new Set(['entrada','entrar','criar','criado','biometria','configurar','trocarSenha','desbloquear']);
 
-/* ---------- navegação ---------- */
+/* ---------- navegação ----------
+   O histórico do navegador acompanha a navegação interna, para o gesto de voltar do
+   Android (deslizar da borda) e o botão do navegador funcionarem. A URL não muda: só
+   entram entradas no histórico, senão recarregar a página cairia num caminho que o
+   GitHub Pages não serve.
+
+   Regra para botão e gesto não se desencontrarem: o botão da tela pede history.back()
+   e quem navega de fato é sempre o popstate. */
+
+let profundidade = 0;
+
+function empilhar(){
+  try { history.pushState({ app:true }, '', location.href); profundidade++; } catch {}
+}
+
 export function ir(tela, { guardar = true } = {}){
-  if(guardar && S.tela && S.tela !== tela) S.pilha.push(S.tela);
+  if(guardar && S.tela && S.tela !== tela){
+    S.pilha.push(S.tela);
+    empilhar();
+  }
   S.tela = tela;
   S.formErro = null;
   const sc = document.getElementById('scroll');
@@ -50,13 +68,44 @@ export function ir(tela, { guardar = true } = {}){
   render();
 }
 
+/** Avança um passo do wizard, deixando rastro no histórico para o gesto voltar um a um. */
+export function avancarPasso(){
+  S.passo = Math.min(5, S.passo + 1);
+  S.faltas = null;
+  empilhar();
+  const sc = document.getElementById('scroll');
+  if(sc) sc.scrollTop = 0;
+  render();
+}
+
+/** Navegação real. Chamada pelo popstate — e diretamente só quando não há histórico. */
 export function voltar(){
+  if(S.tela === 'wizard' && S.passo > 1){
+    S.passo--;
+    S.faltas = null;
+    const sc0 = document.getElementById('scroll');
+    if(sc0) sc0.scrollTop = 0;
+    return render();
+  }
   const anterior = S.pilha.pop();
   S.tela = anterior || (S.conta ? 'home' : 'entrada');
   S.formErro = null;
   const sc = document.getElementById('scroll');
   if(sc) sc.scrollTop = 0;
   render();
+}
+
+/** O que o botão '‹' da tela chama. Delega ao histórico para não dessincronizar. */
+export function voltarUI(){
+  if(profundidade > 0) history.back();
+  else voltar();
+}
+
+if(typeof window !== 'undefined'){
+  window.addEventListener('popstate', () => {
+    if(profundidade > 0) profundidade--;
+    voltar();
+  });
 }
 
 let tToast;
@@ -76,16 +125,43 @@ export function toast(msg){
 export function erroForm(msg){ S.formErro = msg; render(); }
 
 /* ---------- carregamento de dados ---------- */
-export async function recarregar(){
+/* Uma única ida ao servidor. Antes eram quatro ou cinco em sequência, a ~2,5s cada:
+   mais de 12 segundos depois de qualquer ação. */
+export async function recarregar({ silencioso = false } = {}){
   if(!S.conta) return;
+  if(!silencioso){ S.sincronizando = true; render(); }
   try {
-    S.ocs = await Store.ocorrencias();
-    S.diretorio = await Store.diretorio();
-    S.alunos = await Store.alunos();
-    S.turmas = await Store.turmas();
-    if(S.conta.papel === 'gestao') S.contas = await Store.contas();
+    const d = await Store.sincronizar();
+    S.ocs = d.ocorrencias || [];
+    S.diretorio = d.diretorio || [];
+    S.alunos = d.alunos || [];
+    S.turmas = d.turmas || [];
+    S.contas = d.contas || [];
+    if(d.conta) S.conta = perfil({ ...S.conta, ...d.conta });
   } catch(e){
-    toast(e.message || 'Não consegui carregar os dados.');
+    toast(e.message || 'Não consegui falar com o servidor.');
+  } finally {
+    S.sincronizando = false;
+    if(!silencioso) render();
+  }
+}
+
+/* Aplica a mudança na hora e grava atrás. Os 2,5s do servidor continuam existindo,
+   mas deixam de ser espera: é a diferença entre "travou" e "é rápido".
+   Se a gravação falhar, desfaz e explica. */
+export async function otimista(aplicar, gravar, msgOk){
+  const antes = JSON.parse(JSON.stringify({ ocs: S.ocs, contas: S.contas, alunos: S.alunos, turmas: S.turmas }));
+  aplicar();
+  S.salvando = true;
+  render();
+  try {
+    await gravar();
+    S.salvando = false;
+    if(msgOk) toast(msgOk); else render();
+  } catch(e){
+    S.ocs = antes.ocs; S.contas = antes.contas; S.alunos = antes.alunos; S.turmas = antes.turmas;
+    S.salvando = false;
+    toast('Não foi salvo: ' + (e.message || 'falha no servidor') + '. Tente de novo.');
   }
 }
 
@@ -109,7 +185,7 @@ app.sair = sairDaConta;
 export function abas(){
   const c = S.conta; if(!c) return [];
   const t = [['home', ICON.home, 'Início'], ['lista', ICON.lista, 'Registros']];
-  if(c.papel !== 'assistente') t.push(['ciencia', ICON.ciencia, 'Ciência', filaDe(c).length]);
+  t.push(['ciencia', ICON.ciencia, 'Ciência', filaDe(c).length]);
   if(temFuncao(c, 'painel'))   t.push(['painel', ICON.painel, 'Painel']);
   if(temFuncao(c, 'horario'))  t.push(['horario', ICON.horario, 'Horário']);
   if(temFuncao(c, 'relacoes')) t.push(['relacoes', ICON.relacoes, 'Relações']);
@@ -181,6 +257,9 @@ function barraInferior(){
 }
 
 function faixaModo(){
+  /* Com ~2,5s de servidor, sem aviso o app parece travado. */
+  if(S.salvando)      return `<div class="modebar trabalho"><span class="girando"></span>Salvando…</div>`;
+  if(S.sincronizando) return `<div class="modebar trabalho"><span class="girando"></span>Atualizando…</div>`;
   if(S.modo === 'api') return '';
   return `<div class="modebar">Modo local · dados só neste aparelho</div>`;
 }
@@ -210,8 +289,42 @@ export function render(){
     document.body.appendChild(d);
   }
   posRender.forEach(f => { try { f(); } catch(e){ console.error(e); } });
+  guardarRascunho();
 }
 
+/* Grava o rascunho a cada redesenho enquanto o formulário está aberto: fechar a aba
+   no meio do preenchimento deixava de perder tudo. */
+function guardarRascunho(){
+  if(!S.conta) return;
+  if(S.rascunho && (S.tela === 'wizard' || S.tela === 'rapido')){
+    Store.guardarRascunho({
+      rascunho: S.rascunho, passo: S.passo, modo: S.modoRegistro,
+      login: S.conta.login, em: new Date().toISOString()
+    });
+  }
+}
+
+/** Retoma o rascunho guardado neste aparelho, se for desta pessoa. */
+export function rascunhoGuardado(){
+  const r = Store.rascunho();
+  if(!r || !S.conta || r.login !== S.conta.login) return null;
+  return r;
+}
+
+export function descartarRascunho(){
+  Store.descartarRascunho();
+  S.rascunho = null; S.passo = 1; S.faltas = null;
+  render();
+}
+app.descartarRascunho = descartarRascunho;
+
+app.retomarRascunho = () => {
+  const r = rascunhoGuardado();
+  if(!r) return;
+  S.rascunho = r.rascunho; S.passo = r.passo || 1; S.modoRegistro = r.modo || 'completo';
+  ir(S.modoRegistro === 'rapido' ? 'rapido' : 'wizard');
+};
+
 app.ir = ir;
-app.voltar = voltar;
+app.voltar = voltarUI;
 app.render = render;
