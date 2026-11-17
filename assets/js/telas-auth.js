@@ -9,7 +9,7 @@ import {
   validaLogin, validaSenha, requisitosSenha, normalizaLogin, sugereLogin, senhaTemporaria,
   criptoDisponivel
 } from './util.js';
-import { PAPEIS_CONTA, TURMAS } from './dados.js';
+import { PAPEIS_CONTA } from './dados.js';
 
 const val = id => (document.getElementById(id) || {}).value || '';
 const marca = () => S.escola.logo
@@ -21,6 +21,11 @@ const cabecalhoMarca = () => `
     ${marca()}
     <p class="loginsub">${esc(S.escola.subtitulo || 'Registro interno de ocorrência')}</p>
   </div>`;
+
+/* As turmas são criadas pela gestão. Aqui mostramos só as que existem de verdade —
+   oferecer turmas inventadas faria a pessoa escolher algo que não existe. A lista vem
+   de estado(), que é público, porque o cadastro acontece antes do login. */
+const turmasDisponiveis = () => (S.turmas || []).map(t => t.nome);
 
 const erroBloco = () => S.formErro ? `<div class="notice alert"><span class="ic">!</span><div>${esc(S.formErro)}</div></div>` : '';
 
@@ -134,16 +139,20 @@ registrarTela('criar', () => {
         <div>
           <p class="sec-label">Sua função</p>
           <div class="chips" data-grupo="papel">
-            ${PAPEIS_CONTA.filter(p => p.id !== 'gestao').map(p => `
+            ${PAPEIS_CONTA.map(p => `
               <button type="button" class="chip" data-valor="${p.id}" aria-pressed="${n.papel === p.id}" onclick="app.campoNova('papel','${p.id}')">${esc(p.nome)}</button>`).join('')}
           </div>
-          <p class="hint">O perfil de gestão só é concedido pela própria gestão.</p>
+          <p class="hint" id="dica-papel">${n.papel === 'gestao'
+            ? 'Gestão vê todos os registros da escola e aprova contas. A gestão atual precisa confirmar.'
+            : 'Esta é a função que você pede; a gestão confirma ao aprovar.'}</p>
         </div>
         <div>
-          <p class="sec-label">Turma (opcional)</p>
-          <div class="chips" data-grupo="turma">
-            ${TURMAS.map(t => `<button type="button" class="chip" data-valor="${esc(t)}" aria-pressed="${n.turma === t}" onclick="app.campoNova('turma','${t}')">${esc(t)}</button>`).join('')}
-          </div>
+          <p class="sec-label">Turma</p>
+          ${turmasDisponiveis().length ? `
+            <div class="chips" data-grupo="turma">
+              ${turmasDisponiveis().map(t => `<button type="button" class="chip" data-valor="${esc(t)}" aria-pressed="${n.turma === t}" onclick="app.campoNova('turma','${t}')">${esc(t)}</button>`).join('')}
+            </div>`
+            : `<p class="fs12 muted" style="margin:0">A gestão ainda não cadastrou as turmas. Ela definirá a sua ao aprovar o cadastro.</p>`}
         </div>
         <button class="btn" type="submit" ${S.ocupado ? 'disabled' : ''}>${S.ocupado ? 'Enviando…' : 'Enviar para aprovação'}</button>
         <button class="btn ghost sm" type="button" style="width:100%" onclick="app.voltar()">Voltar</button>
@@ -186,6 +195,12 @@ app.campoNova = (campo, valor) => {
   document.querySelectorAll(`[data-grupo="${campo}"] .chip`).forEach(b => {
     b.setAttribute('aria-pressed', String(b.dataset.valor === S.novaConta[campo]));
   });
+  if(campo === 'papel'){
+    const dica = document.getElementById('dica-papel');
+    if(dica) dica.textContent = S.novaConta.papel === 'gestao'
+      ? 'Gestão vê todos os registros da escola e aprova contas. A gestão atual precisa confirmar.'
+      : 'Esta é a função que você pede; a gestão confirma ao aprovar.';
+  }
 };
 
 app.submeterCriar = async ev => {

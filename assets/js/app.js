@@ -9,6 +9,7 @@ import { criptoDisponivel } from './util.js';
 import './telas-auth.js';
 import './telas-registro.js';
 import './telas-gestao.js';
+import './telas-relatorio.js';
 
 function aplicarIdentidade(){
   const nome = S.escola.nome;
@@ -29,6 +30,8 @@ async function iniciar(){
   try {
     const estado = await Store.estado();
     S.precisaConfigurar = !!estado.precisaConfigurar;
+    /* O cadastro acontece sem sessão, então as turmas vêm já no estado público. */
+    if(Array.isArray(estado.turmas)) S.turmas = estado.turmas;
     /* A API pode mandar a identidade da escola, mantendo-a fora do repositório. */
     if(estado.escola){
       S.escola = { ...S.escola, ...estado.escola };

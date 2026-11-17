@@ -258,3 +258,51 @@ textarea.input{min-height:96px;resize:vertical;line-height:1.55;font-size:14.5px
 .switch[aria-pressed="true"] .track::after{transform:translateX(16px)}
 .empty{text-align:center;padding:26px 14px;color:var(--muted)}
 .empty .big{font-size:13.5px;font-weight:600;color:var(--fg);margin-bottom:5px;font-family:var(--font-display)}
+
+/* ---------- busca ---------- */
+.busca{position:relative;display:flex;align-items:center;min-width:0}
+.busca .ic{position:absolute;left:11px;display:grid;place-items:center;color:var(--muted);pointer-events:none}
+.busca .ic svg{width:17px;height:17px}
+.busca .input{padding-left:36px}
+
+.chip.sm{min-height:32px;padding:6px 11px;font-size:12px}
+.chip.kid .fs11{margin-left:2px}
+
+/* ---------- ficha para impressão ---------- */
+.ficha{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;color:var(--fg)}
+.ficha-topo{display:flex;gap:12px;align-items:center;border-bottom:2px solid var(--line);padding-bottom:12px;margin-bottom:4px}
+.ficha-selo svg{width:40px;height:40px}
+.ficha-topo h1{font-size:16px;margin:0}
+.ficha-topo p{font-size:11px;color:var(--muted);margin:3px 0 0}
+.ficha section{margin-top:16px}
+.ficha h2{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
+  margin:0 0 7px;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.ficha-kv{display:grid;grid-template-columns:120px 1fr;gap:5px 10px;font-size:12.5px;margin:0}
+.ficha-kv dt{color:var(--muted)} .ficha-kv dd{margin:0;min-width:0}
+.ficha-tab{width:100%;border-collapse:collapse;font-size:12px}
+.ficha-tab th{text-align:left;font-weight:600;color:var(--muted);font-size:10.5px;
+  text-transform:uppercase;letter-spacing:.06em;padding:0 8px 5px 0;vertical-align:bottom}
+.ficha-tab td{padding:6px 8px 6px 0;border-top:1px solid var(--line);vertical-align:top}
+.ficha-sub{font-size:10.5px;color:var(--muted)}
+.ficha-texto{font-size:13px;line-height:1.55;margin:0;white-space:pre-wrap}
+.ficha-lista{margin:0;padding-left:18px;font-size:13px;line-height:1.7}
+.ficha-rodape{margin-top:20px;padding-top:10px;border-top:1px solid var(--line)}
+.ficha-rodape p{font-size:10px;color:var(--muted);margin:0 0 4px;line-height:1.45}
+
+@media print{
+  /* Só a ficha vai para o papel: nada de barras, abas ou controles. */
+  .appbar, .tabbar, .modebar, #faixa, .naoimprime, .toast, .steps{display:none!important}
+  html, body{height:auto;background:#fff;color:#000}
+  body{display:block}
+  .app{max-width:none;height:auto;border:0;border-radius:0;box-shadow:none;background:#fff;display:block}
+  .scroll{overflow:visible;height:auto}
+  .pad{padding:0}
+  .stack{gap:0}
+  .ficha{border:0;border-radius:0;padding:0;background:#fff;color:#000;font-size:11pt}
+  .ficha h2{color:#444;border-color:#bbb}
+  .ficha-topo{border-color:#000}
+  .ficha-kv dt, .ficha-tab th, .ficha-sub, .ficha-rodape p{color:#444}
+  .ficha-tab td{border-color:#ccc}
+  .ficha section{break-inside:avoid}
+  @page{margin:16mm}
+}

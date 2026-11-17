@@ -15,6 +15,8 @@
 
 var ABAS = {
   contas: ['login','nome','papel','turma','funcoes','status','resumo','criadoEm','aprovadoPor','aprovadoEm','trocarSenha'],
+  alunos: ['id','nome','turma','nascimento','saude','ativo','avulso','criadoEm'],
+  turmas: ['id','nome','faixa'],
   ocorrencias: ['id','json'],
   sessoes: ['token','login','expiraEm'],
   log: ['quando','login','acao','detalhe'],
@@ -52,6 +54,11 @@ function executar(acao, d, token){
     case 'eu':              return publica(exigeSessao(token));
     case 'diretorio':       return diretorio(exigeSessao(token));
     case 'trocarSenha':     return trocarSenha(exigeSessao(token), d);
+    case 'alunos':          return alunos(exigeSessao(token));
+    case 'turmas':          return turmas();
+    case 'salvarAluno':     return salvarAluno(exigeGestaoOuAutor(token), d);
+    case 'salvarTurma':     return salvarTurma(exigeGestao(token), d);
+    case 'removerTurma':    return removerTurma(exigeGestao(token), d);
     case 'contas':          return contas(exigeGestao(token));
     case 'atualizarConta':  return atualizarConta(exigeGestao(token), d);
     case 'redefinirSenha':  return redefinirSenha(exigeGestao(token), d);
@@ -156,6 +163,11 @@ function exigeGestao(token){
   return c;
 }
 
+/* Quem registra precisa poder criar a criança que ainda não está no cadastro, senão
+   um cadastro faltando trava o registro na hora em que ele mais importa. A criança
+   entra marcada como avulsa, para a gestão confirmar depois. */
+function exigeGestaoOuAutor(token){ return exigeSessao(token); }
+
 /* ============================= contas ============================= */
 
 function acharConta(login){
@@ -189,7 +201,7 @@ function estado(){
     if(conf.escolaSubtitulo) escola.subtitulo = conf.escolaSubtitulo;
     if(conf.escolaLogo) escola.logo = conf.escolaLogo;
   }
-  return { precisaConfigurar: gestao.length === 0, escola: escola };
+  return { precisaConfigurar: gestao.length === 0, escola: escola, turmas: turmas() };
 }
 
 function validaLogin_(login){
@@ -311,6 +323,93 @@ function redefinirSenha(eu, d){
   atualizarLinha('contas', c._linha, { resumo: resumoDaChave(d.chave), trocarSenha: true });
   registrar(eu.login, 'redefine_senha', String(d.login));
   return true;
+}
+
+/* ============================= alunos e turmas ============================= */
+
+function alunoPublico(a){
+  return {
+    id: String(a.id), nome: String(a.nome),
+    turma: a.turma ? String(a.turma) : '',
+    nascimento: a.nascimento ? String(a.nascimento) : '',
+    saude: a.saude ? String(a.saude) : '',
+    ativo: String(a.ativo) !== 'false',
+    avulso: String(a.avulso) === 'true',
+    criadoEm: a.criadoEm ? String(a.criadoEm) : ''
+  };
+}
+
+function alunos(eu){ return lerTudo('alunos').map(alunoPublico); }
+
+function salvarAluno(eu, d){
+  return comTrava(function(){
+    var a = d.aluno;
+    if(!a || !a.id) throw erro('Aluno sem identificador.', 'dados');
+    var existente = lerTudo('alunos').filter(function(x){ return String(x.id) === String(a.id); })[0];
+
+    /* Só a gestão edita um aluno já cadastrado; quem registra apenas cria avulsos. */
+    if(existente && eu.papel !== 'gestao')
+      throw erro('Apenas a gestão altera o cadastro de um aluno.', 'permissao');
+
+    if(existente){
+      var patch = {};
+      ['nome','turma','nascimento','saude'].forEach(function(k){ if(k in a) patch[k] = a[k]; });
+      if('ativo' in a) patch.ativo = !!a.ativo;
+      /* Salvar pela gestão confirma o cadastro feito em campo. */
+      if(eu.papel === 'gestao') patch.avulso = false;
+      atualizarLinha('alunos', existente._linha, patch);
+    } else {
+      acrescentar('alunos', {
+        id: a.id, nome: a.nome, turma: a.turma || '',
+        nascimento: a.nascimento || '', saude: a.saude || '',
+        ativo: a.ativo === false ? false : true,
+        avulso: eu.papel !== 'gestao',
+        criadoEm: new Date().toISOString()
+      });
+    }
+    registrar(eu.login, existente ? 'edita_aluno' : 'cria_aluno', String(a.id));
+    return alunoPublico(lerTudo('alunos').filter(function(x){ return String(x.id) === String(a.id); })[0]);
+  });
+}
+
+/* Sem sessão: a tela de cadastro precisa das turmas antes de alguém entrar.
+   Nome de turma não é dado sensível. */
+function turmas(){
+  return lerTudo('turmas').map(function(t){
+    return { id:String(t.id), nome:String(t.nome), faixa: t.faixa ? String(t.faixa) : '' };
+  });
+}
+
+function salvarTurma(eu, d){
+  return comTrava(function(){
+    var t = d.turma;
+    if(!t || !t.nome) throw erro('Turma sem nome.', 'dados');
+    var existente = lerTudo('turmas').filter(function(x){ return String(x.id) === String(t.id); })[0];
+    if(existente) atualizarLinha('turmas', existente._linha, { nome:t.nome, faixa:t.faixa || '' });
+    else {
+      var repetida = lerTudo('turmas').filter(function(x){
+        return String(x.nome).toLowerCase() === String(t.nome).toLowerCase();
+      })[0];
+      if(repetida) throw erro('Já existe uma turma com esse nome.', 'duplicado');
+      acrescentar('turmas', { id:t.id, nome:t.nome, faixa:t.faixa || '' });
+    }
+    registrar(eu.login, 'salva_turma', String(t.nome));
+    return turmas();
+  });
+}
+
+function removerTurma(eu, d){
+  return comTrava(function(){
+    var t = lerTudo('turmas').filter(function(x){ return String(x.id) === String(d.id); })[0];
+    if(!t) throw erro('Turma não encontrada.', 'inexistente');
+    var comAlunos = lerTudo('alunos').filter(function(a){
+      return String(a.turma) === String(t.nome) && String(a.ativo) !== 'false';
+    });
+    if(comAlunos.length) throw erro('Há alunos nesta turma. Mova-os antes de remover.', 'em_uso');
+    aba('turmas').deleteRow(t._linha);
+    registrar(eu.login, 'remove_turma', String(t.nome));
+    return turmas();
+  });
 }
 
 /* ============================= ocorrências ============================= */

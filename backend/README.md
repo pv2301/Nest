@@ -12,10 +12,14 @@ São cerca de 10 minutos, uma vez só.
 
 ---
 
-## 1. Criar a planilha
+## 1. A planilha
 
-1. Abra <https://sheets.new> com a conta Google que vai guardar os dados.
-2. Dê um nome ao arquivo, por exemplo `Registros — banco`.
+A planilha já foi criada no seu Drive com o nome
+**Registros de Ocorrências — banco de dados** (o link está na conversa). Ela está
+vazia de propósito: o passo 3 cria as abas e os cabeçalhos sozinho.
+
+Se preferir criar você mesmo, abra <https://sheets.new> com a conta que vai guardar
+os dados e siga daqui.
 
 > **Qual conta usar.** Dado de comportamento e saúde de criança não deve ficar numa
 > conta pessoal. O ideal é uma conta institucional da escola (ou, sem Workspace, uma
@@ -37,8 +41,9 @@ São cerca de 10 minutos, uma vez só.
 3. Abra **Ver → Registro de execução**: ele mostra o `CODIGO_CONFIG`, um número de 6
    dígitos. **Anote**: é ele que libera a criação da primeira conta de gestão.
 
-Isso cria as abas `contas`, `ocorrencias`, `sessoes`, `log` e `config`, e gera dois
-segredos em **Configurações do projeto → Propriedades do script**:
+Isso cria as abas `contas`, `alunos`, `turmas`, `ocorrencias`, `sessoes`, `log` e
+`config`, e gera dois segredos em **Configurações do projeto → Propriedades do
+script**:
 
 | Propriedade | Para que serve |
 |---|---|

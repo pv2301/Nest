@@ -13,6 +13,10 @@ export const ICON = {
   painel:'<rect x="3.2" y="3.2" width="7.2" height="8.4" rx="1.6"/><rect x="13.6" y="3.2" width="7.2" height="5.2" rx="1.6"/><rect x="3.2" y="14.4" width="7.2" height="6.4" rx="1.6"/><rect x="13.6" y="10.8" width="7.2" height="10" rx="1.6"/>',
   usuarios:'<circle cx="9" cy="8" r="3.4"/><path d="M3 20c0-3.3 2.7-5.4 6-5.4s6 2.1 6 5.4"/><path d="M16.4 5.2a3.4 3.4 0 0 1 0 6.1"/><path d="M18.4 14.9c1.7.7 2.9 2.2 2.9 4.1"/>',
   horario:'<circle cx="12" cy="12" r="8.6"/><path d="M12 7.2V12l3.2 2"/>',
+  alunos:'<circle cx="12" cy="7.4" r="3.4"/><path d="M4.6 20.4c0-3.9 3.3-6.4 7.4-6.4s7.4 2.5 7.4 6.4"/>',
+  busca:'<circle cx="10.8" cy="10.8" r="6.4"/><path d="m15.6 15.6 5 5"/>',
+  exportar:'<path d="M12 3.6v10.2"/><path d="M8.2 10.2 12 14l3.8-3.8"/><path d="M4.4 15.4v3.4a1.6 1.6 0 0 0 1.6 1.6h12a1.6 1.6 0 0 0 1.6-1.6v-3.4"/>',
+  mais:'<path d="M12 5v14"/><path d="M5 12h14"/>',
   relacoes:'<circle cx="6" cy="6.6" r="2.8"/><circle cx="18" cy="6.6" r="2.8"/><circle cx="12" cy="17.6" r="2.8"/><path d="M8.6 7.8 10.6 15"/><path d="M15.4 7.8 13.4 15"/>',
   digital:'<path d="M12 4.3c-3.1 0-5.6 2.5-5.6 5.6v2.4"/><path d="M12 4.3c3.1 0 5.6 2.5 5.6 5.6v4.4"/><path d="M9.2 9.9a2.8 2.8 0 0 1 5.6 0v6.8"/><path d="M12 9.9v7.6"/><path d="M6.4 15.5v1.6"/><path d="M17.3 17.6a12 12 0 0 1-.5 2.1"/><path d="M7.4 19.9c-.6-1-1-1.9-1-1.9"/>'
 };

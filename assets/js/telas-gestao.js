@@ -3,8 +3,8 @@
 
 import { S, app, registrarTela, ir, toast, render, recarregar, rodape, pendentes } from './core.js';
 import { Store } from './store.js';
-import { esc, ICON, svgIc, iniciais, quandoLegivel, senhaTemporaria } from './util.js';
-import { PAPEIS_CONTA, FUNCOES, TURMAS } from './dados.js';
+import { esc, ICON, svgIc, iniciais, quandoLegivel, senhaTemporaria, semAcento } from './util.js';
+import { PAPEIS_CONTA, FUNCOES } from './dados.js';
 
 const rotuloPapel = p => (PAPEIS_CONTA.find(x => x.id === p) || {}).nome || p;
 const gestoresAtivos = () => S.contas.filter(c => c.papel === 'gestao' && c.status === 'ativo');
@@ -44,6 +44,9 @@ registrarTela('usuarios', () => {
               </span>
             </div>
             <p class="fs11 muted" style="margin:0 0 9px">Criada ${esc(quandoLegivel(c.criadoEm))}</p>
+            ${c.papel === 'gestao' ? `<div class="notice alert" style="margin-bottom:9px"><span class="ic">!</span><div>
+              Pedido de <b>Gestão</b>: aprovar dá acesso a todos os registros da escola e ao controle de contas.
+              Confirme que é isso mesmo, ou ajuste a função antes.</div></div>` : ''}
             <div class="row" style="gap:8px">
               <button class="btn sm" style="flex:1" onclick="app.aprovar('${esc(c.login)}')">Aprovar</button>
               <button class="btn ghost sm" style="flex:1" onclick="app.abrirUsuario('${esc(c.login)}')">Ajustar antes</button>
@@ -141,8 +144,9 @@ registrarTela('usuario', () => {
     <div>
       <p class="sec-label">Turma</p>
       <div class="chips">
-        ${TURMAS.map(t => `<button class="chip" aria-pressed="${c.turma === t}"
-          onclick="app.mudarTurma('${esc(c.login)}','${esc(t)}')">${esc(t)}</button>`).join('')}
+        ${S.turmas.map(t => t.nome).map(t => `<button class="chip" aria-pressed="${c.turma === t}"
+          onclick="app.mudarTurma('${esc(c.login)}','${esc(t)}')">${esc(t)}</button>`).join('')
+          || '<span class="fs12 muted">Cadastre as turmas na aba Alunos.</span>'}
       </div>
       <p class="hint">A turma define para qual Miss vai a ciência dos registros das crianças dela.</p>
     </div>
@@ -260,3 +264,190 @@ registrarTela('relacoes', () => placeholder(ICON.relacoes, 'Relações', [
   'Quem responde pela ciência de cada turma, inclusive nas ausências',
   'Pares de crianças que se envolvem com frequência, para rever agrupamentos'
 ]));
+
+/* ================================================================
+   Alunos e turmas
+   Antes eram constantes no código: uma criança nova exigia mexer no
+   repositório. Agora a gestão mantém, e o registro passa a ter busca.
+   ================================================================ */
+
+const turmaNomes = () => S.turmas.map(t => t.nome);
+
+function alunosFiltrados(){
+  const q = semAcento(String(S.buscaAluno || '')).toLowerCase();
+  return S.alunos
+    .filter(a => !S.filtroTurma || a.turma === S.filtroTurma)
+    .filter(a => !q || semAcento(a.nome).toLowerCase().includes(q))
+    .sort((a, b) => Number(b.ativo !== false) - Number(a.ativo !== false)
+                 || a.nome.localeCompare(b.nome, 'pt-BR'));
+}
+
+registrarTela('alunos', () => {
+  const lista = alunosFiltrados();
+  const avulsos = S.alunos.filter(a => a.avulso).length;
+  return `<div class="stack s18">
+    ${avulsos ? `<div class="notice info"><span class="ic">◆</span><div>
+      ${avulsos} criança(s) ${avulsos > 1 ? 'foram adicionadas' : 'foi adicionada'} durante um registro e
+      ${avulsos > 1 ? 'aguardam' : 'aguarda'} sua confirmação.</div></div>` : ''}
+
+    <div>
+      <p class="sec-label">Turmas · ${S.turmas.length}</p>
+      <div class="stack s8">
+        ${S.turmas.length ? S.turmas.map(t => {
+          const miss = (S.diretorio || []).find(d => d.papel === 'miss' && d.turma === t.nome);
+          const n = S.alunos.filter(a => a.turma === t.nome && a.ativo !== false).length;
+          return `<div class="card flat" style="padding:11px 12px">
+            <div class="row"><b class="fs13 grow">${esc(t.nome)}</b>
+              <span class="pill">${n} aluno${n === 1 ? '' : 's'}</span>
+              <button class="btn ghost sm" style="padding:4px 9px;min-height:0" onclick="app.removerTurma('${esc(t.id)}')">Remover</button></div>
+            <div class="fs11 muted" style="margin-top:3px">${t.faixa ? esc(t.faixa) + ' · ' : ''}${miss ? 'Ciência: ' + esc(miss.nome) : 'Sem Miss responsável — a ciência vai direto à gestão'}</div>
+          </div>`;
+        }).join('') : `<p class="fs12 muted" style="margin:0">Nenhuma turma cadastrada.</p>`}
+        <div class="row" style="gap:8px">
+          <input class="input" id="t-nova" placeholder="Nome da turma" style="flex:1">
+          <button class="btn sm" onclick="app.novaTurma()">Adicionar</button>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="row" style="margin-bottom:8px">
+        <p class="sec-label grow" style="margin:0">Alunos · ${S.alunos.filter(a => a.ativo !== false).length}</p>
+        <button class="btn sm" onclick="app.novoAluno()">+ Aluno</button>
+      </div>
+      <div class="stack s8">
+        <div class="busca">
+          <span class="ic">${svgIc(ICON.busca)}</span>
+          <input class="input" id="b-al" placeholder="Buscar pelo nome" value="${esc(S.buscaAluno || '')}"
+                 oninput="app.buscaAlunoGestao(this.value)">
+        </div>
+        ${turmaNomes().length ? `<div class="chips">
+          <button class="chip sm" aria-pressed="${!S.filtroTurma}" onclick="app.filtroTurmaGestao('')">Todas</button>
+          ${turmaNomes().map(t => `<button class="chip sm" aria-pressed="${S.filtroTurma === t}" onclick="app.filtroTurmaGestao('${esc(t)}')">${esc(t)}</button>`).join('')}
+        </div>` : ''}
+        ${lista.length ? lista.map(a => `<button class="urow" onclick="app.abrirAluno('${esc(a.id)}')">
+          <span class="avatar sm">${esc(iniciais(a.nome))}</span>
+          <span class="grow">
+            <span style="display:block;font-size:13.5px;font-weight:600">${esc(a.nome)}</span>
+            <span class="fs11 muted">${esc(a.turma || 'sem turma')}${a.saude ? ' · ' + esc(a.saude) : ''}</span>
+          </span>
+          ${a.avulso ? '<span class="pill wait">confirmar</span>' : ''}
+          ${a.ativo === false ? '<span class="pill off">arquivado</span>' : ''}
+        </button>`).join('')
+        : `<div class="empty"><div class="big">Nenhum aluno</div><p class="fs12" style="margin:0">Adicione os alunos para que apareçam no registro de ocorrência.</p></div>`}
+      </div>
+    </div>
+
+    <div class="card flat stack s8">
+      <p class="sec-label" style="margin:0">Dados de demonstração</p>
+      <p class="fs12 muted" style="margin:0">Carrega turmas, alunos, contas e registros fictícios para experimentar o painel.
+        As contas de demonstração nascem sem senha: use <b>Redefinir senha</b> na ficha do usuário para entrar como uma delas.</p>
+      <div class="row" style="gap:8px">
+        <button class="btn soft sm" style="flex:1" onclick="app.demo(true)">Carregar</button>
+        <button class="btn ghost sm" style="flex:1" onclick="app.demo(false)">Limpar</button>
+      </div>
+    </div>
+    ${rodape()}
+  </div>`;
+});
+
+app.buscaAlunoGestao = v => {
+  S.buscaAluno = v; render();
+  const el = document.getElementById('b-al');
+  if(el){ el.focus(); try { el.setSelectionRange(99, 99); } catch {} }
+};
+app.filtroTurmaGestao = t => { S.filtroTurma = S.filtroTurma === t ? '' : t; render(); };
+
+app.novaTurma = async () => {
+  const nome = ((document.getElementById('t-nova') || {}).value || '').trim();
+  if(!nome) return toast('Informe o nome da turma.');
+  if(S.turmas.some(t => t.nome.toLowerCase() === nome.toLowerCase())) return toast('Essa turma já existe.');
+  try {
+    await Store.salvarTurma({ id:'t' + Date.now().toString(36), nome, faixa:'' });
+    await recarregar(); toast('Turma criada.');
+  } catch(e){ toast(e.message); }
+};
+
+app.removerTurma = async id => {
+  const t = S.turmas.find(x => x.id === id);
+  if(!t) return;
+  if(S.alunos.some(a => a.turma === t.nome && a.ativo !== false))
+    return toast('Há alunos nesta turma. Mova-os antes de remover.');
+  try { await Store.removerTurma(id); await recarregar(); toast('Turma removida.'); }
+  catch(e){ toast(e.message); }
+};
+
+app.novoAluno = () => { S.alunoSel = { id:'a' + Date.now().toString(36), nome:'', turma:'', nascimento:'', saude:'', ativo:true, novo:true }; ir('aluno'); };
+app.abrirAluno = id => { S.alunoSel = { ...S.alunos.find(a => a.id === id) }; ir('aluno'); };
+
+registrarTela('aluno', () => {
+  const a = S.alunoSel;
+  if(!a) return `<div class="empty"><div class="big">Aluno não encontrado</div></div>`;
+  const nRegistros = S.ocs.filter(o => (o.envolvidos || []).some(e => e.kid === a.id)).length;
+  return `<div class="stack s18">
+    ${a.avulso ? `<div class="notice info"><span class="ic">◆</span><div>
+      Adicionada durante um registro. Confira o nome e a turma, e confirme o cadastro.</div></div>` : ''}
+    <div class="card stack">
+      <div class="field"><label for="al-nome">Nome completo</label>
+        <input class="input" id="al-nome" value="${esc(a.nome)}"></div>
+      <div><p class="fs12" style="font-weight:600;color:var(--muted);margin:0 0 5px">Turma</p>
+        <div class="chips">${turmaNomes().map(t => `<button class="chip sm" aria-pressed="${a.turma === t}" onclick="app.alunoCampo('turma','${esc(t)}')">${esc(t)}</button>`).join('')
+        || '<span class="fs12 muted">Cadastre uma turma primeiro.</span>'}</div></div>
+      <div class="field"><label for="al-nasc">Data de nascimento (opcional)</label>
+        <input class="input" type="date" id="al-nasc" value="${esc(a.nascimento || '')}"></div>
+      <div class="field"><label for="al-saude">Alergias e observações de saúde (opcional)</label>
+        <input class="input" id="al-saude" value="${esc(a.saude || '')}" placeholder="Ex.: alergia a amendoim"></div>
+    </div>
+
+    ${!a.novo ? `<div class="card flat"><dl class="kv">
+      <dt>Registros</dt><dd>${nRegistros}</dd>
+      <dt>Situação</dt><dd>${a.ativo === false ? 'arquivado' : 'ativo'}</dd>
+    </dl></div>` : ''}
+
+    <div class="stack s8">
+      <button class="btn" onclick="app.salvarAlunoFicha()">${a.novo ? 'Adicionar aluno' : (a.avulso ? 'Confirmar cadastro' : 'Salvar')}</button>
+      ${!a.novo ? (a.ativo === false
+        ? `<button class="btn soft" onclick="app.arquivarAluno(false)">Reativar</button>`
+        : `<button class="btn danger" onclick="app.arquivarAluno(true)">Arquivar aluno</button>`) : ''}
+      ${!a.novo ? `<p class="fs11 muted center" style="margin:0">Arquivar preserva os registros antigos; o aluno só deixa de aparecer em novos.</p>` : ''}
+    </div>
+    ${rodape()}
+  </div>`;
+});
+
+app.alunoCampo = (k, v) => {
+  /* Guarda o que já foi digitado antes de redesenhar os chips. */
+  S.alunoSel.nome = (document.getElementById('al-nome') || {}).value || S.alunoSel.nome;
+  S.alunoSel.nascimento = (document.getElementById('al-nasc') || {}).value || S.alunoSel.nascimento;
+  S.alunoSel.saude = (document.getElementById('al-saude') || {}).value || S.alunoSel.saude;
+  S.alunoSel[k] = S.alunoSel[k] === v ? '' : v;
+  render();
+};
+
+app.salvarAlunoFicha = async () => {
+  const a = S.alunoSel;
+  const nome = ((document.getElementById('al-nome') || {}).value || '').trim();
+  if(!nome) return toast('Informe o nome do aluno.');
+  const dados = {
+    id:a.id, nome,
+    turma:a.turma || '',
+    nascimento:(document.getElementById('al-nasc') || {}).value || '',
+    saude:((document.getElementById('al-saude') || {}).value || '').trim(),
+    ativo:a.ativo !== false
+  };
+  try {
+    await Store.salvarAluno(dados);
+    await recarregar();
+    toast(a.novo ? 'Aluno adicionado.' : 'Aluno salvo.');
+    ir('alunos', { guardar:false });
+  } catch(e){ toast(e.message); }
+};
+
+app.arquivarAluno = async arquivar => {
+  try {
+    await Store.arquivarAluno(S.alunoSel.id, arquivar);
+    await recarregar();
+    toast(arquivar ? 'Aluno arquivado.' : 'Aluno reativado.');
+    ir('alunos', { guardar:false });
+  } catch(e){ toast(e.message); }
+};

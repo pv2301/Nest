@@ -17,7 +17,12 @@ export const S = {
   pilha: [],
   contas: [],
   diretorio: [],
+  alunos: [],
+  turmas: [],
   ocs: [],
+  periodo: 'mes',
+  buscaAluno: '',
+  filtroTurma: '',
   rascunho: null, passo: 1, modoRegistro: null,
   detalhe: null, usuarioSel: null,
   formErro: null, ocupado: false, toastMsg: null
@@ -70,6 +75,8 @@ export async function recarregar(){
   try {
     S.ocs = await Store.ocorrencias();
     S.diretorio = await Store.diretorio();
+    S.alunos = await Store.alunos();
+    S.turmas = await Store.turmas();
     if(S.conta.papel === 'gestao') S.contas = await Store.contas();
   } catch(e){
     toast(e.message || 'Não consegui carregar os dados.');
@@ -100,11 +107,18 @@ export function abas(){
   if(temFuncao(c, 'painel'))   t.push(['painel', ICON.painel, 'Painel']);
   if(temFuncao(c, 'horario'))  t.push(['horario', ICON.horario, 'Horário']);
   if(temFuncao(c, 'relacoes')) t.push(['relacoes', ICON.relacoes, 'Relações']);
+  if(c.papel === 'gestao')     t.push(['alunos', ICON.alunos, 'Alunos']);
   if(c.papel === 'gestao')     t.push(['usuarios', ICON.usuarios, 'Usuários', pendentes().length]);
   return t;
 }
 
 export const pendentes = () => S.contas.filter(c => c.status === 'pendente');
+
+/** Aluno por id. Substitui a antiga constante KIDS: agora vem do cadastro da gestão. */
+export function aluno(id){
+  return S.alunos.find(a => a.id === id) || { id, nome:'(aluno removido)', turma:'', ini:'??' };
+}
+export const nomesTurmas = () => S.turmas.map(t => t.nome);
 
 /** Registros aguardando a ciência desta pessoa. */
 export function filaDe(u){
@@ -140,9 +154,9 @@ function barraSuperior(){
     horario:'Quadro horário', relacoes:'Relações', usuarios:'Usuários',
     novo:'Novo registro', rapido:'Registro rápido', wizard:'Registro completo',
     detalhe:'Ocorrência ' + (S.detalhe || ''), usuario:'Usuário', crianca:'Ficha da criança',
-    conta:'Minha conta'
+    conta:'Minha conta', alunos:'Alunos e turmas', aluno:'Aluno', ficha:'Exportar ficha'
   };
-  const comVoltar = ['detalhe','novo','rapido','wizard','usuario','crianca','conta'].includes(S.tela);
+  const comVoltar = ['detalhe','novo','rapido','wizard','usuario','crianca','conta','aluno','ficha'].includes(S.tela);
   const esquerda = comVoltar
     ? `<button class="back" onclick="app.voltar()" aria-label="Voltar">&lsaquo;</button>`
     : `<button class="avatar" onclick="app.ir('conta')" title="${esc(c.nome)}">${esc(c.ini)}</button>`;

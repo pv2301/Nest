@@ -9,9 +9,10 @@
 
 import { CONFIG } from '../../config.js';
 import { derivarChave, resumoLocal, carimbo, iniciais, primeiroNome } from './util.js';
-import { DEMO_CONTAS, DEMO_OCORRENCIAS } from './dados.js';
+import { DEMO_CONTAS, DEMO_OCORRENCIAS, SEMENTE_ALUNOS, SEMENTE_TURMAS } from './dados.js';
 
-const K = { contas:'reg.contas', ocs:'reg.ocorrencias', sessao:'reg.sessao', aparelho:'reg.aparelho' };
+const K = { contas:'reg.contas', ocs:'reg.ocorrencias', sessao:'reg.sessao',
+            aparelho:'reg.aparelho', alunos:'reg.alunos', turmas:'reg.turmas' };
 
 /* localStorage pode lançar (janela anônima, dados bloqueados): nunca deixar quebrar. */
 const memoria = {};
@@ -70,10 +71,14 @@ function publica(c){
 export const Store = {
   modo(){ return temApi() ? 'api' : 'local'; },
 
-  /** {precisaConfigurar} — true quando ainda não existe nenhuma conta de gestão. */
+  /** Chamado ANTES do login. Diz se falta configurar e entrega as turmas, que a
+      tela de cadastro precisa para a pessoa escolher a sua. */
   async estado(){
     if(temApi()) return await api('estado');
-    return { precisaConfigurar: !contasLocais().some(c => c.papel === 'gestao' && c.status === 'ativo') };
+    return {
+      precisaConfigurar: !contasLocais().some(c => c.papel === 'gestao' && c.status === 'ativo'),
+      turmas: LS.ler(K.turmas, [])
+    };
   },
 
   /* ---------- sessão neste aparelho ---------- */
@@ -191,6 +196,52 @@ export const Store = {
     gravarContasLocais(cs);
   },
 
+  /* ---------- alunos e turmas ----------
+     Antes eram constantes no código. Agora são dados que a gestão mantém: sem isso,
+     uma criança nova obriga a mexer no repositório. Qualquer pessoa autenticada LÊ
+     (precisa, para registrar); só a gestão escreve — o backend é quem impõe isso. */
+
+  async alunos(){
+    if(temApi()) return await api('alunos');
+    return LS.ler(K.alunos, []);
+  },
+
+  async salvarAluno(aluno){
+    if(temApi()) return await api('salvarAluno', { aluno });
+    const as = LS.ler(K.alunos, []);
+    const i = as.findIndex(a => a.id === aluno.id);
+    if(i >= 0) as[i] = { ...as[i], ...aluno }; else as.push(aluno);
+    LS.gravar(K.alunos, as);
+    return aluno;
+  },
+
+  async arquivarAluno(id, arquivar = true){
+    if(temApi()) return await api('salvarAluno', { aluno: { id, ativo: !arquivar } });
+    const as = LS.ler(K.alunos, []);
+    const a = as.find(x => x.id === id);
+    if(a){ a.ativo = !arquivar; LS.gravar(K.alunos, as); }
+    return a;
+  },
+
+  async turmas(){
+    if(temApi()) return await api('turmas');
+    return LS.ler(K.turmas, []);
+  },
+
+  async salvarTurma(turma){
+    if(temApi()) return await api('salvarTurma', { turma });
+    const ts = LS.ler(K.turmas, []);
+    const i = ts.findIndex(t => t.id === turma.id);
+    if(i >= 0) ts[i] = { ...ts[i], ...turma }; else ts.push(turma);
+    LS.gravar(K.turmas, ts);
+    return turma;
+  },
+
+  async removerTurma(id){
+    if(temApi()) return await api('removerTurma', { id });
+    LS.gravar(K.turmas, LS.ler(K.turmas, []).filter(t => t.id !== id));
+  },
+
   /* ---------- ocorrências ---------- */
   async ocorrencias(){
     if(temApi()) return await api('ocorrencias');
@@ -212,9 +263,18 @@ export const Store = {
     const cs = contasLocais();
     for(const d of DEMO_CONTAS) if(!cs.some(c => c.login === d.login)) cs.push({ ...d, demo:true });
     gravarContasLocais(cs);
+
+    const ts = LS.ler(K.turmas, []);
+    for(const t of SEMENTE_TURMAS) if(!ts.some(x => x.nome === t.nome)) ts.push({ ...t, demo:true });
+    LS.gravar(K.turmas, ts);
+
+    const as = LS.ler(K.alunos, []);
+    for(const a of SEMENTE_ALUNOS) if(!as.some(x => x.id === a.id)) as.push({ ...a, demo:true });
+    LS.gravar(K.alunos, as);
+
     const os = LS.ler(K.ocs, []);
     for(const o of DEMO_OCORRENCIAS) if(!os.some(x => x.id === o.id)) os.push({ ...o, demo:true });
-    os.sort((a,b) => (b.id > a.id ? 1 : -1));
+    os.sort((a,b) => String(b.quandoISO || '').localeCompare(String(a.quandoISO || '')));
     LS.gravar(K.ocs, os);
   },
 
@@ -222,6 +282,8 @@ export const Store = {
     if(temApi()) return await api('limparDemo');
     gravarContasLocais(contasLocais().filter(c => !c.demo));
     LS.gravar(K.ocs, LS.ler(K.ocs, []).filter(o => !o.demo));
+    LS.gravar(K.alunos, LS.ler(K.alunos, []).filter(a => !a.demo));
+    LS.gravar(K.turmas, LS.ler(K.turmas, []).filter(t => !t.demo));
   },
 
   /** Apaga tudo deste aparelho. Só no modo local. */
