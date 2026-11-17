@@ -69,7 +69,7 @@ registrarTela('usuarios', () => {
     <div class="card flat stack s8">
       <p class="sec-label" style="margin:0">Dados de demonstração</p>
       <p class="fs12 muted" style="margin:0">
-        Contas de demonstração nascem sem senha: use <b>Redefinir senha</b> na ficha.
+        Contas de demonstração nascem sem senha: use <b>Redefinir senha</b> na conta.
       </p>
       <div class="row" style="gap:8px">
         <button class="btn soft sm" style="flex:1" onclick="app.demo(true)">Carregar</button>

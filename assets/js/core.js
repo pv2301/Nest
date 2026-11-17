@@ -239,11 +239,11 @@ function barraSuperior(){
     home:'Início', lista:'Registros', ciencia:'Ciência', painel:'Painel',
     horario:'Quadro horário', relacoes:'Relações', usuarios:'Usuários',
     novo:'Novo registro', rapido:'Registro rápido', wizard:'Registro completo',
-    detalhe:'Ocorrência ' + (S.detalhe || ''), usuario:'Usuário', crianca:'Ficha da criança',
+    detalhe:'Ocorrência ' + (S.detalhe || ''), usuario:'Usuário',
     conta:'Minha conta', alunos:'Alunos e turmas', aluno:'Aluno', ficha:'Gerar relatório',
     ajuda:'Como funciona'
   };
-  const comVoltar = ['detalhe','novo','rapido','wizard','usuario','crianca','conta','aluno','ficha','ajuda'].includes(S.tela);
+  const comVoltar = ['detalhe','novo','rapido','wizard','usuario','conta','aluno','ficha','ajuda'].includes(S.tela);
   const esquerda = comVoltar
     ? `<button class="back" onclick="app.voltar()" aria-label="Voltar">&lsaquo;</button>`
     : `<button class="avatar" onclick="app.ir('conta')" title="${esc(c.nome)}">${esc(c.ini)}</button>`;
