@@ -21,7 +21,7 @@ export const CONFIG = {
      Deve terminar em /exec, por exemplo:
      'https://script.google.com/macros/s/AKfy.../exec'
      --------------------------------------------------------------------------- */
-  API_URL: '',
+  API_URL: 'https://script.google.com/macros/s/AKfycbwcekwb9LlsLCeZcJnAKgC_SqSbQHk-niZ0r55BMPeKbbbk4MVXRIh326r7AjlrjqCl/exec',
 
   /* ---------------------------------------------------------------------------
      2. IDENTIDADE
