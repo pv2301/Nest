@@ -733,7 +733,7 @@ registrarTela('detalhe', () => {
     ${o.acomp ? `<div class="notice info"><span class="ic">◆</span><div><b>Acompanhamento:</b> ${esc(o.acomp)}</div></div>` : ''}
 
     <button class="btn soft" onclick="app.abrirFicha('${esc(o.id)}')">
-      ${svgIc(ICON.exportar).replace('<svg','<svg width="17" height="17"')} Exportar ficha</button>
+      ${svgIc(ICON.exportar).replace('<svg','<svg width="17" height="17"')} Gerar relatório</button>
 
     ${souDestino ? `<div class="card lift stack s8" style="border-color:var(--accent-text)">
       <p class="sec-label" style="margin:0">Sua ciência</p>

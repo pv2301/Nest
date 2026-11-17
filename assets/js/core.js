@@ -240,7 +240,7 @@ function barraSuperior(){
     horario:'Quadro horário', relacoes:'Relações', usuarios:'Usuários',
     novo:'Novo registro', rapido:'Registro rápido', wizard:'Registro completo',
     detalhe:'Ocorrência ' + (S.detalhe || ''), usuario:'Usuário', crianca:'Ficha da criança',
-    conta:'Minha conta', alunos:'Alunos e turmas', aluno:'Aluno', ficha:'Exportar ficha',
+    conta:'Minha conta', alunos:'Alunos e turmas', aluno:'Aluno', ficha:'Gerar relatório',
     ajuda:'Como funciona'
   };
   const comVoltar = ['detalhe','novo','rapido','wizard','usuario','crianca','conta','aluno','ficha','ajuda'].includes(S.tela);
