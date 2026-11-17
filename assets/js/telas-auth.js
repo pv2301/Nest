@@ -10,6 +10,7 @@ import {
   criptoDisponivel
 } from './util.js';
 import { PAPEIS_CONTA } from './dados.js';
+import { CONFIG } from '../../config.js';
 
 const val = id => (document.getElementById(id) || {}).value || '';
 const marca = () => S.escola.logo
@@ -39,9 +40,6 @@ registrarTela('entrada', () => `
       <div class="card lift stack s8">
         <button class="btn" onclick="app.ir('entrar')">Entrar</button>
         <button class="btn ghost" onclick="app.irCriar()">Criar conta</button>
-        <p class="fs11 muted center" style="margin:4px 0 0">
-          Ainda não tem acesso? Crie sua conta — a gestão aprova e você entra.
-        </p>
       </div>
       ${rodape()}
     </div>
@@ -58,7 +56,6 @@ registrarTela('entrar', () => `
           <label for="f-login">Login</label>
           <input class="input" id="f-login" autocomplete="username" inputmode="text"
                  placeholder="nome.sobrenome" oninput="app.normaliza('f-login')">
-          <p class="hint">Formato nome.sobrenome, só letras minúsculas.</p>
         </div>
         <div class="field">
           <label for="f-senha">Senha</label>
@@ -67,7 +64,7 @@ registrarTela('entrar', () => `
         <button class="btn" type="submit" ${S.ocupado ? 'disabled' : ''}>${S.ocupado ? 'Entrando…' : 'Entrar'}</button>
         <button class="btn ghost sm" type="button" style="width:100%" onclick="app.voltar()">Voltar</button>
       </form>
-      <p class="fs11 muted center" style="margin:0">Esqueceu a senha? A gestão redefine para você.</p>
+      <p class="fs11 muted center" style="margin:0">Esqueceu a senha? Fale com a gestão.</p>
       ${rodape()}
     </div>
   </div>`);
@@ -114,7 +111,6 @@ registrarTela('criar', () => {
       <div class="stack s8 center">
         ${SEAL.replace('class="seal"','class="seal" style="width:46px;height:46px;margin:0 auto"')}
         <h1 style="font-size:19px">Criar conta</h1>
-        <p class="fs12 muted" style="margin:0">Sua conta fica aguardando a aprovação da gestão.</p>
       </div>
       ${erroBloco()}
       <form class="card lift stack" onsubmit="app.submeterCriar(event)">
@@ -125,7 +121,6 @@ registrarTela('criar', () => {
         <div class="field">
           <label for="c-login">Login</label>
           <input class="input" id="c-login" autocomplete="username" placeholder="nome.sobrenome" oninput="app.normaliza('c-login')">
-          <p class="hint">Formato nome.sobrenome, só letras minúsculas. Ex.: ana.paula</p>
         </div>
         <div class="field">
           <label for="c-senha">Senha</label>
@@ -142,9 +137,6 @@ registrarTela('criar', () => {
             ${PAPEIS_CONTA.map(p => `
               <button type="button" class="chip" data-valor="${p.id}" aria-pressed="${n.papel === p.id}" onclick="app.campoNova('papel','${p.id}')">${esc(p.nome)}</button>`).join('')}
           </div>
-          <p class="hint" id="dica-papel">${n.papel === 'gestao'
-            ? 'Gestão vê todos os registros da escola e aprova contas. A gestão atual precisa confirmar.'
-            : 'Esta é a função que você pede; a gestão confirma ao aprovar.'}</p>
         </div>
         <div>
           <p class="sec-label">Turma</p>
@@ -152,7 +144,7 @@ registrarTela('criar', () => {
             <div class="chips" data-grupo="turma">
               ${turmasDisponiveis().map(t => `<button type="button" class="chip" data-valor="${esc(t)}" aria-pressed="${n.turma === t}" onclick="app.campoNova('turma','${t}')">${esc(t)}</button>`).join('')}
             </div>`
-            : `<p class="fs12 muted" style="margin:0">A gestão ainda não cadastrou as turmas. Ela definirá a sua ao aprovar o cadastro.</p>`}
+            : `<p class="fs12 muted" style="margin:0">A gestão definirá sua turma.</p>`}
         </div>
         <button class="btn" type="submit" ${S.ocupado ? 'disabled' : ''}>${S.ocupado ? 'Enviando…' : 'Enviar para aprovação'}</button>
         <button class="btn ghost sm" type="button" style="width:100%" onclick="app.voltar()">Voltar</button>
@@ -195,12 +187,6 @@ app.campoNova = (campo, valor) => {
   document.querySelectorAll(`[data-grupo="${campo}"] .chip`).forEach(b => {
     b.setAttribute('aria-pressed', String(b.dataset.valor === S.novaConta[campo]));
   });
-  if(campo === 'papel'){
-    const dica = document.getElementById('dica-papel');
-    if(dica) dica.textContent = S.novaConta.papel === 'gestao'
-      ? 'Gestão vê todos os registros da escola e aprova contas. A gestão atual precisa confirmar.'
-      : 'Esta é a função que você pede; a gestão confirma ao aprovar.';
-  }
 };
 
 app.submeterCriar = async ev => {
@@ -233,13 +219,11 @@ registrarTela('criado', () => `
         </div>
         <h1 style="font-size:19px">Conta enviada</h1>
         <p class="fs13 muted" style="margin:0 8px">
-          O login <b>${esc(S.loginCriado || '')}</b> foi enviado para aprovação da gestão.
-          Assim que for aprovado, você entra normalmente com a senha que acabou de criar.
+          <b>${esc(S.loginCriado || '')}</b> · aguardando aprovação da gestão
         </p>
       </div>
       ${S.modo === 'local' ? `<div class="notice info"><span class="ic">◆</span><div>
-        Este aparelho está em <b>modo local</b>: a conta existe só aqui. Para a gestão aprovar de outro
-        aparelho, o backend precisa estar configurado.</div></div>` : ''}
+        <b>Modo local</b>: a conta existe só neste aparelho.</div></div>` : ''}
       <button class="btn" onclick="app.ir('entrada')">Voltar ao início</button>
       ${rodape()}
     </div>
@@ -254,10 +238,7 @@ registrarTela('biometria', () => `
           ${svgIc(ICON.digital).replace('<svg','<svg width="34" height="34"')}
         </div>
         <h1 style="font-size:19px">Desbloqueio rápido</h1>
-        <p class="fs12 muted" style="margin:0 10px">
-          Da próxima vez você entra direto neste aparelho, sem digitar a senha.
-          A gestão pode revogar o acesso a qualquer momento.
-        </p>
+        <p class="fs12 muted" style="margin:0 10px">Entrar sem digitar a senha neste aparelho.</p>
       </div>
       <div class="card lift stack s8">
         <button class="btn" onclick="app.ativarBiometria(true)">Ativar neste aparelho</button>
@@ -282,8 +263,7 @@ registrarTela('configurar', () => `
     <div class="stack s18" style="position:relative">
       ${cabecalhoMarca()}
       <div class="notice calm"><span class="ic">◆</span><div>
-        <b>Configuração inicial.</b> Ainda não existe nenhuma conta de gestão.
-        Crie agora a primeira — é ela que aprova as demais.
+        <b>Configuração inicial.</b> Crie a primeira conta de gestão.
       </div></div>
       ${erroBloco()}
       <form class="card lift stack" onsubmit="app.submeterConfig(event)">
@@ -308,7 +288,7 @@ registrarTela('configurar', () => `
         <div class="field">
           <label for="g-codigo">Código de configuração</label>
           <input class="input" id="g-codigo" autocomplete="off">
-          <p class="hint">O código que você definiu no Apps Script, em Propriedades do script.</p>
+          <p class="hint">Definido no servidor, em CODIGO_CONFIG.</p>
         </div>` : ''}
         <button class="btn" type="submit" ${S.ocupado ? 'disabled' : ''}>${S.ocupado ? 'Criando…' : 'Criar conta de gestão'}</button>
       </form>
@@ -353,7 +333,7 @@ registrarTela('trocarSenha', () => `
     <div class="stack s18">
       <div class="stack s8 center">
         <h1 style="font-size:19px">Defina uma nova senha</h1>
-        <p class="fs12 muted" style="margin:0 10px">Sua senha foi redefinida pela gestão. Escolha uma nova para continuar.</p>
+        <p class="fs12 muted" style="margin:0 10px">Sua senha foi redefinida pela gestão.</p>
       </div>
       ${erroBloco()}
       <form class="card lift stack" onsubmit="app.submeterTroca(event)">
@@ -411,6 +391,7 @@ registrarTela('conta', () => {
         ? `<button class="btn ghost" onclick="app.revogarAparelho()">Desativar desbloqueio rápido</button>`
         : `<button class="btn soft" onclick="app.lembrarEste()">Ativar desbloqueio rápido</button>`}
       <button class="btn ghost" onclick="app.ir('trocarSenha')">Trocar minha senha</button>
+      <button class="btn ghost" onclick="app.ir('ajuda')">Como funciona</button>
       <button class="btn danger" onclick="app.sair()">Sair da conta</button>
     </div>
     ${rodape()}
@@ -452,3 +433,26 @@ app.desbloquear = async () => {
 app.usarOutra = () => { Store.esquecerAparelho(); Store.sair(); ir('entrada', { guardar:false }); };
 
 export { senhaTemporaria };
+
+/* ---------------------------------------------------------------- como funciona
+   O que a interface deixou de explicar em cada botão fica aqui, num lugar só, para
+   quem quiser consultar — fora do caminho de quem já sabe.
+
+   Só entra o que o código cumpre. Ficaram de fora duas regras que o app anunciava e
+   nunca teve: a trava de edição com adendos (não existe tela de edição nem de adendo)
+   e o prazo de ciência que escalaria sozinho para a gestão (o prazo é uma etiqueta
+   fixa, nunca recalculada, e não há escalonamento). */
+registrarTela('ajuda', () => `
+  <div class="stack s18">
+    <div class="card flat">
+      <dl class="kv">
+        <dt>Quem vê</dt><dd>Cada Miss vê os registros que criou e os das crianças da sua turma. A gestão vê todos.</dd>
+        <dt>Ciência</dt><dd>O registro segue para a Miss de cada turma envolvida e depois para a gestão.</dd>
+        <dt>Rascunho</dt><dd>Salvo sozinho enquanto você preenche.</dd>
+        <dt>Fotos</dt><dd>Apagadas em ${CONFIG.REGRAS.retencaoFotoDias} dias. Visíveis à cadeia de ciência e à gestão; todo acesso fica em log.</dd>
+        <dt>Contas</dt><dd>A gestão aprova cada conta nova e define função e turma.</dd>
+        <dt>Ficha</dt><dd>Três versões: sem identificar (padrão), para a família e de uso interno.</dd>
+      </dl>
+    </div>
+    ${rodape()}
+  </div>`);

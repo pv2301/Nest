@@ -24,14 +24,13 @@ function statusPill(o){
   return `<span class="pill wait">Aguarda ciência · ${esc(n ? n.nivel.split(' (')[0] : '—')}</span>`;
 }
 
-function itemHTML(o, prazo){
+function itemHTML(o){
   const nomes = (o.envolvidos || []).map(e => aluno(e.kid).nome).join(' · ');
   return `<button class="item n${o.sev}" onclick="app.abrirOc('${esc(o.id)}')">
     <span class="stripe"></span>
     <div class="row" style="gap:8px;margin-bottom:5px"><h4 class="grow">${esc(tipoDe(o))}</h4>${sevTag(o.sev)}</div>
     <div class="fs12 muted" style="margin-bottom:7px">${esc(nomes)} · ${esc(localDe(o))} · ${esc(quandoTexto(o))}</div>
     <div class="row" style="gap:6px;flex-wrap:wrap">${statusPill(o)}
-      ${prazo && o.prazo ? `<span class="pill">${esc(o.prazo)}</span>` : ''}
       ${o.duas ? '<span class="pill">2 turmas</span>' : ''}
       ${o.demo ? '<span class="pill demo">demonstração</span>' : ''}</div>
   </button>`;
@@ -79,7 +78,7 @@ registrarTela('home', () => {
 
   out += `<button class="btn" style="padding:16px" onclick="app.ir('novo')">+ &nbsp;Registrar ocorrência</button>`;
   if(fila.length) out += `<div><p class="sec-label">Aguardando sua ciência</p>
-      <div class="stack s8">${fila.map(o => itemHTML(o, true)).join('')}</div></div>`;
+      <div class="stack s8">${fila.map(o => itemHTML(o)).join('')}</div></div>`;
   out += `<div><p class="sec-label">${u.papel === 'gestao' ? 'Últimos registros' : 'Meus registros'}</p>
     <div class="stack s8">${meus.length ? meus.map(o => itemHTML(o)).join('')
       : vazio('Nenhum registro ainda', 'O que você registrar aparece aqui, com o estado da ciência.')}</div>
@@ -92,13 +91,12 @@ registrarTela('home', () => {
 registrarTela('novo', () => `<div class="stack">
   <button class="item" style="padding:16px" onclick="app.iniciar('rapido')">
     <div class="row" style="margin-bottom:5px"><h4 class="grow" style="font-size:15px">Registro rápido</h4><span class="pill">~40s</span></div>
-    <p class="fs12 muted" style="margin:0">Categoria, criança, gravidade e uma linha. Para o cotidiano leve.</p>
+    <p class="fs12 muted" style="margin:0">Categoria, criança, gravidade e uma linha.</p>
   </button>
   <button class="item" style="padding:16px" onclick="app.iniciar('completo')">
     <div class="row" style="margin-bottom:5px"><h4 class="grow" style="font-size:15px">Registro completo</h4><span class="pill">5 passos</span></div>
-    <p class="fs12 muted" style="margin:0">Envolvidos e papéis, horário e local, providências, condição de cada criança e foto.</p>
+    <p class="fs12 muted" style="margin:0">Envolvidos, horário, local, providências e foto.</p>
   </button>
-  <div class="notice calm"><span class="ic">◆</span><div>Seu rascunho fica salvo enquanto você preenche. Se for interrompida, pode voltar.</div></div>
 </div>`);
 
 app.iniciar = modo => {
@@ -228,7 +226,6 @@ function dialogoAvulso(){
     ${turmas.length ? `<div><p class="fs11 muted" style="margin:0 0 6px">Turma</p><div class="chips">
       ${turmas.map(t => `<button class="chip sm" aria-pressed="${S.avulso.turma === t}" onclick="app.avulsoTurma('${esc(t)}')">${esc(t)}</button>`).join('')}
     </div></div>` : ''}
-    <p class="fs11 muted" style="margin:0">Ela entra no cadastro com um selo, para a gestão confirmar ou juntar a um aluno existente.</p>
     <div class="row" style="gap:8px">
       <button class="btn sm" style="flex:1" onclick="app.salvarAvulso()">Adicionar</button>
       <button class="btn ghost sm" style="flex:1" onclick="app.fecharAvulso()">Cancelar</button>
@@ -367,7 +364,7 @@ function checagemLinguagem(txt){
   const achados = JULGAMENTO.filter(w =>
     new RegExp('(^|[^a-zà-ú])' + w.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '([^a-zà-ú]|$)', 'i').test(txt));
   if(!achados.length) return '';
-  return `<div class="notice info"><span class="ic">◆</span><div>Encontrei <b>${achados.map(esc).join('</b>, <b>')}</b>. Prefira descrever o fato observável — o que a criança fez ou disse — em vez de interpretar. O envio não fica bloqueado.</div></div>`;
+  return `<div class="notice info"><span class="ic">◆</span><div>Palavras de interpretação: <b>${achados.map(esc).join('</b>, <b>')}</b>. Descreva o que a criança fez ou disse.</div></div>`;
 }
 
 app.checarTexto = (campo, destino, v) => {
@@ -396,7 +393,7 @@ function campoDescricao(id){
     <textarea class="input" id="${id}" placeholder="${esc(ex)}"
       oninput="app.checarTexto('desc','${id}-chk',this.value)">${esc(d.desc)}</textarea>
     <div id="${id}-chk" style="margin-top:8px">${checagemLinguagem(d.desc)}</div>
-    <p class="hint">Descreva o que foi observado, antes e depois. Toque no microfone do teclado para ditar.</p>
+    <p class="hint">Descreva o que foi observado, antes e depois.</p>
   </div>`;
 }
 
@@ -454,7 +451,7 @@ registrarTela('wizard', () => {
         <input class="input" id="w-tipo" value="${esc(d.tipoOutro)}" oninput="app.campoTxt('tipoOutro',this.value)"></div>` : ''}</div>`
       : `<p class="fs12 muted" style="margin:0">Escolha a categoria para ver os tipos.</p>`}
     ${d.tipo ? `<div><p class="sec-label">Gravidade</p>${sevPicker()}
-      <p class="hint">A Miss que receber a ciência confirma ou corrige este nível.</p></div>` : ''}
+      </div>` : ''}
   </div>`;
 
   /* 2 — quem: um cartão por criança, com papel, turma, como ficou e lesão.
@@ -465,7 +462,7 @@ registrarTela('wizard', () => {
     ${sinalRecentes()}
     ${d.envolvidos.length ? `<div class="stack s8">
       ${d.envolvidos.map((e, i) => cardEnvolvido(e, i)).join('')}</div>
-      <p class="fs11 muted" style="margin:0">Uma ocorrência, não duas fichas. Crianças de turmas diferentes podem estar no mesmo registro: a ciência vai para a Miss de cada turma envolvida.</p>` : ''}
+      ` : ''}
   </div>`;
 
   /* 3 — contexto: quando, onde, de onde veio a informação e o relato. */
@@ -481,7 +478,7 @@ registrarTela('wizard', () => {
              <button class="btn ghost sm" style="width:100%;margin-top:8px" onclick="app.tirarFoto(true)">Remover foto</button></div>`
         : `<label class="photo" for="w-foto" style="cursor:pointer">Tirar foto · só a região da lesão, sem rosto e sem outras crianças</label>
            <input type="file" id="w-foto" accept="image/*" capture="environment" hidden onchange="app.escolherFoto(this)">`}
-      <p class="hint">A imagem sobe direto, sem passar pela galeria do aparelho. Só é exibida a quem está na cadeia de ciência e à gestão, todo acesso fica em log, e é apagada sozinha ${CONFIG.REGRAS.retencaoFotoDias} dias depois.</p></div>
+      </div>
   </div>`;
 
   /* 4 — providências e revisão. */
@@ -518,7 +515,6 @@ registrarTela('wizard', () => {
           <div class="gut"><div class="dot">${i+1}</div>${i < dest.length-1 ? '<div class="line"></div>' : ''}</div>
           <div class="body"><b class="fs13">${esc(n.q)}</b><div class="fs11 muted">${esc(n.p)}</div></div></div>`).join('')}</div></div>
 
-      <div class="notice calm"><span class="ic">◆</span><div>Você pode editar este registro até a primeira ciência, ou por ${CONFIG.REGRAS.travaEdicaoHoras}h — o que vier primeiro. Depois disso, só acrescentar adendos.</div></div>
       <button class="btn" id="btn-enviar" onclick="app.tentarEnviar()">Enviar registro</button>
     </div>`;
   }
@@ -614,13 +610,14 @@ app.enviar = async () => {
     duas: [...new Set(d.envolvidos.map(e => e.turma || aluno(e.kid).turma))].filter(Boolean).length > 1
   };
   if(u.papel === 'gestao'){
-    oc.chain = [{ nivel:'Gestão', st:'ok', quando:agoraHora(), parecer:'Registrado e encerrado pela gestão.' }];
+    oc.chain = [{ nivel:'Gestão', st:'ok', quandoISO:new Date().toISOString(),
+      quando:agoraHora(), parecer:'Registrado e encerrado pela gestão.' }];
     oc.status = 'concluido'; oc.prazo = null;
   }
   await otimista(
     () => {
       S.ocs = [oc, ...S.ocs];
-      S.rascunho = null; S.passo = 1; S.faltas = null; S.pilha = [];
+      S.rascunho = null; S.passo = 1; S.faltas = null; S.pilha = []; S.avisouRascunho = false;
       Store.descartarRascunho();
       ir('home', { guardar:false });
     },
@@ -652,9 +649,6 @@ registrarTela('lista', () => {
                                     semAcento(aluno(e.kid).turma || '').toLowerCase().includes(q)) ||
     semAcento(tipoDe(o)).toLowerCase().includes(q));
   return `<div class="stack s18">
-    <p class="fs12 muted" style="margin:0">${u.papel === 'gestao'
-      ? 'A gestão vê todos os registros da escola.'
-      : 'Você vê os registros que criou e os que passaram pela sua ciência.'}</p>
     <div class="busca">
       <span class="ic">${svgIc(ICON.busca)}</span>
       <input class="input" id="b-lista" placeholder="Buscar por aluno, turma ou tipo" value="${esc(S.buscaLista || '')}"
@@ -678,8 +672,8 @@ registrarTela('ciencia', () => {
   if(!fila.length) return `<div class="stack s18">
     <div class="notice calm"><span class="ic">&check;</span><div>Nada aguardando a sua ciência.</div></div>${rodape()}</div>`;
   return `<div class="stack s18">
-    <p class="fs12 muted" style="margin:0">Ordenado por gravidade. O prazo vem do nível: 4h no nível 3, 24h no nível 2. Vencido, sobe sozinho para a gestão.</p>
-    <div class="stack s8">${fila.map(o => itemHTML(o, true)).join('')}</div>
+    <p class="fs12 muted" style="margin:0">Ordenado por gravidade.</p>
+    <div class="stack s8">${fila.map(o => itemHTML(o)).join('')}</div>
     ${rodape()}
   </div>`;
 });
@@ -687,14 +681,13 @@ registrarTela('ciencia', () => {
 /* ---------------------------------------------------------------- detalhe */
 function fotoBloco(o){
   const gestao = S.conta.papel === 'gestao';
-  if(o.fotoPurgada) return `<div class="photo" style="border-style:solid">Foto removida pela política de retenção em ${esc(o.fotoPurgada)}<br><span class="fs11">A descrição e a região do corpo permanecem no registro</span></div>`;
+  if(o.fotoPurgada) return `<div class="photo" style="border-style:solid">Foto apagada em ${esc(o.fotoPurgada)}</div>`;
   if(o.preservado) return `<div class="photo">1 foto · <b>preservada por decisão da gestão</b><br><span class="fs11">Fora da exclusão automática · acesso em log</span></div>`
     + (gestao ? `<button class="btn ghost sm" style="width:100%;margin-top:8px" onclick="app.preservar('${esc(o.id)}',false)">Voltar à retenção de ${CONFIG.REGRAS.retencaoFotoDias} dias</button>` : '');
   const url = o.fotoId ? Store.urlFoto(o.fotoId) : null;
   return (url
       ? `<div class="fotobox"><img src="${esc(url)}" alt="Foto da lesão" loading="lazy"></div>`
       : `<div class="photo">1 foto registrada</div>`)
-    + `<p class="hint">Visível para a cadeia de ciência e a gestão · acesso em log · apagada sozinha em ${o.fotoDias || CONFIG.REGRAS.retencaoFotoDias} dias</p>`
     + (gestao ? `<button class="btn ghost sm" style="width:100%;margin-top:8px" onclick="app.preservar('${esc(o.id)}',true)">Preservar anexo (exceção)</button>` : '');
 }
 
@@ -731,7 +724,9 @@ registrarTela('detalhe', () => {
       ${(o.chain || []).map((c, i) => `<div class="node ${c.st}">
         <div class="gut"><div class="dot ${c.st === 'ok' ? 'ok' : c.st === 'now' ? 'now' : ''}">${c.st === 'ok' ? '&check;' : i+1}</div>${i < o.chain.length-1 ? `<div class="line ${c.st === 'ok' ? 'done' : ''}"></div>` : ''}</div>
         <div class="body"><b class="fs13">${esc(c.nivel)}</b>
-          <div class="fs11 muted">${c.st === 'ok' ? 'Ciência em ' + esc(c.quando) : c.st === 'now' ? 'Aguardando' + (o.prazo ? ' · ' + esc(o.prazo) : '') : 'Na fila'}</div>
+          <div class="fs11 muted">${c.st === 'ok'
+            ? 'Ciência em ' + esc(c.quandoISO ? quandoLegivel(c.quandoISO) : c.quando)
+            : c.st === 'now' ? 'Aguardando' : 'Na fila'}</div>
           ${c.parecer ? `<p class="fs12" style="margin:6px 0 0;padding:8px 10px;background:var(--surface-2);border-radius:9px">${esc(c.parecer)}</p>` : ''}
         </div></div>`).join('')}</div></div>
 
@@ -754,10 +749,6 @@ registrarTela('detalhe', () => {
       <button class="btn soft" onclick="app.marcarComunicacao('${esc(o.id)}')">Registrar comunicação com a família</button>
     </div>` : ''}
 
-    ${o.autorLogin === u.login && o.status !== 'concluido' ? `<p class="fs11 muted center" style="margin:0">
-      ${(o.chain || []).some(c => c.st === 'ok')
-        ? 'Edição encerrada pela ciência. Você ainda pode acrescentar um adendo.'
-        : `Editável até a primeira ciência ou por ${CONFIG.REGRAS.travaEdicaoHoras}h.`}</p>` : ''}
     ${rodape()}
   </div>`;
 });
@@ -782,7 +773,10 @@ app.darCiencia = id => {
   const par = (document.getElementById('d-par') || {}).value || '';
   const i = o.chain.findIndex(c => c.st === 'now'); if(i < 0) return;
   o.chain[i].st = 'ok';
-  o.chain[i].quando = 'Hoje, ' + agoraHora();
+  /* Guarda o instante, não o texto: "Hoje, 22:47" gravado em texto continuava dizendo
+     "Hoje" meses depois, na tela e no papel. */
+  o.chain[i].quandoISO = new Date().toISOString();
+  o.chain[i].quando = quandoLegivel(o.chain[i].quandoISO);
   if(par.trim()) o.chain[i].parecer = par.trim();
   const prox = o.chain.findIndex(c => c.st === 'wait');
   if(prox >= 0){ o.chain[prox].st = 'now'; o.status = 'aguarda_miss'; }
@@ -852,7 +846,7 @@ registrarTela('painel', () => {
       <div class="legend" style="margin-top:10px"><span><i style="background:var(--surface-2)"></i>0</span>
         <span><i style="background:color-mix(in srgb,var(--teal) 44%,var(--surface))"></i>poucos</span>
         <span><i style="background:var(--teal)"></i>${grade.max}</span></div>
-      <p class="hint">Cruzamento de horário e local, calculado dos registros do período. É aqui que a repetição aparece.</p>`
+      `
       : '<p class="fs12 muted" style="margin:0">Sem horário registrado no período.</p>'}
     </div>
 
@@ -879,15 +873,12 @@ registrarTela('painel', () => {
         </div>`).join('')}
         ${pares.map(p => `<div class="card flat" style="padding:11px 12px">
           <div class="row"><b class="fs13 grow">Par recorrente</b><span class="pill wait">${p.total} episódios</span></div>
-          <div class="fs11 muted" style="margin-top:3px">${esc(aluno(p.a).nome)} e ${esc(aluno(p.b).nome)} · vale rever o agrupamento</div>
+          <div class="fs11 muted" style="margin-top:3px">${esc(aluno(p.a).nome)} e ${esc(aluno(p.b).nome)}</div>
         </div>`).join('')}
       </div>
     </div>` : ''}
 
-    <div class="card">
-      <p class="sec-label">Leitura ética</p>
-      <p class="fs12 muted" style="margin:0">Números de processo, não de pessoas. Servem para apoio e formação — nunca para avaliação punitiva, ou a equipe para de registrar.</p>
-    </div>`}
+`}
     ${rodape()}
   </div>`;
 });

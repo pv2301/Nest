@@ -165,6 +165,44 @@ cookieAtual = cookieGestao;
 r = await chamar('ocorrencias');
 t('gestão vê todas', r.ok && r.dados.length === 2);
 
+console.log('\n=== Quem pode alterar um registro ===');
+/* Antes da guarda, qualquer conta autenticada sobrescrevia qualquer ocorrência —
+   inclusive uma que nem consegue ver. Estes testes fixam a regra. */
+const CHAVE_Z = 'd'.repeat(64);
+cookieAtual = cookieGestao;
+await chamar('salvarTurma', { turma:{ id:'t3', nome:'Azul' } });
+await chamar('criarConta', { nome:'Bianca Rocha', login:'bianca.rocha', chave:CHAVE_Z, papel:'miss', turma:'Azul' });
+await chamar('atualizarConta', { login:'bianca.rocha', patch:{ status:'ativo', aprovadoPor:'tallita.lima' } });
+cookieAtual = '';
+r = await chamar('entrar', { login:'bianca.rocha', chave:CHAVE_Z });
+t('terceira Miss entra', r.ok === true);
+
+r = await chamar('salvarOcorrencia', { ocorrencia: { ...ocMiss, desc:'texto trocado por estranha' } });
+t('Miss de fora NÃO altera registro alheio', !r.ok && r.codigo === 'permissao' && r.http === 403,
+  JSON.stringify(r));
+
+cookieAtual = cookieGestao;
+r = await chamar('ocorrencias');
+const intacta = (r.dados || []).find(o => o.id === '9001');
+t('o registro ficou intacto', !!intacta && intacta.desc !== 'texto trocado por estranha');
+
+cookieAtual = cookieMiss;
+r = await chamar('salvarOcorrencia', { ocorrencia: { ...ocMiss, acomp:'Família avisada no fim do turno.' } });
+t('a autora altera o próprio registro', r.ok === true, JSON.stringify(r));
+
+cookieAtual = cookieGestao;
+r = await chamar('salvarOcorrencia', { ocorrencia: { ...ocMiss, acomp:'Família avisada no fim do turno.',
+  textoFamilia:'Helena se desentendeu com outra criança e recebeu um arranhão no braço.' } });
+t('gestão altera qualquer registro', r.ok === true);
+
+r = await chamar('ocorrencias');
+const comTexto = (r.dados || []).find(o => o.id === '9001');
+t('textoFamilia é guardado no registro',
+  !!comTexto && comTexto.textoFamilia === 'Helena se desentendeu com outra criança e recebeu um arranhão no braço.',
+  JSON.stringify(comTexto && comTexto.textoFamilia));
+t('a descrição interna continua separada do texto da família',
+  !!comTexto && comTexto.desc !== comTexto.textoFamilia);
+
 console.log('\n=== Sincronizar: uma requisição só ===');
 r = await chamar('sincronizar');
 const d = r.dados || {};

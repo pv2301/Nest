@@ -4,6 +4,7 @@
 
 const { consultar, uma, todas, registrar } = require('./_db');
 const A = require('./_auth');
+const { podeVer } = require('./foto');
 const { ErroApi } = A;
 
 /* ============================ ajudantes ============================ */
@@ -259,6 +260,11 @@ async function salvarOcorrencia(eu, d){
   if(!oc || !oc.id) throw new ErroApi('Ocorrência sem identificador.', 'dados');
   const existe = await uma('SELECT autor_login FROM ocorrencias WHERE id=$1', [oc.id]);
   if(existe){
+    /* Antes qualquer conta autenticada sobrescrevia qualquer ocorrência, inclusive uma
+       que nem consegue ver. podeVer já expressa a permissão certa: autora, gestão, ou
+       quem está na cadeia de ciência. */
+    if(!await podeVer(eu, oc.id))
+      throw new ErroApi('Você não pode alterar este registro.', 'permissao', 403);
     await consultar('UPDATE ocorrencias SET dados=$1 WHERE id=$2', [oc, oc.id]);
   } else {
     await consultar('INSERT INTO ocorrencias (id,dados,autor_login) VALUES ($1,$2,$3)',

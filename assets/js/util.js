@@ -155,3 +155,20 @@ export function quandoLegivel(iso){
   if(d.toDateString() === ontem.toDateString()) return 'Ontem, ' + hora;
   return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}) + ', ' + hora;
 }
+
+/* Datas para papel. quandoLegivel() devolve "Hoje, 10h20", que serve na tela e não
+   serve num documento: quem ler o impresso semanas depois não sabe que dia era
+   "hoje". Aqui a data vem sempre inteira. */
+export const dataCompleta = iso => {
+  if(!iso) return '';
+  const d = new Date(iso);
+  if(isNaN(d)) return '';
+  return d.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric' })
+    + ' às ' + d.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+};
+
+export const soData = iso => {
+  if(!iso) return '';
+  const d = new Date(iso);
+  return isNaN(d) ? '' : d.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric' });
+};

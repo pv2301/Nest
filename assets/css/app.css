@@ -288,6 +288,15 @@ textarea.input{min-height:96px;resize:vertical;line-height:1.55;font-size:14.5px
 .ficha-lista{margin:0;padding-left:18px;font-size:13px;line-height:1.7}
 .ficha-rodape{margin-top:20px;padding-top:10px;border-top:1px solid var(--line)}
 .ficha-rodape p{font-size:10px;color:var(--muted);margin:0 0 4px;line-height:1.45}
+/* O comunicado da família abre com os dados soltos, sem seção numerada antes. */
+.ficha > .ficha-kv{margin-top:16px}
+/* max-width, não width: uma foto pequena ampliada ocupa meia página impressa à toa. */
+.ficha-img{display:block;max-width:100%;max-height:420px;
+  border:1px solid var(--line);border-radius:8px;background:var(--surface-2)}
+/* Linha de assinatura: o comunicado volta assinado pelo responsável. */
+.ficha-assina{margin-top:26px}
+.ficha-assina span{display:block;border-top:1px solid var(--fg);max-width:280px}
+.ficha-assina p{font-size:10px;color:var(--muted);margin:4px 0 0}
 
 @media print{
   /* Só a ficha vai para o papel: nada de barras, abas ou controles. */
@@ -304,6 +313,9 @@ textarea.input{min-height:96px;resize:vertical;line-height:1.55;font-size:14.5px
   .ficha-kv dt, .ficha-tab th, .ficha-sub, .ficha-rodape p{color:#444}
   .ficha-tab td{border-color:#ccc}
   .ficha section{break-inside:avoid}
+  .ficha-img{max-height:95mm;border-color:#999}
+  .ficha-assina span{border-color:#000}
+  .ficha-assina{break-inside:avoid}
   @page{margin:16mm}
 }
 

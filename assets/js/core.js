@@ -240,9 +240,10 @@ function barraSuperior(){
     horario:'Quadro horário', relacoes:'Relações', usuarios:'Usuários',
     novo:'Novo registro', rapido:'Registro rápido', wizard:'Registro completo',
     detalhe:'Ocorrência ' + (S.detalhe || ''), usuario:'Usuário', crianca:'Ficha da criança',
-    conta:'Minha conta', alunos:'Alunos e turmas', aluno:'Aluno', ficha:'Exportar ficha'
+    conta:'Minha conta', alunos:'Alunos e turmas', aluno:'Aluno', ficha:'Exportar ficha',
+    ajuda:'Como funciona'
   };
-  const comVoltar = ['detalhe','novo','rapido','wizard','usuario','crianca','conta','aluno','ficha'].includes(S.tela);
+  const comVoltar = ['detalhe','novo','rapido','wizard','usuario','crianca','conta','aluno','ficha','ajuda'].includes(S.tela);
   const esquerda = comVoltar
     ? `<button class="back" onclick="app.voltar()" aria-label="Voltar">&lsaquo;</button>`
     : `<button class="avatar" onclick="app.ir('conta')" title="${esc(c.nome)}">${esc(c.ini)}</button>`;
@@ -317,6 +318,14 @@ export function render(){
 function guardarRascunho(){
   if(!S.conta) return;
   if(S.rascunho && (S.tela === 'wizard' || S.tela === 'rapido')){
+    /* Confirmação momentânea, uma vez por preenchimento: antes um parágrafo fixo
+       anunciava a cada tela que o rascunho estava sendo salvo. */
+    if(!S.avisouRascunho){
+      S.avisouRascunho = true;
+      /* Fora do ciclo de desenho: toast() chama render(), e esta função roda dentro
+         dele. */
+      setTimeout(() => toast('Rascunho salvo'), 0);
+    }
     /* O arquivo e a URL temporária da foto não sobrevivem ao JSON nem ao recarregar:
        guardamos o resto e a pessoa escolhe a imagem de novo, se for o caso. */
     const { fotoArquivo, fotoPreview, ...semArquivo } = S.rascunho;
@@ -337,7 +346,7 @@ export function rascunhoGuardado(){
 
 export function descartarRascunho(){
   Store.descartarRascunho();
-  S.rascunho = null; S.passo = 1; S.faltas = null;
+  S.rascunho = null; S.passo = 1; S.faltas = null; S.avisouRascunho = false;
   render();
 }
 app.descartarRascunho = descartarRascunho;

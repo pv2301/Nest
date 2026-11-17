@@ -45,7 +45,7 @@ registrarTela('usuarios', () => {
             </div>
             <p class="fs11 muted" style="margin:0 0 9px">Criada ${esc(quandoLegivel(c.criadoEm))}</p>
             ${c.papel === 'gestao' ? `<div class="notice alert" style="margin-bottom:9px"><span class="ic">!</span><div>
-              Pedido de <b>Gestão</b>: aprovar dá acesso a todos os registros da escola e ao controle de contas.
+              Pedido de <b>Gestão</b>: dá acesso a todos os registros e ao controle de contas.
               Confirme que é isso mesmo, ou ajuste a função antes.</div></div>` : ''}
             <div class="row" style="gap:8px">
               <button class="btn sm" style="flex:1" onclick="app.aprovar('${esc(c.login)}')">Aprovar</button>
@@ -69,9 +69,7 @@ registrarTela('usuarios', () => {
     <div class="card flat stack s8">
       <p class="sec-label" style="margin:0">Dados de demonstração</p>
       <p class="fs12 muted" style="margin:0">
-        Carrega contas e registros fictícios para você experimentar o painel e a cadeia de ciência.
-        As contas de demonstração nascem sem senha: para entrar como uma delas, use
-        <b>Redefinir senha</b> na ficha do usuário.
+        Contas de demonstração nascem sem senha: use <b>Redefinir senha</b> na ficha.
       </p>
       <div class="row" style="gap:8px">
         <button class="btn soft sm" style="flex:1" onclick="app.demo(true)">Carregar</button>
@@ -125,9 +123,9 @@ registrarTela('usuario', () => {
     </div>
 
     ${euMesmo ? `<div class="notice info"><span class="ic">◆</span><div>
-      Esta é a sua própria conta. O perfil e a situação não podem ser alterados por você mesma.</div></div>` : ''}
+      Sua própria conta: perfil e situação não podem ser alterados por você.</div></div>` : ''}
     ${ultimoGestor && !euMesmo ? `<div class="notice info"><span class="ic">◆</span><div>
-      Última conta de gestão ativa. Promova outra pessoa antes de rebaixar ou desativar esta.</div></div>` : ''}
+      Última conta de gestão ativa. Promova outra antes de rebaixar esta.</div></div>` : ''}
 
     <div>
       <p class="sec-label">Perfil</p>
@@ -136,7 +134,7 @@ registrarTela('usuario', () => {
           ${euMesmo || (ultimoGestor && p.id !== 'gestao') ? 'disabled style="opacity:.45"' : ''}
           onclick="app.mudarPapel('${esc(c.login)}','${p.id}')">${esc(p.nome)}</button>`).join('')}
       </div>
-      ${c.papel !== 'gestao' ? '<p class="hint">Promover a Gestão dá acesso a todos os registros da escola e à aprovação de contas.</p>' : ''}
+      ${c.papel !== 'gestao' ? '<p class="hint">Gestão vê todos os registros e aprova contas.</p>' : ''}
     </div>
 
     <div>
@@ -146,7 +144,6 @@ registrarTela('usuario', () => {
           onclick="app.mudarTurma('${esc(c.login)}','${esc(t)}')">${esc(t)}</button>`).join('')
           || '<span class="fs12 muted">Cadastre as turmas na aba Alunos.</span>'}
       </div>
-      <p class="hint">A turma define para qual Miss vai a ciência dos registros das crianças dela.</p>
     </div>
 
     <div>
@@ -292,8 +289,7 @@ registrarTela('alunos', () => {
   const avulsos = S.alunos.filter(a => a.avulso).length;
   return `<div class="stack s18">
     ${avulsos ? `<div class="notice info"><span class="ic">◆</span><div>
-      ${avulsos} criança(s) ${avulsos > 1 ? 'foram adicionadas' : 'foi adicionada'} durante um registro e
-      ${avulsos > 1 ? 'aguardam' : 'aguarda'} sua confirmação.</div></div>` : ''}
+      ${avulsos} ${avulsos > 1 ? 'crianças aguardam' : 'criança aguarda'} confirmação do cadastro.</div></div>` : ''}
 
     <div>
       <p class="sec-label">Turmas · ${S.turmas.length}</p>
@@ -310,7 +306,7 @@ registrarTela('alunos', () => {
             <div class="chips">
               ${misses.length ? misses.map(m => `<button class="chip sm" aria-pressed="${t.missResponsavel === m.login}"
                  onclick="app.missDaTurma('${esc(t.id)}','${esc(m.login)}')">${esc(m.nome)}</button>`).join('')
-                : '<span class="fs11 muted">Nenhuma Miss ativa ainda — a ciência vai direto à gestão.</span>'}
+                : '<span class="fs11 muted">Sem Miss: a ciência vai à gestão.</span>'}
             </div>
           </div>`;
         }).join('') : `<p class="fs12 muted" style="margin:0">Nenhuma turma cadastrada.</p>`}
@@ -362,9 +358,8 @@ function blocoDemo(){
   const existe = n.total > 0;
   return `<div class="card flat stack s8">
     <p class="sec-label" style="margin:0">Dados de demonstração</p>
-    <p class="fs12 muted" style="margin:0">Turmas, alunos, contas e registros fictícios para experimentar o painel.
-      Tudo o que entra por aqui fica com o selo <span class="pill demo">demonstração</span> na lista.
-      As contas nascem sem senha: use <b>Redefinir senha</b> na ficha do usuário para entrar como uma delas.</p>
+    <p class="fs12 muted" style="margin:0">Turmas, alunos, contas e registros fictícios, com o selo
+      <span class="pill demo">demonstração</span> na lista. As contas nascem sem senha.</p>
     ${existe ? `<div class="notice info"><span class="ic">◆</span><div>
       Hoje há <b>${n.total}</b> ${n.total === 1 ? 'registro fictício' : 'registros fictícios'} no sistema:
       ${[[n.turmas,'turma','turmas'],[n.alunos,'aluno','alunos'],[n.ocorrencias,'registro','registros'],[n.contas,'conta','contas']]
@@ -430,7 +425,7 @@ registrarTela('aluno', () => {
   const nRegistros = S.ocs.filter(o => (o.envolvidos || []).some(e => e.kid === a.id)).length;
   return `<div class="stack s18">
     ${a.avulso ? `<div class="notice info"><span class="ic">◆</span><div>
-      Adicionada durante um registro. Confira o nome e a turma, e confirme o cadastro.</div></div>` : ''}
+      Adicionada durante um registro. Confira o nome e a turma.</div></div>` : ''}
     <div class="card stack">
       <div class="field"><label for="al-nome">Nome completo</label>
         <input class="input" id="al-nome" value="${esc(a.nome)}"></div>
@@ -453,7 +448,7 @@ registrarTela('aluno', () => {
       ${!a.novo ? (a.ativo === false
         ? `<button class="btn soft" onclick="app.arquivarAluno(false)">Reativar</button>`
         : `<button class="btn danger" onclick="app.arquivarAluno(true)">Arquivar aluno</button>`) : ''}
-      ${!a.novo ? `<p class="fs11 muted center" style="margin:0">Arquivar preserva os registros antigos; o aluno só deixa de aparecer em novos.</p>` : ''}
+      ${!a.novo ? `<p class="fs11 muted center" style="margin:0">Os registros antigos são preservados.</p>` : ''}
     </div>
     ${rodape()}
   </div>`;
