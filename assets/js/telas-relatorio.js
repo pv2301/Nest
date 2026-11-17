@@ -296,7 +296,7 @@ registrarTela('ficha', () => {
         <span class="grow"><span style="display:block;font-size:13px;font-weight:600">Incluir a foto</span></span>
         <span class="track"></span></button>` : ''}
 
-      <button class="btn" onclick="app.imprimirFicha()">Imprimir ou salvar em PDF</button>
+      <button class="btn" onclick="app.imprimirFicha()">Gerar PDF</button>
     </div>`;
 
   return `<div class="stack s18">${controles}${
