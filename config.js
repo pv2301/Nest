@@ -17,11 +17,10 @@ export const CONFIG = {
      Preenchido = modo compartilhado: criar conta num aparelho e a gestão aprovar
      em outro funciona de verdade.
 
-     Cole aqui a URL do Apps Script publicado (ver backend/README.md).
-     Deve terminar em /exec, por exemplo:
-     'https://script.google.com/macros/s/AKfy.../exec'
+     No Vercel a API vive no mesmo endereço do site, então '/api' basta.
+     Deixe vazio para rodar sem servidor, em modo local por aparelho.
      --------------------------------------------------------------------------- */
-  API_URL: 'https://script.google.com/macros/s/AKfycbwcekwb9LlsLCeZcJnAKgC_SqSbQHk-niZ0r55BMPeKbbbk4MVXRIh326r7AjlrjqCl/exec',
+  API_URL: '/api',
 
   /* ---------------------------------------------------------------------------
      2. IDENTIDADE

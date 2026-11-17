@@ -276,10 +276,26 @@ export function render(){
   const fn = TELAS[S.tela] || TELAS.entrada;
   const logada = !!S.conta && !SEM_CHROME.has(S.tela);
 
+  /* Redesenhar troca o HTML inteiro, o que zerava os campos: mostrar um erro fazia a
+     pessoa perder tudo o que tinha digitado. Guardamos o que estava escrito e
+     devolvemos aos campos que voltaram vazios, desde que seja a mesma tela. */
+  const digitado = {};
+  view.querySelectorAll('input[id], textarea[id]').forEach(el => {
+    if(el.type !== 'file') digitado[el.id] = el.value;
+  });
+  const telaAnterior = S.telaDesenhada;
+
   faixa.innerHTML = faixaModo();
   chrome.innerHTML = logada ? barraSuperior() : '';
   view.innerHTML = fn ? fn() : '';
   tabs.innerHTML = logada ? barraInferior() : '';
+
+  if(telaAnterior === S.tela){
+    view.querySelectorAll('input[id], textarea[id]').forEach(el => {
+      if(el.type !== 'file' && el.value === '' && digitado[el.id] !== undefined) el.value = digitado[el.id];
+    });
+  }
+  S.telaDesenhada = S.tela;
 
   document.querySelectorAll('.toast').forEach(t => t.remove());
   if(S.toastMsg){
@@ -297,8 +313,12 @@ export function render(){
 function guardarRascunho(){
   if(!S.conta) return;
   if(S.rascunho && (S.tela === 'wizard' || S.tela === 'rapido')){
+    /* O arquivo e a URL temporária da foto não sobrevivem ao JSON nem ao recarregar:
+       guardamos o resto e a pessoa escolhe a imagem de novo, se for o caso. */
+    const { fotoArquivo, fotoPreview, ...semArquivo } = S.rascunho;
     Store.guardarRascunho({
-      rascunho: S.rascunho, passo: S.passo, modo: S.modoRegistro,
+      rascunho: { ...semArquivo, foto:false },
+      passo: S.passo, modo: S.modoRegistro,
       login: S.conta.login, em: new Date().toISOString()
     });
   }

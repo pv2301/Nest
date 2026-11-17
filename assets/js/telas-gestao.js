@@ -292,13 +292,18 @@ registrarTela('alunos', () => {
       <p class="sec-label">Turmas · ${S.turmas.length}</p>
       <div class="stack s8">
         ${S.turmas.length ? S.turmas.map(t => {
-          const miss = (S.diretorio || []).find(d => d.papel === 'miss' && d.turma === t.nome);
           const n = S.alunos.filter(a => a.turma === t.nome && a.ativo !== false).length;
+          const misses = (S.diretorio || []).filter(d => d.papel === 'miss');
           return `<div class="card flat" style="padding:11px 12px">
             <div class="row"><b class="fs13 grow">${esc(t.nome)}</b>
               <span class="pill">${n} aluno${n === 1 ? '' : 's'}</span>
               <button class="btn ghost sm" style="padding:4px 9px;min-height:0" onclick="app.removerTurma('${esc(t.id)}')">Remover</button></div>
-            <div class="fs11 muted" style="margin-top:3px">${t.faixa ? esc(t.faixa) + ' · ' : ''}${miss ? 'Ciência: ' + esc(miss.nome) : 'Sem Miss responsável — a ciência vai direto à gestão'}</div>
+            <p class="fs11 muted" style="margin:7px 0 5px">Quem recebe a ciência desta turma</p>
+            <div class="chips">
+              ${misses.length ? misses.map(m => `<button class="chip sm" aria-pressed="${t.missResponsavel === m.login}"
+                 onclick="app.missDaTurma('${esc(t.id)}','${esc(m.login)}')">${esc(m.nome)}</button>`).join('')
+                : '<span class="fs11 muted">Nenhuma Miss ativa ainda — a ciência vai direto à gestão.</span>'}
+            </div>
           </div>`;
         }).join('') : `<p class="fs12 muted" style="margin:0">Nenhuma turma cadastrada.</p>`}
         <div class="row" style="gap:8px">
@@ -371,6 +376,16 @@ app.removerTurma = async id => {
     return toast('Há alunos nesta turma. Mova-os antes de remover.');
   await otimista(() => { S.turmas = S.turmas.filter(x => x.id !== id); },
     () => Store.removerTurma(id), 'Turma removida.');
+};
+
+/* Com mais de uma Miss na turma, a ciência ia para a primeira encontrada, o que era
+   arbitrário. Agora a gestão designa. */
+app.missDaTurma = (id, login) => {
+  const t = S.turmas.find(x => x.id === id); if(!t) return;
+  const novo = t.missResponsavel === login ? '' : login;
+  otimista(() => { t.missResponsavel = novo; },
+    () => Store.salvarTurma({ ...t, missResponsavel: novo }),
+    novo ? 'Ciência da turma ' + t.nome + ' com ' + login : 'Turma sem Miss designada');
 };
 
 app.novoAluno = () => { S.alunoSel = { id:'a' + Date.now().toString(36), nome:'', turma:'', nascimento:'', saude:'', ativo:true, novo:true }; ir('aluno'); };

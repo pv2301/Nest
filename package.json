@@ -1,0 +1,19 @@
+{
+  "name": "registro-ocorrencias",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Registro interno de ocorrencias da equipe pedagogica.",
+  "type": "commonjs",
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "@vercel/blob": "0.27.3",
+    "bcryptjs": "2.4.3",
+    "pg": "8.13.1"
+  },
+  "devDependencies": {
+    "pg-mem": "3.0.5"
+  },
+  "scripts": {
+    "test": "node testes/executar.mjs"
+  }
+}

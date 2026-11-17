@@ -456,8 +456,12 @@ registrarTela('wizard', () => {
     ${blocoPresenciou()}
     ${campoDescricao('w-desc')}
     <div><p class="sec-label">Foto da lesão (opcional)</p>
-      <div class="photo" onclick="app.campo('foto',${!d.foto})">${d.foto ? '&check; 1 foto anexada · toque para remover' : 'Tirar foto · só a região da lesão, sem rosto e sem outras crianças'}</div>
-      <p class="hint">A foto sobe direto e não fica na galeria do aparelho. Todo acesso fica em log, e ela é apagada sozinha ${CONFIG.REGRAS.retencaoFotoDias} dias depois.</p></div>
+      ${d.fotoPreview
+        ? `<div class="fotobox"><img src="${esc(d.fotoPreview)}" alt="Foto anexada">
+             <button class="btn ghost sm" style="width:100%;margin-top:8px" onclick="app.tirarFoto(true)">Remover foto</button></div>`
+        : `<label class="photo" for="w-foto" style="cursor:pointer">Tirar foto · só a região da lesão, sem rosto e sem outras crianças</label>
+           <input type="file" id="w-foto" accept="image/*" capture="environment" hidden onchange="app.escolherFoto(this)">`}
+      <p class="hint">A imagem sobe direto, sem passar pela galeria do aparelho. Ela só é exibida a quem está na cadeia de ciência e à gestão, todo acesso fica em log, e é apagada sozinha ${CONFIG.REGRAS.retencaoFotoDias} dias depois.</p></div>
   </div>`;
 
   if(st === 4) corpo = `<div class="stack s18">
@@ -514,8 +518,34 @@ registrarTela('wizard', () => {
 
 app.passo = delta => { delta > 0 ? avancarPasso() : voltar(); };
 
+/* A imagem fica em memória até o envio do registro: só então existe um id de
+   ocorrência a que prendê-la. */
+app.escolherFoto = input => {
+  const arq = input.files && input.files[0];
+  if(!arq) return;
+  if(arq.size > 6 * 1024 * 1024) return toast('Imagem acima de 6 MB. Tente outra.');
+  S.rascunho.fotoArquivo = arq;
+  S.rascunho.foto = true;
+  try { S.rascunho.fotoPreview = URL.createObjectURL(arq); } catch { S.rascunho.fotoPreview = ''; }
+  render();
+};
+
+app.tirarFoto = () => {
+  const d = S.rascunho;
+  if(d.fotoPreview){ try { URL.revokeObjectURL(d.fotoPreview); } catch {} }
+  d.fotoArquivo = null; d.fotoPreview = ''; d.foto = false;
+  render();
+};
+
 /* ---------------------------------------------------------------- roteamento da ciência */
+/* Preferência: a Miss que a gestão designou para a turma. Sem designação, a primeira
+   Miss cujo cadastro aponta para essa turma. */
 function missDaTurma(turma){
+  const t = (S.turmas || []).find(x => x.nome === turma);
+  if(t && t.missResponsavel){
+    const m = (S.diretorio || []).find(d => d.login === t.missResponsavel);
+    if(m) return m;
+  }
   return (S.diretorio || []).find(d => d.papel === 'miss' && d.turma === turma && d.status === 'ativo');
 }
 
@@ -548,6 +578,7 @@ function destinoCiencia(){
 
 app.enviar = async () => {
   const u = S.conta, d = S.rascunho, dest = destinoCiencia();
+  const arquivoFoto = d.fotoArquivo || null;
   const id = String(Date.now()).slice(-4);
   const chain = dest.filter(x => !x.q.startsWith('Encerra')).map((x, i) => ({
     nivel: x.q.startsWith('Encerrado') ? 'Gestão' : x.q,
@@ -580,7 +611,20 @@ app.enviar = async () => {
       Store.descartarRascunho();
       ir('home', { guardar:false });
     },
-    () => Store.salvarOcorrencia(oc),
+    async () => {
+      await Store.salvarOcorrencia(oc);
+      if(arquivoFoto){
+        /* A foto vai depois: só agora existe um id de ocorrência para prendê-la.
+           Falhar aqui não invalida o registro, que já está salvo. */
+        try {
+          const r = await Store.enviarFoto(oc.id, arquivoFoto);
+          oc.fotoId = r.id;
+          await Store.salvarOcorrencia(oc);
+          const i = S.ocs.findIndex(x => x.id === oc.id);
+          if(i >= 0) S.ocs[i] = oc;
+        } catch(e){ toast('Registro salvo, mas a foto não subiu: ' + e.message); }
+      }
+    },
     u.papel === 'gestao' ? `Registro #${id} criado e encerrado` : `Registro #${id} enviado para ciência`
   );
 };
@@ -633,7 +677,11 @@ function fotoBloco(o){
   if(o.fotoPurgada) return `<div class="photo" style="border-style:solid">Foto removida pela política de retenção em ${esc(o.fotoPurgada)}<br><span class="fs11">A descrição e a região do corpo permanecem no registro</span></div>`;
   if(o.preservado) return `<div class="photo">1 foto · <b>preservada por decisão da gestão</b><br><span class="fs11">Fora da exclusão automática · acesso em log</span></div>`
     + (gestao ? `<button class="btn ghost sm" style="width:100%;margin-top:8px" onclick="app.preservar('${esc(o.id)}',false)">Voltar à retenção de ${CONFIG.REGRAS.retencaoFotoDias} dias</button>` : '');
-  return `<div class="photo">1 foto · visível para a cadeia de ciência e a gestão<br><span class="fs11">Acesso em log · apagada sozinha em ${o.fotoDias || CONFIG.REGRAS.retencaoFotoDias} dias</span></div>`
+  const url = o.fotoId ? Store.urlFoto(o.fotoId) : null;
+  return (url
+      ? `<div class="fotobox"><img src="${esc(url)}" alt="Foto da lesão" loading="lazy"></div>`
+      : `<div class="photo">1 foto registrada</div>`)
+    + `<p class="hint">Visível para a cadeia de ciência e a gestão · acesso em log · apagada sozinha em ${o.fotoDias || CONFIG.REGRAS.retencaoFotoDias} dias</p>`
     + (gestao ? `<button class="btn ghost sm" style="width:100%;margin-top:8px" onclick="app.preservar('${esc(o.id)}',true)">Preservar anexo (exceção)</button>` : '');
 }
 

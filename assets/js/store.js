@@ -38,24 +38,29 @@ export class ErroStore extends Error {
 
 const temApi = () => !!(CONFIG.API_URL && CONFIG.API_URL.trim());
 
-/* Apps Script não responde a preflight CORS. Enviando como text/plain a requisição
-   vira "simples" e passa direto; o servidor lê e.postData.contents como JSON. */
+/* A sessão vive num cookie httpOnly posto pelo servidor: o JavaScript daqui não o
+   alcança, então um XSS não a rouba. Como a API fica no mesmo endereço do site,
+   basta mandar as credenciais da própria origem. */
 async function api(acao, dados){
   let resposta;
   try {
     resposta = await fetch(CONFIG.API_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ acao, token: LS.ler(K.sessao, {}).token || '', dados: dados || {} }),
-      redirect: 'follow'
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ acao, dados: dados || {} })
     });
   } catch {
     throw new ErroStore('Não consegui falar com o servidor. Verifique a conexão.', 'rede');
   }
   let json;
   try { json = await resposta.json(); }
-  catch { throw new ErroStore('O servidor respondeu em formato inesperado. Confira a URL do Apps Script.', 'resposta'); }
-  if(!json || json.ok !== true) throw new ErroStore((json && json.erro) || 'Falha no servidor.', (json && json.codigo) || 'erro');
+  catch { throw new ErroStore('O servidor respondeu em formato inesperado.', 'resposta'); }
+  if(!json || json.ok !== true){
+    const e = new ErroStore((json && json.erro) || 'Falha no servidor.', (json && json.codigo) || 'erro');
+    e.http = resposta.status;
+    throw e;
+  }
   return json.dados;
 }
 
@@ -85,7 +90,10 @@ export const Store = {
   /* ---------- sessão neste aparelho ---------- */
   sessao(){ return LS.ler(K.sessao, null); },
   guardarSessao(s){ LS.gravar(K.sessao, s); },
-  sair(){ LS.apagar(K.sessao); },
+  sair(){
+    LS.apagar(K.sessao);
+    if(temApi()) api('sair').catch(() => {});
+  },
 
   aparelhoLembrado(){ return LS.ler(K.aparelho, null); },
   lembrarAparelho(login){ LS.gravar(K.aparelho, { login, desde: carimbo() }); },
@@ -118,7 +126,8 @@ export const Store = {
     const chave = await derivarChave(senha, login);
     if(temApi()){
       const r = await api('entrar', { login, chave });
-      LS.gravar(K.sessao, { token: r.token, login: r.conta.login });
+      /* Marca local só para saber que há sessão; quem autentica é o cookie. */
+      LS.gravar(K.sessao, { login: r.conta.login });
       return r.conta;
     }
     const conta = contasLocais().find(c => c.login === login);
@@ -146,10 +155,13 @@ export const Store = {
 
   /** Confere o token do aparelho e devolve a conta, ou null. */
   async retomarSessao(){
+    if(temApi()){
+      /* O cookie decide; o registro local pode nem existir, num aparelho novo. */
+      try { return await api('eu'); } catch { return null; }
+    }
     const s = this.sessao();
     if(!s || !s.login) return null;
     try {
-      if(temApi()) return await api('eu');
       const c = contasLocais().find(x => x.login === s.login && x.status === 'ativo');
       return c ? publica(c) : null;
     } catch { return null; }
@@ -285,7 +297,12 @@ export const Store = {
 
   /* ---------- dados de demonstração ---------- */
   async carregarDemo(){
-    if(temApi()) return await api('carregarDemo');
+    /* Antes isto só escrevia no log do servidor e nada era semeado: a gestão clicava
+       e nada acontecia. Agora manda os dados, que o front já tem em mãos. */
+    if(temApi()) return await api('carregarDemo', {
+      turmas: SEMENTE_TURMAS, alunos: SEMENTE_ALUNOS,
+      ocorrencias: DEMO_OCORRENCIAS, contas: DEMO_CONTAS
+    });
     const cs = contasLocais();
     for(const d of DEMO_CONTAS) if(!cs.some(c => c.login === d.login)) cs.push({ ...d, demo:true });
     gravarContasLocais(cs);
@@ -310,6 +327,39 @@ export const Store = {
     LS.gravar(K.ocs, LS.ler(K.ocs, []).filter(o => !o.demo));
     LS.gravar(K.alunos, LS.ler(K.alunos, []).filter(a => !a.demo));
     LS.gravar(K.turmas, LS.ler(K.turmas, []).filter(t => !t.demo));
+  },
+
+  /* ---------- foto ----------
+     A imagem sobe direto e sai sempre pela API, que confere a sessão e o acesso
+     àquele registro. No modo local não há onde guardar: fica só a marca. */
+  async enviarFoto(ocorrenciaId, arquivo){
+    if(!temApi()) return { id:'local', dias:CONFIG.REGRAS.retencaoFotoDias };
+    let r;
+    try {
+      r = await fetch(`${CONFIG.API_URL}/foto?ocorrencia=${encodeURIComponent(ocorrenciaId)}`, {
+        method:'POST',
+        headers:{ 'Content-Type': arquivo.type || 'image/jpeg' },
+        credentials:'same-origin',
+        body: arquivo
+      });
+    } catch { throw new ErroStore('Não consegui enviar a foto.', 'rede'); }
+    const j = await r.json().catch(() => null);
+    if(!j || j.ok !== true) throw new ErroStore((j && j.erro) || 'Falha ao enviar a foto.', 'foto');
+    return j.dados;
+  },
+
+  urlFoto(id){
+    if(!temApi() || !id || id === 'local') return null;
+    return `${CONFIG.API_URL}/foto?id=${encodeURIComponent(id)}`;
+  },
+
+  async removerFoto(id){
+    if(!temApi()) return true;
+    const r = await fetch(`${CONFIG.API_URL}/foto?id=${encodeURIComponent(id)}`,
+      { method:'DELETE', credentials:'same-origin' });
+    const j = await r.json().catch(() => null);
+    if(!j || j.ok !== true) throw new ErroStore((j && j.erro) || 'Falha ao remover a foto.', 'foto');
+    return true;
   },
 
   /** Apaga tudo deste aparelho. Só no modo local. */
