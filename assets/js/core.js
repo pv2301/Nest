@@ -70,7 +70,7 @@ export function ir(tela, { guardar = true } = {}){
 
 /** Avança um passo do wizard, deixando rastro no histórico para o gesto voltar um a um. */
 export function avancarPasso(){
-  S.passo = Math.min(5, S.passo + 1);
+  S.passo = Math.min(4, S.passo + 1);
   S.faltas = null;
   empilhar();
   const sc = document.getElementById('scroll');
@@ -246,7 +246,7 @@ function barraSuperior(){
     ? `<div class="grow"><h2>${esc(titulos[S.tela] || '')}</h2></div>`
     : `<div class="grow"><h2>${esc(c.curto)}</h2><div class="sub">${esc(c.rotulo)}</div></div>`;
   return `<div class="appbar">${esquerda}${titulo}<div style="margin-left:auto;flex:none">${SEAL}</div></div>`
-       + (S.tela === 'wizard' ? `<div class="steps">${[1,2,3,4,5].map(i=>`<i class="${i<=S.passo?'on':''}"></i>`).join('')}</div>` : '');
+       + (S.tela === 'wizard' ? `<div class="steps">${[1,2,3,4].map(i=>`<i class="${i<=S.passo?'on':''}"></i>`).join('')}</div>` : '');
 }
 
 function barraInferior(){

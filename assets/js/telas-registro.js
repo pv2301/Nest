@@ -116,9 +116,9 @@ function faltas(d){
   if(!d.categoria) f.push({ passo:1, texto:'Escolher a categoria' });
   else if(!d.tipo) f.push({ passo:1, texto:'Escolher o tipo' });
   if(d.tipo === OUTRO && !String(d.tipoOutro).trim()) f.push({ passo:1, texto:'Descrever o tipo em "Outro"' });
+  if(!d.sev) f.push({ passo:1, texto:'Escolher a gravidade' });
   if(!d.envolvidos.length) f.push({ passo:2, texto:'Selecionar ao menos uma criança' });
   else if(d.envolvidos.some(e => !e.papel)) f.push({ passo:2, texto:'Marcar o papel de cada criança' });
-  if(!d.sev) f.push({ passo:3, texto:'Escolher a gravidade' });
   if(String(d.desc).trim().length <= 8) f.push({ passo:3, texto:'Escrever a descrição do ocorrido' });
   if(!d.presenciou && !String(d.informanteNome).trim()) f.push({ passo:3, texto:'Informar quem relatou' });
   return f;
@@ -259,17 +259,30 @@ function sinalRecentes(){
    crianças de turmas distintas, e é a turma de cada uma que decide para qual Miss vai
    a ciência. Vem preenchida do cadastro, e dá para corrigir aqui. */
 function cardEnvolvido(e, i){
-  const a = aluno(e.kid), turmas = nomesTurmas();
-  return `<div class="card flat">
-    <div class="row" style="margin-bottom:8px">
+  const d = S.rascunho, a = aluno(e.kid), turmas = nomesTurmas();
+  const cond = d.cond[e.kid] || '';
+  /* A região do corpo só faz sentido quando houve lesão. Perguntar sempre enchia a
+     tela com doze botões inúteis para quem só voltou às atividades. */
+  const temLesao = cond === 'Marca/lesão visível' || cond === 'Relatou dor/desconforto';
+  return `<div class="card flat stack s8">
+    <div class="row">
       <span class="avatar sm">${esc(iniciais(a.nome))}</span>
       <b class="fs13 grow">${esc(a.nome)}</b>
       ${e.turma ? `<span class="pill">${esc(e.turma)}</span>` : '<span class="pill off">sem turma</span>'}
+      <button class="chip sm" style="min-height:28px;padding:4px 9px" onclick="app.togKid('${esc(e.kid)}')" aria-label="Remover">&times;</button>
     </div>
-    <p class="fs11 muted" style="margin:0 0 5px">Papel nesta ocorrência</p>
-    <div class="chips">${PAPEIS_ENVOLVIDO.map(p => `<button class="chip sm" aria-pressed="${e.papel === p}" onclick="app.papelEnvolvido(${i},'${p}')">${p}</button>`).join('')}</div>
-    ${turmas.length ? `<p class="fs11 muted" style="margin:9px 0 5px">Turma</p>
-      <div class="chips">${turmas.map(t => `<button class="chip sm" aria-pressed="${e.turma === t}" onclick="app.turmaEnvolvido(${i},'${esc(t)}')">${esc(t)}</button>`).join('')}</div>` : ''}
+
+    <div><p class="fs11 muted" style="margin:0 0 5px">Papel nesta ocorrência</p>
+      <div class="chips">${PAPEIS_ENVOLVIDO.map(p => `<button class="chip sm" aria-pressed="${e.papel === p}" onclick="app.papelEnvolvido(${i},'${p}')">${p}</button>`).join('')}</div></div>
+
+    ${turmas.length ? `<div><p class="fs11 muted" style="margin:0 0 5px">Turma</p>
+      <div class="chips">${turmas.map(t => `<button class="chip sm" aria-pressed="${e.turma === t}" onclick="app.turmaEnvolvido(${i},'${esc(t)}')">${esc(t)}</button>`).join('')}</div></div>` : ''}
+
+    <div><p class="fs11 muted" style="margin:0 0 5px">Como ficou</p>
+      <div class="chips">${CONDICOES.map(c => `<button class="chip sm" aria-pressed="${cond === c}" onclick="app.campoObj('cond','${esc(e.kid)}','${esc(c)}')">${esc(c)}</button>`).join('')}</div></div>
+
+    ${temLesao ? `<div><p class="fs11 muted" style="margin:0 0 5px">Onde é a marca ou lesão</p>
+      <div class="bodymap">${REGIOES.filter(r => r !== 'Não se aplica').map(r => `<button aria-pressed="${d.lesao[e.kid] === r}" onclick="app.campoObj('lesao','${esc(e.kid)}','${esc(r)}')">${esc(r)}</button>`).join('')}</div></div>` : ''}
   </div>`;
 }
 
@@ -429,6 +442,8 @@ registrarTela('wizard', () => {
   const d = S.rascunho, st = S.passo;
   let corpo = '';
 
+  /* 1 — classificar o que aconteceu. Gravidade entra aqui, ao lado de categoria e
+     tipo, porque é a mesma pergunta: que tipo de coisa foi, e quão séria. */
   if(st === 1) corpo = `<div class="stack s18">
     <div><p class="sec-label">1 · Categoria do registro</p><div class="chips">
       ${Object.keys(CATS).map(c => `<button class="chip" aria-pressed="${d.categoria === c}" onclick="app.escolherCat('${esc(c)}')">${esc(c)}</button>`).join('')}</div></div>
@@ -437,22 +452,26 @@ registrarTela('wizard', () => {
       ${d.tipo === OUTRO ? `<div class="field" style="margin-top:9px"><label for="w-tipo">Qual?</label>
         <input class="input" id="w-tipo" value="${esc(d.tipoOutro)}" oninput="app.campoTxt('tipoOutro',this.value)"></div>` : ''}</div>`
       : `<p class="fs12 muted" style="margin:0">Escolha a categoria para ver os tipos.</p>`}
+    ${d.tipo ? `<div><p class="sec-label">Gravidade</p>${sevPicker()}
+      <p class="hint">A Miss que receber a ciência confirma ou corrige este nível.</p></div>` : ''}
   </div>`;
 
+  /* 2 — quem: um cartão por criança, com papel, turma, como ficou e lesão.
+     Antes cada criança aparecia duas vezes, em passos distantes. */
   if(st === 2) corpo = `<div class="stack s18">
     <div><p class="sec-label">2 · Quem esteve envolvido</p>${seletorAlunos()}</div>
     ${dialogoAvulso()}
     ${sinalRecentes()}
-    ${d.envolvidos.length ? `<div><p class="sec-label">Papel de cada criança</p><div class="stack s8">
+    ${d.envolvidos.length ? `<div class="stack s8">
       ${d.envolvidos.map((e, i) => cardEnvolvido(e, i)).join('')}</div>
-      <p class="fs11 muted" style="margin:8px 0 0">Uma ocorrência, não duas fichas. Crianças de turmas diferentes podem estar no mesmo registro: a ciência vai para a Miss de cada turma envolvida.</p></div>` : ''}
-    ${blocoQuando()}
-    ${blocoOnde()}
+      <p class="fs11 muted" style="margin:0">Uma ocorrência, não duas fichas. Crianças de turmas diferentes podem estar no mesmo registro: a ciência vai para a Miss de cada turma envolvida.</p>` : ''}
   </div>`;
 
+  /* 3 — contexto: quando, onde, de onde veio a informação e o relato. */
   if(st === 3) corpo = `<div class="stack s18">
-    <div><p class="sec-label">3 · Gravidade</p>${sevPicker()}
-      <p class="hint">A Miss confirma ou corrige este nível ao dar ciência.</p></div>
+    <p class="sec-label">3 · Contexto</p>
+    ${blocoQuando()}
+    ${blocoOnde()}
     ${blocoPresenciou()}
     ${campoDescricao('w-desc')}
     <div><p class="sec-label">Foto da lesão (opcional)</p>
@@ -461,38 +480,31 @@ registrarTela('wizard', () => {
              <button class="btn ghost sm" style="width:100%;margin-top:8px" onclick="app.tirarFoto(true)">Remover foto</button></div>`
         : `<label class="photo" for="w-foto" style="cursor:pointer">Tirar foto · só a região da lesão, sem rosto e sem outras crianças</label>
            <input type="file" id="w-foto" accept="image/*" capture="environment" hidden onchange="app.escolherFoto(this)">`}
-      <p class="hint">A imagem sobe direto, sem passar pela galeria do aparelho. Ela só é exibida a quem está na cadeia de ciência e à gestão, todo acesso fica em log, e é apagada sozinha ${CONFIG.REGRAS.retencaoFotoDias} dias depois.</p></div>
+      <p class="hint">A imagem sobe direto, sem passar pela galeria do aparelho. Só é exibida a quem está na cadeia de ciência e à gestão, todo acesso fica em log, e é apagada sozinha ${CONFIG.REGRAS.retencaoFotoDias} dias depois.</p></div>
   </div>`;
 
-  if(st === 4) corpo = `<div class="stack s18">
-    <div><p class="sec-label">4 · O que foi feito</p><div class="chips">
-      ${PROVIDENCIAS.map(p => `<button class="chip" aria-pressed="${d.prov.includes(p)}" onclick="app.togArr('prov','${esc(p)}')">${esc(p)}</button>`).join('')}</div></div>
-    ${d.tipo === 'Mordida' ? `<div class="card flat"><p class="sec-label">Cuidados para mordida</p>
-      <div class="stack s6 fs12">
-        ${['Lavar com água e sabão','Compressa fria por 5 minutos','Observar inchaço e rompimento da pele','Se houver rompimento, comunicar a coordenação']
-          .map((t, i) => `<div class="row" style="gap:7px"><span>${i+1}.</span><div class="grow">${t}</div></div>`).join('')}
-      </div></div>` : ''}
-  </div>`;
-
-  if(st === 5){
+  /* 4 — providências e revisão. */
+  if(st === 4){
     const dest = destinoCiencia();
     corpo = `<div class="stack s18">
-      <div><p class="sec-label">5 · Como cada criança ficou</p>
-        ${d.envolvidos.length ? `<div class="stack s8">${d.envolvidos.map(e => `<div class="card stack s8">
-          <div class="row"><span class="avatar sm">${esc(iniciais(aluno(e.kid).nome))}</span>
-            <b class="fs13 grow">${esc(aluno(e.kid).nome)}</b>${e.papel ? `<span class="pill">${esc(e.papel)}</span>` : ''}</div>
-          <div class="chips">${CONDICOES.map(c => `<button class="chip sm" aria-pressed="${d.cond[e.kid] === c}" onclick="app.campoObj('cond','${e.kid}','${esc(c)}')">${esc(c)}</button>`).join('')}</div>
-          <div><p class="fs11 muted" style="margin:2px 0 6px">Região da marca ou lesão</p>
-            <div class="bodymap">${REGIOES.map(r => `<button aria-pressed="${d.lesao[e.kid] === r}" onclick="app.campoObj('lesao','${e.kid}','${esc(r)}')">${esc(r)}</button>`).join('')}</div></div>
-        </div>`).join('')}</div>` : '<p class="fs13 muted">Volte ao passo 2 e selecione as crianças envolvidas.</p>'}
-      </div>
+      <div><p class="sec-label">4 · O que foi feito</p><div class="chips">
+        ${PROVIDENCIAS.map(p => `<button class="chip" aria-pressed="${d.prov.includes(p)}" onclick="app.togArr('prov','${esc(p)}')">${esc(p)}</button>`).join('')}</div></div>
+
+      ${d.tipo === 'Mordida' ? `<div class="card flat"><p class="sec-label">Cuidados para mordida</p>
+        <div class="stack s6 fs12">
+          ${['Lavar com água e sabão','Compressa fria por 5 minutos','Observar inchaço e rompimento da pele','Se houver rompimento, comunicar a coordenação']
+            .map((t, i) => `<div class="row" style="gap:7px"><span>${i+1}.</span><div class="grow">${t}</div></div>`).join('')}
+        </div></div>` : ''}
 
       ${blocoFaltas()}
 
       <div class="card"><p class="sec-label">Revisão</p><dl class="kv">
         <dt>Categoria</dt><dd>${esc(d.categoria || '—')}${d.tipo ? ' · ' + esc(d.tipo === OUTRO ? d.tipoOutro || 'Outro' : d.tipo) : ''}</dd>
-        <dt>Envolvidos</dt><dd>${d.envolvidos.map(e => esc(aluno(e.kid).nome) + (e.papel ? ` <span class="muted">(${esc(e.papel)})</span>` : ' <span class="muted">(sem papel)</span>')).join('<br>') || '—'}</dd>
         <dt>Gravidade</dt><dd>${d.sev ? sevTag(d.sev) : '—'}</dd>
+        <dt>Envolvidos</dt><dd>${d.envolvidos.map(e => esc(aluno(e.kid).nome)
+          + (e.papel ? ` <span class="muted">(${esc(e.papel)})</span>` : ' <span class="muted">(sem papel)</span>')
+          + (d.cond[e.kid] ? `<br><span class="fs11 muted">${esc(d.cond[e.kid])}${d.lesao[e.kid] ? ' · ' + esc(d.lesao[e.kid]) : ''}</span>` : '')
+        ).join('<br>') || '—'}</dd>
         <dt>Quando</dt><dd>${esc(quandoLegivel(d.quandoISO))}</dd>
         <dt>Onde</dt><dd>${esc(d.local === OUTRO ? (d.localOutro || 'Outro') : (d.local || '—'))}</dd>
         <dt>Origem</dt><dd>${d.presenciou ? 'Presenciou' : 'Informada por ' + esc(d.informanteNome || '—') + (d.informanteCanal ? ' · ' + esc(d.informanteCanal) : '')}</dd>
@@ -506,11 +518,11 @@ registrarTela('wizard', () => {
           <div class="body"><b class="fs13">${esc(n.q)}</b><div class="fs11 muted">${esc(n.p)}</div></div></div>`).join('')}</div></div>
 
       <div class="notice calm"><span class="ic">◆</span><div>Você pode editar este registro até a primeira ciência, ou por ${CONFIG.REGRAS.travaEdicaoHoras}h — o que vier primeiro. Depois disso, só acrescentar adendos.</div></div>
-      <button class="btn" onclick="app.tentarEnviar()">Enviar registro</button>
+      <button class="btn" id="btn-enviar" onclick="app.tentarEnviar()">Enviar registro</button>
     </div>`;
   }
 
-  const nav = st < 5 ? `<div class="row" style="gap:9px;margin-top:20px">
+  const nav = st < 4 ? `<div class="row" style="gap:9px;margin-top:20px">
       ${st > 1 ? '<button class="btn ghost" onclick="app.passo(-1)">Voltar</button>' : ''}
       <button class="btn" onclick="app.passo(1)">Continuar</button></div>` : '';
   return corpo + nav;

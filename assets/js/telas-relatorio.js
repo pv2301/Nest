@@ -1,10 +1,12 @@
 /* Ficha completa da ocorrência, para imprimir ou salvar em PDF.
 
-   Dois modos de identificação, porque são dois destinos diferentes:
-   - Interna: todas as crianças nomeadas. Vai para o arquivo da escola.
-   - Para a família: só a criança daquela família é nomeada; as demais viram
-     "outra criança". É a regra de sigilo do documento em papel — preservar a
-     identidade das outras crianças — aplicada por construção, não por disciplina.
+   Três modos, porque são três destinos diferentes — e o padrão é o mais fechado:
+   - Anonimizado: ninguém é nomeado (Criança A, Criança B). É o padrão, porque a
+     maior parte dos usos — estudar o caso, levar a uma reunião, circular entre a
+     equipe — não precisa de nome nenhum.
+   - Para a família: só a criança daquela família é nomeada; as demais seguem
+     anônimas. É a regra de sigilo do documento em papel aplicada por construção.
+   - Uso interno: todas nomeadas. Para o arquivo da escola.
 
    A impressão usa window.print(), que aqui funciona por ser um site comum. O próprio
    navegador oferece "Salvar como PDF", sem nenhuma dependência. */
@@ -16,7 +18,10 @@ import { tipoDe, localDe, quandoTexto } from './telas-registro.js';
 
 app.abrirFicha = id => {
   const o = S.ocs.find(x => x.id === id);
-  S.ficha = { id, modo:'interna', focoKid: (o && o.envolvidos && o.envolvidos[0]) ? o.envolvidos[0].kid : null, incluirFoto:false };
+  /* Nasce anonimizado: identificar é uma escolha deliberada, não o padrão. */
+  S.ficha = { id, modo:'anonimo',
+    focoKid: (o && o.envolvidos && o.envolvidos[0]) ? o.envolvidos[0].kid : null,
+    incluirFoto:false };
   ir('ficha');
 };
 
@@ -28,32 +33,41 @@ app.imprimirFicha = () => {
   window.print();
 };
 
-/** Nome a exibir conforme o modo. No modo família, só a criança escolhida é nomeada. */
+/** Rótulo da criança conforme o modo. Anônimo vira Criança A, Criança B… pela ordem
+    em que aparece no registro, para a ficha continuar legível sem nomear ninguém. */
 function nomeNaFicha(kid, idx){
   const f = S.ficha;
-  if(f.modo === 'interna' || kid === f.focoKid) return aluno(kid).nome;
-  return 'Outra criança' + (idx > 0 ? ' ' + String.fromCharCode(64 + idx) : '');
+  if(f.modo === 'interna') return aluno(kid).nome;
+  if(f.modo === 'familia' && kid === f.focoKid) return aluno(kid).nome;
+  return 'Criança ' + String.fromCharCode(65 + idx);
 }
+
+/** A turma só aparece quando alguém já está nomeado: turma somada a data identifica. */
+const mostraTurma = () => S.ficha.modo === 'interna';
 
 registrarTela('ficha', () => {
   const o = S.ocs.find(x => x.id === S.ficha.id);
   if(!o) return `<div class="empty"><div class="big">Registro não encontrado</div></div>`;
   const f = S.ficha;
   const envolvidos = o.envolvidos || [];
-  const anonimos = f.modo === 'familia' && envolvidos.length > 1;
+  const semNome = envolvidos.filter((e, i) => nomeNaFicha(e.kid, i) !== aluno(e.kid).nome).length;
 
   const controles = `
     <div class="naoimprime stack s18">
       <div>
         <p class="sec-label">Para quem é esta ficha</p>
         <div class="stack s8">
-          <button class="switch" aria-pressed="${f.modo === 'interna'}" onclick="app.fichaModo('interna')">
-            <span class="grow"><span style="display:block;font-size:13px;font-weight:600">Uso interno</span>
-            <span class="fs11 muted">Todas as crianças nomeadas. Para o arquivo da escola.</span></span>
+          <button class="switch" aria-pressed="${f.modo === 'anonimo'}" onclick="app.fichaModo('anonimo')">
+            <span class="grow"><span style="display:block;font-size:13px;font-weight:600">Sem identificar <span class="pill" style="font-size:9.5px">padrão</span></span>
+            <span class="fs11 muted">Ninguém é nomeado: Criança A, Criança B. Serve para estudar o caso, levar a uma reunião ou circular na equipe.</span></span>
             <span class="track"></span></button>
           <button class="switch" aria-pressed="${f.modo === 'familia'}" onclick="app.fichaModo('familia')">
             <span class="grow"><span style="display:block;font-size:13px;font-weight:600">Para a família</span>
-            <span class="fs11 muted">Só a criança da família é nomeada; as demais viram "outra criança".</span></span>
+            <span class="fs11 muted">Só a criança daquela família é nomeada; as demais seguem anônimas.</span></span>
+            <span class="track"></span></button>
+          <button class="switch" aria-pressed="${f.modo === 'interna'}" onclick="app.fichaModo('interna')">
+            <span class="grow"><span style="display:block;font-size:13px;font-weight:600">Uso interno</span>
+            <span class="fs11 muted">Todas as crianças nomeadas. Para o arquivo da escola.</span></span>
             <span class="track"></span></button>
         </div>
       </div>
@@ -67,8 +81,10 @@ registrarTela('ficha', () => {
         <span class="grow"><span style="display:block;font-size:13px;font-weight:600">Incluir a foto do anexo</span>
         <span class="fs11 muted">Desmarcado por padrão.</span></span><span class="track"></span></button>` : ''}
 
-      ${anonimos ? `<div class="notice calm"><span class="ic">◆</span><div>
-        Na versão impressa, ${envolvidos.length - 1} criança(s) ${envolvidos.length - 1 > 1 ? 'aparecem' : 'aparece'} sem nome.</div></div>` : ''}
+      ${semNome ? `<div class="notice calm"><span class="ic">◆</span><div>
+        Na versão impressa, ${semNome} ${semNome > 1 ? 'crianças aparecem' : 'criança aparece'} sem nome.</div></div>`
+       : `<div class="notice info"><span class="ic">!</span><div>
+        Esta versão identifica ${envolvidos.length > 1 ? 'todas as crianças' : 'a criança'}. Use só para o arquivo da escola.</div></div>`}
 
       <button class="btn" onclick="app.imprimirFicha()">Imprimir ou salvar em PDF</button>
       <p class="fs11 muted center" style="margin:0">Na janela de impressão, escolha "Salvar como PDF" no destino.</p>
@@ -104,7 +120,7 @@ registrarTela('ficha', () => {
         <table class="ficha-tab">
           <thead><tr><th>Criança</th><th>Papel</th><th>Como ficou</th><th>Marca ou lesão</th></tr></thead>
           <tbody>${envolvidos.map((e, i) => `<tr>
-            <td>${esc(nomeNaFicha(e.kid, i))}${f.modo === 'interna' && aluno(e.kid).turma ? `<br><span class="ficha-sub">Turma ${esc(aluno(e.kid).turma)}</span>` : ''}</td>
+            <td>${esc(nomeNaFicha(e.kid, i))}${mostraTurma() && aluno(e.kid).turma ? `<br><span class="ficha-sub">Turma ${esc(aluno(e.kid).turma)}</span>` : ''}</td>
             <td>${esc(e.papel || '—')}</td>
             <td>${esc(e.cond || '—')}</td>
             <td>${esc(e.lesao || '—')}</td>
@@ -142,7 +158,9 @@ registrarTela('ficha', () => {
         ? `<section><h2>Anexo</h2><p class="ficha-texto">1 fotografia da região da lesão, arquivada no sistema.</p></section>` : ''}
 
       <footer class="ficha-rodape">
-        <p>Documento gerado em ${esc(quandoLegivel(new Date().toISOString()))}${f.modo === 'familia' ? ' · versão para a família, com as demais crianças não identificadas' : ' · versão de uso interno'}.</p>
+        <p>Documento gerado em ${esc(quandoLegivel(new Date().toISOString()))}${{ anonimo:' · versão sem identificação das crianças',
+    familia:' · versão para a família, com as demais crianças não identificadas',
+    interna:' · versão de uso interno, com as crianças identificadas' }[f.modo]}.</p>
         <p>Registrar fatos observáveis, com linguagem clara, objetiva e respeitosa. Este documento é interno e deve ser acessado apenas por profissionais autorizados.</p>
       </footer>
     </article>`;
