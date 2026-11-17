@@ -163,7 +163,8 @@ app.filtrarTurma = t => { S.filtroTurma = S.filtroTurma === t ? '' : t; render()
 
 app.togKid = id => {
   const d = S.rascunho, i = d.envolvidos.findIndex(e => e.kid === id);
-  if(i >= 0) d.envolvidos.splice(i, 1); else d.envolvidos.push({ kid:id, papel:'' });
+  if(i >= 0) d.envolvidos.splice(i, 1);
+  else d.envolvidos.push({ kid:id, papel:'', turma: aluno(id).turma || '' });
   render();
 };
 
@@ -222,6 +223,29 @@ function sinalRecentes(){
   /* Para quem não é gestão: só a existência, nunca a quantidade nem o conteúdo. */
   return `<div class="notice info"><span class="ic">◆</span><div>${comRegistro.map(x => '<b>' + esc(x.a.nome) + '</b>').join(' e ')} ${comRegistro.length > 1 ? 'têm' : 'tem'} registros recentes. Converse com a coordenação.</div></div>`;
 }
+
+/* Cada criança carrega a sua turma no próprio registro: uma ocorrência pode envolver
+   crianças de turmas distintas, e é a turma de cada uma que decide para qual Miss vai
+   a ciência. Vem preenchida do cadastro, e dá para corrigir aqui. */
+function cardEnvolvido(e, i){
+  const a = aluno(e.kid), turmas = nomesTurmas();
+  return `<div class="card flat">
+    <div class="row" style="margin-bottom:8px">
+      <span class="avatar sm">${esc(iniciais(a.nome))}</span>
+      <b class="fs13 grow">${esc(a.nome)}</b>
+      ${e.turma ? `<span class="pill">${esc(e.turma)}</span>` : '<span class="pill off">sem turma</span>'}
+    </div>
+    <p class="fs11 muted" style="margin:0 0 5px">Papel nesta ocorrência</p>
+    <div class="chips">${PAPEIS_ENVOLVIDO.map(p => `<button class="chip sm" aria-pressed="${e.papel === p}" onclick="app.papelEnvolvido(${i},'${p}')">${p}</button>`).join('')}</div>
+    ${turmas.length ? `<p class="fs11 muted" style="margin:9px 0 5px">Turma</p>
+      <div class="chips">${turmas.map(t => `<button class="chip sm" aria-pressed="${e.turma === t}" onclick="app.turmaEnvolvido(${i},'${esc(t)}')">${esc(t)}</button>`).join('')}</div>` : ''}
+  </div>`;
+}
+
+app.turmaEnvolvido = (i, t) => {
+  S.rascunho.envolvidos[i].turma = S.rascunho.envolvidos[i].turma === t ? '' : t;
+  render();
+};
 
 const sevPicker = () => `<div class="sevpick">${[1,2,3,4].map(n => `
   <button data-n="${n}" aria-pressed="${S.rascunho.sev === n}" onclick="app.campo('sev',${n})">
@@ -362,11 +386,7 @@ registrarTela('rapido', () => {
     ${dialogoAvulso()}
     ${sinalRecentes()}
     ${d.envolvidos.length ? `<div><p class="sec-label">Papel de cada criança</p><div class="stack s8">
-      ${d.envolvidos.map((e, i) => `<div class="card flat">
-        <div class="row" style="margin-bottom:8px"><span class="avatar sm">${esc(iniciais(aluno(e.kid).nome))}</span>
-          <b class="fs13 grow">${esc(aluno(e.kid).nome)}</b></div>
-        <div class="chips">${PAPEIS_ENVOLVIDO.map(p => `<button class="chip sm" aria-pressed="${e.papel === p}" onclick="app.papelEnvolvido(${i},'${p}')">${p}</button>`).join('')}</div>
-      </div>`).join('')}</div></div>` : ''}
+      ${d.envolvidos.map((e, i) => cardEnvolvido(e, i)).join('')}</div></div>` : ''}
     <div><p class="sec-label">3 · Gravidade</p>${sevPicker()}</div>
     ${campoDescricao('r-desc')}
     <button class="btn" onclick="app.tentarEnviar()">Enviar registro</button>
@@ -393,13 +413,8 @@ registrarTela('wizard', () => {
     ${dialogoAvulso()}
     ${sinalRecentes()}
     ${d.envolvidos.length ? `<div><p class="sec-label">Papel de cada criança</p><div class="stack s8">
-      ${d.envolvidos.map((e, i) => `<div class="card flat">
-        <div class="row" style="margin-bottom:8px"><span class="avatar sm">${esc(iniciais(aluno(e.kid).nome))}</span>
-          <b class="fs13 grow">${esc(aluno(e.kid).nome)}</b>
-          <span class="fs11 muted">${esc(aluno(e.kid).turma || '—')}</span></div>
-        <div class="chips">${PAPEIS_ENVOLVIDO.map(p => `<button class="chip sm" aria-pressed="${e.papel === p}" onclick="app.papelEnvolvido(${i},'${p}')">${p}</button>`).join('')}</div>
-      </div>`).join('')}</div>
-      <p class="fs11 muted" style="margin:8px 0 0">Uma ocorrência, não duas fichas. É o papel que permite saber, depois, quem causou e quem sofreu.</p></div>` : ''}
+      ${d.envolvidos.map((e, i) => cardEnvolvido(e, i)).join('')}</div>
+      <p class="fs11 muted" style="margin:8px 0 0">Uma ocorrência, não duas fichas. Crianças de turmas diferentes podem estar no mesmo registro: a ciência vai para a Miss de cada turma envolvida.</p></div>` : ''}
     ${blocoQuando()}
     ${blocoOnde()}
   </div>`;
@@ -480,7 +495,7 @@ function missDaTurma(turma){
 
 function destinoCiencia(){
   const u = S.conta, d = S.rascunho, out = [];
-  const turmas = [...new Set(d.envolvidos.map(e => aluno(e.kid).turma).filter(Boolean))];
+  const turmas = [...new Set(d.envolvidos.map(e => e.turma || aluno(e.kid).turma).filter(Boolean))];
 
   if(u.papel === 'gestao'){
     out.push({ q:'Encerrado por você', p:'A gestão registra e conclui no mesmo ato' });
@@ -518,6 +533,7 @@ app.enviar = async () => {
     quandoISO:d.quandoISO, criadoEm:new Date().toISOString(),
     autor:u.nome, autorLogin:u.login, autorPapel:u.papel,
     envolvidos: d.envolvidos.map(e => ({ kid:e.kid, papel:e.papel,
+      turma: e.turma || aluno(e.kid).turma || '',
       cond:d.cond[e.kid] || '—', lesao:d.lesao[e.kid] || '' })),
     desc:d.desc, prov:d.prov, foto:d.foto,
     fotoDias: d.foto ? CONFIG.REGRAS.retencaoFotoDias : undefined,
@@ -525,7 +541,7 @@ app.enviar = async () => {
     informante: d.presenciou ? null : { nome:d.informanteNome, canal:d.informanteCanal },
     chain: chain.length ? chain : [{ nivel:'Gestão', st:'now' }],
     status:'aguarda_miss', prazo:CONFIG.REGRAS.travaEdicaoHoras + 'h restantes',
-    duas: [...new Set(d.envolvidos.map(e => aluno(e.kid).turma))].filter(Boolean).length > 1
+    duas: [...new Set(d.envolvidos.map(e => e.turma || aluno(e.kid).turma))].filter(Boolean).length > 1
   };
   if(u.papel === 'gestao'){
     oc.chain = [{ nivel:'Gestão', st:'ok', quando:agoraHora(), parecer:'Registrado e encerrado pela gestão.' }];
@@ -611,7 +627,7 @@ registrarTela('detalhe', () => {
       ${(o.envolvidos || []).map(e => `<div class="card flat">
         <div class="row" style="margin-bottom:6px"><span class="avatar sm">${esc(iniciais(aluno(e.kid).nome))}</span>
           <b class="fs13 grow">${esc(aluno(e.kid).nome)}</b><span class="pill">${esc(e.papel || '—')}</span></div>
-        <div class="fs12 muted">Turma ${esc(aluno(e.kid).turma || '—')} · ${esc(e.cond)}${e.lesao ? ' · marca em ' + esc(e.lesao) : ''}</div>
+        <div class="fs12 muted">Turma ${esc(e.turma || aluno(e.kid).turma || '—')} · ${esc(e.cond)}${e.lesao ? ' · marca em ' + esc(e.lesao) : ''}</div>
       </div>`).join('')}</div></div>
 
     <div><p class="sec-label">Descrição</p><p class="fs13" style="margin:0">${esc(o.desc)}</p></div>

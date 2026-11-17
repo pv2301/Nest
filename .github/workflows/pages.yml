@@ -41,6 +41,21 @@ jobs:
         with:
           enablement: true
 
+      # O navegador guarda cada módulo ES em cache pela URL. Sem isto, publicar não
+      # garante que o aparelho pegue a versão nova — foi assim que um celular ficou
+      # preso no modo local depois de o backend já estar ligado.
+      - name: Carimbar a versão nas URLs dos arquivos
+        run: |
+          V="${GITHUB_SHA::8}"
+          echo "Versão: $V"
+          sed -i -E "s|(src=\"assets/js/app\.js)\"|\1?v=$V\"|" index.html
+          sed -i -E "s|(href=\"assets/css/app\.css)\"|\1?v=$V\"|" index.html
+          # imports relativos dentro dos módulos: './x.js' e '../../config.js'
+          sed -i -E "s|from '(\.[^']*\.js)'|from '\1?v=$V'|g" assets/js/*.js
+          echo "--- conferência ---"
+          grep -o 'assets/js/app.js?v=[a-f0-9]*' index.html
+          grep -ho "from '\..*?v=$V'" assets/js/app.js | head -3
+
       - name: Empacotar o site
         uses: actions/upload-pages-artifact@v3
         with:

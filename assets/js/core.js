@@ -64,7 +64,13 @@ export function toast(msg){
   S.toastMsg = msg;
   render();
   clearTimeout(tToast);
-  tToast = setTimeout(() => { S.toastMsg = null; render(); }, 3000);
+  /* Só remove o aviso da tela. Re-renderizar aqui apagaria o que a pessoa estivesse
+     digitando no instante em que o tempo acabasse — foi assim que um cadastro perdeu
+     o nome já preenchido. */
+  tToast = setTimeout(() => {
+    S.toastMsg = null;
+    document.querySelectorAll('.toast').forEach(t => t.remove());
+  }, 3000);
 }
 
 export function erroForm(msg){ S.formErro = msg; render(); }
