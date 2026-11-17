@@ -12,7 +12,8 @@ name: Publicar site
 
 on:
   push:
-    branches: [main, ccr-c0b9af95-o5sryf]
+    # Só a branch padrão: um push em qualquer outra falharia na regra do ambiente.
+    branches: [ccr-c0b9af95-o5sryf]
   workflow_dispatch:
 
 permissions:
