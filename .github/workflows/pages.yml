@@ -1,18 +1,18 @@
-# Publica o site no GitHub Pages a cada push na main.
+# Publica o site no GitHub Pages a cada push.
 #
-# O passo "configure-pages" com enablement: true ATIVA o Pages sozinho na primeira
-# execução, usando o token do próprio workflow — não é preciso mexer em
-# Settings → Pages.
+# IMPORTANTE: o ambiente "github-pages" só aceita deploy da BRANCH PADRÃO do
+# repositório. Hoje a padrão é ccr-c0b9af95-o5sryf. Se a padrão for trocada para
+# main (Settings → General → Default branch), a publicação passa a sair de lá e
+# esta lista pode ser reduzida a [main].
 #
-# Se este workflow falhar com 403 em "configure-pages", o repositório está com
-# Settings → Actions → General → Workflow permissions em somente leitura.
-# Mude para "Read and write permissions", salve, e execute o workflow de novo.
+# Uma execução a partir de uma branch que não é a padrão falha em segundos, sem
+# rodar nenhum passo — é a regra do ambiente recusando, não erro do workflow.
 
 name: Publicar site
 
 on:
   push:
-    branches: [main]
+    branches: [main, ccr-c0b9af95-o5sryf]
   workflow_dispatch:
 
 permissions:
