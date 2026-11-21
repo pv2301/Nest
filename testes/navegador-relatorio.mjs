@@ -17,6 +17,11 @@ import { createRequire } from 'node:module';
 const { chromium } = createRequire(import.meta.url)('playwright');
 
 const BASE = process.env.BASE_TESTE || 'http://localhost:8222/';
+
+/* As escolhas viraram campo com lista: a suíte aciona o componente diretamente, em
+   vez de caçar chips. Quem exercita o componente pela interface é navegador-busca. */
+const escolher = (p, id, v) => p.evaluate(([i, x]) => app.escolherLista(i, x), [id, v]);
+
 let f=[]; const ok=(n,c,x)=>{ if(c) console.log('  OK '+n); else { f.push(n); console.log('  XX '+n+(x?'\n       '+x:'')); } };
 const prim = n => n.split(' ')[0];
 (async()=>{
@@ -33,25 +38,24 @@ const prim = n => n.split(' ')[0];
  /* Duas crianças envolvidas e uma terceira citada só na narrativa: é o caso que a
     anonimização de fachada deixava passar. */
  await p.evaluate(()=>app.iniciar('completo')); await p.waitForTimeout(700);
- await p.click('.chip:text-is("Incidente")'); await p.waitForTimeout(350);
- await p.click('.chip:text-is("Mordida")'); await p.waitForTimeout(350);
+ await escolher(p, 'cat', 'Incidente'); await p.waitForTimeout(350);
+ await escolher(p, 'tipo', 'Mordida'); await p.waitForTimeout(350);
  await p.click('.sevpick button[data-n="2"]'); await p.waitForTimeout(350);
  await p.evaluate(()=>app.irPasso(2)); await p.waitForTimeout(700);
- /* O chip é: iniciais, nome, turma. O nome é a linha do meio — pegar a última
-    trazia a TURMA, e a narrativa do teste saía com "Verde e Verde". */
- const nomeDoChip = async i => {
-   const linhas = (await p.locator('.pick.kid').nth(i).innerText())
-     .split('\n').map(x => x.trim()).filter(Boolean);
-   return linhas[1] || linhas[0];
- };
- const n1 = await nomeDoChip(0), n2 = await nomeDoChip(1), n3 = await nomeDoChip(2);
+
+ /* Os três primeiros alunos da lista, pelo id e pelo nome. */
+ await p.evaluate(()=>app.abrirLista('kids')); await p.waitForTimeout(600);
+ const alunos = await p.evaluate(() => Array.from(document.querySelectorAll('.cl-op')).slice(0, 3)
+   .map(b => ({ id: (b.getAttribute('onclick').match(/,'([^']+)'/) || [])[1],
+                nome: b.querySelector('.cl-nome').textContent.trim() })));
+ const [a1, a2, a3] = alunos;
+ const n1 = a1.nome, n2 = a2.nome, n3 = a3.nome;
  console.log(`  (crianças do teste: ${n1} / ${n2} / ${n3})`);
- await p.locator('.pick.kid').nth(0).click(); await p.waitForTimeout(450);
- await p.locator('.pick.kid').nth(1).click(); await p.waitForTimeout(450);
- const cartoes=p.locator('.card.flat:has(.chip.sm)');
- await cartoes.nth(0).locator('.chip.sm:text-is("Sofreu")').click(); await p.waitForTimeout(250);
- await cartoes.nth(0).locator('.chip.sm:text-is("Permaneceu chorosa")').click(); await p.waitForTimeout(250);
- await cartoes.nth(1).locator('.chip.sm:text-is("Causou")').click(); await p.waitForTimeout(250);
+ await escolher(p, 'kids', a1.id); await p.waitForTimeout(400);
+ await escolher(p, 'kids', a2.id); await p.waitForTimeout(500);
+ await escolher(p, 'papel-0', 'Sofreu'); await p.waitForTimeout(250);
+ await escolher(p, 'cond-0', 'Permaneceu chorosa'); await p.waitForTimeout(250);
+ await escolher(p, 'papel-1', 'Causou'); await p.waitForTimeout(250);
 
  await p.evaluate(()=>app.irPasso(3)); await p.waitForTimeout(700);
  const DESC = `${prim(n1)} e ${prim(n2)} disputavam o balde. ${prim(n2)} mordeu a mão de ${prim(n1)}. ${prim(n3)} chamou a Miss.`;

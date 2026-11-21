@@ -18,7 +18,8 @@
 
 import { S, app, registrarTela, ir, toast, render, aluno } from './core.js';
 import { Store } from './store.js';
-import { esc, SEAL, dataCompleta, soData, posicaoNome, trocarNomes } from './util.js';
+import { campoLista } from './campo-lista.js';
+import { esc, SEAL, iniciais, dataCompleta, soData, posicaoNome, trocarNomes } from './util.js';
 import { SEVL } from './dados.js';
 import { tipoDe, localDe } from './telas-registro.js';
 
@@ -334,12 +335,13 @@ registrarTela('ficha', () => {
           : 'Criança A, Criança B — inclusive na narrativa'}</span></span>
         <span class="track"></span></button>
 
-      ${f.destino === 'familia' && envolvidos.length > 1 ? `<div>
-        <p class="sec-label">Qual criança</p>
-        <div class="chips">${envolvidos.map(e => `
-          <button class="chip sm" aria-pressed="${f.focoKid === e.kid}"
-            onclick="app.fichaFoco('${esc(e.kid)}')">${esc(aluno(e.kid).nome)}</button>`).join('')}</div>
-      </div>` : ''}
+      ${f.destino === 'familia' && envolvidos.length > 1
+        ? campoLista({ id:'foco', rotulo:'Qual criança',
+            opcoes:envolvidos.map(e => ({ valor:e.kid, nome:aluno(e.kid).nome,
+              ini:iniciais(aluno(e.kid).nome) })),
+            valor:f.focoKid, placeholder:'Escolher a criança',
+            aoEscolher:k => { S.ficha.focoKid = k; } })
+        : ''}
 
       ${legenda(mapa)}
 

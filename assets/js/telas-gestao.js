@@ -4,6 +4,7 @@
 import { S, app, registrarTela, ir, toast, render, recarregar, rodape, pendentes, otimista,
          entradasGestao } from './core.js';
 import { Store } from './store.js';
+import { campoLista } from './campo-lista.js';
 import { esc, ICON, svgIc, iniciais, quandoLegivel, senhaTemporaria, semAcento } from './util.js';
 import { PAPEIS_CONTA, FUNCOES } from './dados.js';
 
@@ -147,22 +148,23 @@ registrarTela('usuario', () => {
       Última conta de gestão ativa. Promova outra antes de rebaixar esta.</div></div>` : ''}
 
     <div>
-      <p class="sec-label">Perfil</p>
-      <div class="chips">
-        ${PAPEIS_CONTA.map(p => `<button class="chip" aria-pressed="${c.papel === p.id}"
-          ${euMesmo || (ultimoGestor && p.id !== 'gestao') ? 'disabled style="opacity:.45"' : ''}
-          onclick="app.mudarPapel('${esc(c.login)}','${p.id}')">${esc(p.nome)}</button>`).join('')}
-      </div>
+      ${euMesmo || ultimoGestor
+        /* Sem campo quando a troca não é permitida: os avisos acima já explicam. */
+        ? `<p class="sec-label">Perfil</p><div class="card flat"><dl class="kv">
+             <dt>Perfil</dt><dd>${esc(rotuloPapel(c.papel))}</dd></dl></div>`
+        : campoLista({ id:'perfil', rotulo:'Perfil',
+            opcoes:PAPEIS_CONTA.map(p => ({ valor:p.id, nome:p.nome })),
+            valor:c.papel, busca:false,
+            aoEscolher:v => app.mudarPapel(c.login, v) })}
       ${c.papel !== 'gestao' ? '<p class="hint">Gestão vê todos os registros e aprova contas.</p>' : ''}
     </div>
 
     <div>
-      <p class="sec-label">Turma</p>
-      <div class="chips">
-        ${S.turmas.map(t => t.nome).map(t => `<button class="chip" aria-pressed="${c.turma === t}"
-          onclick="app.mudarTurma('${esc(c.login)}','${esc(t)}')">${esc(t)}</button>`).join('')
-          || '<span class="fs12 muted">Cadastre as turmas na aba Alunos.</span>'}
-      </div>
+      ${S.turmas.length
+        ? campoLista({ id:'turma-conta', rotulo:'Turma', opcoes:S.turmas.map(t => t.nome),
+            valor:c.turma || '', placeholder:'Sem turma',
+            aoEscolher:v => app.mudarTurma(c.login, v) })
+        : `<p class="sec-label">Turma</p><span class="fs12 muted">Cadastre as turmas na aba Alunos.</span>`}
     </div>
 
     <div>
@@ -465,14 +467,13 @@ registrarTela('turma', () => {
       <button class="btn soft" onclick="app.renomearTurma()">Salvar nome</button>
     </div>
 
-    <div class="card">
-      <p class="sec-label">Quem recebe a ciência</p>
-      <div class="chips">
-        ${misses.length ? misses.map(m => `<button class="chip sm" aria-pressed="${t.missResponsavel === m.login}"
-           onclick="app.missDaTurma('${esc(t.id)}','${esc(m.login)}')">${esc(m.nome)}</button>`).join('')
-          : '<span class="fs12 muted">Sem Miss: a ciência vai à gestão.</span>'}
-      </div>
-    </div>
+    ${misses.length
+      ? campoLista({ id:'miss-turma', rotulo:'Quem recebe a ciência',
+          opcoes:misses.map(m => ({ valor:m.login, nome:m.nome, ini:iniciais(m.nome) })),
+          valor:t.missResponsavel || '', placeholder:'Sem Miss: a ciência vai à gestão',
+          aoEscolher:v => app.missDaTurma(t.id, v) })
+      : `<div class="card"><p class="sec-label">Quem recebe a ciência</p>
+         <span class="fs12 muted">Sem Miss: a ciência vai à gestão.</span></div>`}
 
     <div class="card flat"><dl class="kv">
       <dt>Alunos</dt><dd>${n}</dd>
@@ -514,9 +515,11 @@ registrarTela('aluno', () => {
     <div class="card stack">
       <div class="field"><label for="al-nome">Nome completo</label>
         <input class="input" id="al-nome" value="${esc(a.nome)}"></div>
-      <div><p class="fs12" style="font-weight:600;color:var(--muted);margin:0 0 5px">Turma</p>
-        <div class="chips">${turmaNomes().map(t => `<button class="chip sm" aria-pressed="${a.turma === t}" onclick="app.alunoCampo('turma','${esc(t)}')">${esc(t)}</button>`).join('')
-        || '<span class="fs12 muted">Cadastre uma turma primeiro.</span>'}</div></div>
+      ${turmaNomes().length
+        ? campoLista({ id:'turma-aluno', rotulo:'Turma', opcoes:turmaNomes(),
+            valor:a.turma || '', placeholder:'Escolher a turma',
+            aoEscolher:v => app.alunoCampo('turma', v) })
+        : `<p class="sec-label">Turma</p><span class="fs12 muted">Cadastre uma turma primeiro.</span>`}
       <div class="field"><label for="al-nasc">Data de nascimento (opcional)</label>
         <input class="input" type="date" id="al-nasc" value="${esc(a.nascimento || '')}"></div>
       <div class="field"><label for="al-saude">Alergias e observações de saúde (opcional)</label>

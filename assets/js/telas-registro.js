@@ -4,6 +4,7 @@ import { S, app, registrarTela, ir, toast, render, recarregar, rodape, otimista,
          filaDe, meusRegistros, visiveis, posRender, temFuncao, aluno, nomesTurmas,
          avancarPasso, voltar, rascunhoGuardado } from './core.js';
 import { Store } from './store.js';
+import { campoLista } from './campo-lista.js';
 import { esc, semAcento, quandoLegivel, agoraHora, iniciais, ICON, svgIc } from './util.js';
 import { CONFIG } from '../../config.js';
 import { CATS, OUTRO, EXEMPLOS, LOCAIS, PROVIDENCIAS, CONDICOES, REGIOES,
@@ -152,71 +153,45 @@ function blocoFaltas(){
 app.irPasso = p => { S.passo = p; S.faltas = null; render(); };
 
 /* ---------------------------------------------------------------- seleção de crianças */
+/* Sem filtro de texto: quem busca é o próprio campo com lista. Aqui fica só o filtro
+   de turma, que é escolha de quem está olhando a tela. */
 function listaAlunos(){
-  const q = semAcento(String(S.buscaAluno || '')).toLowerCase();
   return S.alunos
     .filter(a => a.ativo !== false)
     .filter(a => !S.filtroTurma || a.turma === S.filtroTurma)
-    .filter(a => !q || semAcento(a.nome).toLowerCase().includes(q))
     .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 
 function seletorAlunos(){
   const d = S.rascunho, turmas = nomesTurmas();
-  const lista = listaAlunos();
-  const escolhido = a => d.envolvidos.some(e => e.kid === a.id);
-  const escolhidas = (S.rascunho.envolvidos || []).length;
+  /* O filtro de turma fica fora do campo: ele filtra o que está à vista, não registra
+     um valor, e aqui um toque vale mais que dois. */
   return `<div class="stack s8">
-    <div class="busca">
-      <span class="ic">${svgIc(ICON.busca)}</span>
-      <input class="input" id="b-aluno" placeholder="Buscar pelo nome" value="${esc(S.buscaAluno || '')}"
-             oninput="app.buscarAluno(this.value)">
-    </div>
     ${turmas.length ? `<div class="chips">
       <button class="chip sm" aria-pressed="${!S.filtroTurma}" onclick="app.filtrarTurma('')">Todas</button>
       ${turmas.map(t => `<button class="chip sm" aria-pressed="${S.filtroTurma === t}" onclick="app.filtrarTurma('${esc(t)}')">${esc(t)}</button>`).join('')}
     </div>` : ''}
-    <div id="lista-alunos" class="stack s8">${resultadoAlunos()}</div>
-    <button class="btn ghost sm" style="width:100%" onclick="app.abrirAvulso()">+ Não está na lista</button>
+    ${campoLista({
+      id:'kids',
+      opcoes: listaAlunos().map(a => ({ valor:a.id, nome:a.nome,
+        sub: a.turma ? 'Turma ' + a.turma : '', ini: iniciais(a.nome) })),
+      valor: d.envolvidos.map(e => e.kid),
+      multipla:true, busca:true,
+      placeholder: S.alunos.length ? 'Escolher as crianças' : 'Nenhum aluno cadastrado ainda',
+      vazio:'Nenhum aluno encontrado.',
+      rodape:`<button class="cl-rodape" onclick="app.abrirAvulso()">+ Não está na lista</button>`,
+      aoEscolher: id => app.togKid(id, true)
+    })}
   </div>`;
 }
 
-/* Só o resultado da busca. Separado para a digitação reescrever esta parte e não a
-   tela inteira: redesenhar destruía o campo a cada tecla, e com isso o teclado
-   preditivo do celular perdia a sessão de composição. */
-function resultadoAlunos(){
-  const d = S.rascunho || { envolvidos: [] };
-  const lista = listaAlunos();
-  const escolhido = a => (d.envolvidos || []).some(e => e.kid === a.id);
-  const escolhidas = (d.envolvidos || []).length;
-  if(!lista.length)
-    return `<p class="fs12 muted" style="margin:0">${S.alunos.length
-      ? 'Nenhum aluno encontrado com esse filtro.' : 'Nenhum aluno cadastrado ainda.'}</p>`;
-  return `<p class="cont fs12 muted" style="margin:0">${escolhidas} ${escolhidas === 1 ? 'selecionada' : 'selecionadas'}${
-      lista.length < S.alunos.length ? ` · ${lista.length} de ${S.alunos.length}` : ''}</p>
-    ${lista.map(a => `
-      <button class="pick kid" aria-pressed="${escolhido(a)}" onclick="app.togKid('${esc(a.id)}')">
-        <span class="avatar">${esc(iniciais(a.nome))}</span>
-        <span class="grow">
-          <span class="lin-t">${esc(a.nome)}</span>
-          ${a.turma ? `<span class="fs11 muted">Turma ${esc(a.turma)}</span>` : ''}
-        </span>
-        <span class="mk" aria-hidden="true"></span>
-      </button>`).join('')}`;
-}
-
-app.buscarAluno = v => {
-  S.buscaAluno = v;
-  const alvo = document.getElementById('lista-alunos');
-  if(alvo) alvo.innerHTML = resultadoAlunos();
-};
 app.filtrarTurma = t => { S.filtroTurma = S.filtroTurma === t ? '' : t; render(); };
 
-app.togKid = id => {
+app.togKid = (id, semDesenhar) => {
   const d = S.rascunho, i = d.envolvidos.findIndex(e => e.kid === id);
   if(i >= 0) d.envolvidos.splice(i, 1);
   else d.envolvidos.push({ kid:id, papel:'', turma: aluno(id).turma || '' });
-  render();
+  if(!semDesenhar) render();
 };
 
 /* Criança ainda não cadastrada: cria na hora, marcada para a gestão confirmar.
@@ -244,9 +219,9 @@ function dialogoAvulso(){
     <p class="sec-label" style="margin:0">Criança fora da lista</p>
     <div class="field"><label for="av-nome">Nome da criança</label>
       <input class="input" id="av-nome" autofocus></div>
-    ${turmas.length ? `<div><p class="fs11 muted" style="margin:0 0 6px">Turma</p><div class="chips">
-      ${turmas.map(t => `<button class="chip sm" aria-pressed="${S.avulso.turma === t}" onclick="app.avulsoTurma('${esc(t)}')">${esc(t)}</button>`).join('')}
-    </div></div>` : ''}
+    ${turmas.length ? campoLista({ id:'turma-avulso', rotulo:'Turma', opcoes:turmas,
+      valor:S.avulso.turma || '', placeholder:'Escolher a turma',
+      aoEscolher:v => app.avulsoTurma(v) }) : ''}
     <div class="row" style="gap:8px">
       <button class="btn sm" style="flex:1" onclick="app.salvarAvulso()">Adicionar</button>
       <button class="btn ghost sm" style="flex:1" onclick="app.fecharAvulso()">Cancelar</button>
@@ -291,17 +266,22 @@ function cardEnvolvido(e, i){
       <button class="chip sm" style="min-height:28px;padding:4px 9px" onclick="app.togKid('${esc(e.kid)}')" aria-label="Remover">&times;</button>
     </div>
 
-    <div><p class="fs11 muted" style="margin:0 0 5px">Papel nesta ocorrência</p>
-      <div class="chips">${PAPEIS_ENVOLVIDO.map(p => `<button class="chip sm" aria-pressed="${e.papel === p}" onclick="app.papelEnvolvido(${i},'${p}')">${p}</button>`).join('')}</div></div>
+    ${campoLista({ id:'papel-' + i, rotulo:'Papel nesta ocorrência', opcoes:PAPEIS_ENVOLVIDO,
+      valor:e.papel, placeholder:'Escolher o papel',
+      aoEscolher:v => { e.papel = v; S.faltas = null; } })}
 
-    ${turmas.length ? `<div><p class="fs11 muted" style="margin:0 0 5px">Turma</p>
-      <div class="chips">${turmas.map(t => `<button class="chip sm" aria-pressed="${e.turma === t}" onclick="app.turmaEnvolvido(${i},'${esc(t)}')">${esc(t)}</button>`).join('')}</div></div>` : ''}
+    ${turmas.length ? campoLista({ id:'turma-' + i, rotulo:'Turma', opcoes:turmas,
+      valor:e.turma, placeholder:'Escolher a turma',
+      aoEscolher:v => { e.turma = e.turma === v ? '' : v; } }) : ''}
 
-    <div><p class="fs11 muted" style="margin:0 0 5px">Como ficou</p>
-      <div class="chips">${CONDICOES.map(c => `<button class="chip sm" aria-pressed="${cond === c}" onclick="app.campoObj('cond','${esc(e.kid)}','${esc(c)}')">${esc(c)}</button>`).join('')}</div></div>
+    ${campoLista({ id:'cond-' + i, rotulo:'Como ficou', opcoes:CONDICOES, valor:cond,
+      busca:true, placeholder:'Escolher',
+      aoEscolher:v => { d.cond[e.kid] = d.cond[e.kid] === v ? '' : v; } })}
 
-    ${temLesao ? `<div><p class="fs11 muted" style="margin:0 0 5px">Onde é a marca ou lesão</p>
-      <div class="bodymap">${REGIOES.filter(r => r !== 'Não se aplica').map(r => `<button aria-pressed="${d.lesao[e.kid] === r}" onclick="app.campoObj('lesao','${esc(e.kid)}','${esc(r)}')">${esc(r)}</button>`).join('')}</div></div>` : ''}
+    ${temLesao ? campoLista({ id:'lesao-' + i, rotulo:'Onde é a marca ou lesão',
+      opcoes:REGIOES.filter(r => r !== 'Não se aplica'), valor:d.lesao[e.kid],
+      placeholder:'Escolher a região',
+      aoEscolher:v => { d.lesao[e.kid] = d.lesao[e.kid] === v ? '' : v; } }) : ''}
   </div>`;
 }
 
@@ -329,11 +309,12 @@ app.escolherCat = c => { const d = S.rascunho; d.categoria = c; d.tipo = ''; d.t
 function blocoQuando(){
   const d = S.rascunho;
   const opcoes = [['Agora',0],['Há 15 min',15],['Há 30 min',30],['Há 1h',60]];
-  return `<div><p class="sec-label">Quando aconteceu</p>
-    <div class="chips">
-      ${opcoes.map(([rot, min]) => `<button class="chip" aria-pressed="${d.quandoOpcao === rot}" onclick="app.quandoRelativo('${rot}',${min})">${rot}</button>`).join('')}
-      <button class="chip" aria-pressed="${d.quandoOpcao === 'manual'}" onclick="app.quandoManual()">Outro horário</button>
-    </div>
+  const minutos = Object.fromEntries(opcoes);
+  return `<div>
+    ${campoLista({ id:'quando', rotulo:'Quando aconteceu',
+      opcoes:[...opcoes.map(([rot]) => rot), { valor:'manual', nome:'Outro horário' }],
+      valor:d.quandoOpcao, placeholder:'Escolher',
+      aoEscolher:v => v === 'manual' ? app.quandoManual() : app.quandoRelativo(v, minutos[v]) })}
     ${d.quandoOpcao === 'manual' ? `<div class="field" style="margin-top:9px">
       <label for="w-quando">Data e hora</label>
       <input class="input" type="datetime-local" id="w-quando" value="${esc(paraInputLocal(d.quandoISO))}"
@@ -368,11 +349,11 @@ app.quandoDigitado = v => {
 
 function blocoOnde(){
   const d = S.rascunho;
-  return `<div><p class="sec-label">Onde aconteceu</p>
-    <div class="chips">
-      ${LOCAIS.map(l => `<button class="chip" aria-pressed="${d.local === l}" onclick="app.campo('local','${esc(l)}')">${esc(l)}</button>`).join('')}
-      <button class="chip" aria-pressed="${d.local === OUTRO}" onclick="app.campo('local','${OUTRO}')">Outro local</button>
-    </div>
+  return `<div>
+    ${campoLista({ id:'local', rotulo:'Onde aconteceu',
+      opcoes:[...LOCAIS, { valor:OUTRO, nome:'Outro local' }],
+      valor:d.local, placeholder:'Escolher o local',
+      aoEscolher:v => { d.local = v; S.faltas = null; } })}
     ${d.local === OUTRO ? `<div class="field" style="margin-top:9px">
       <label for="w-local">Qual local</label>
       <input class="input" id="w-local" value="${esc(d.localOutro)}" placeholder="Escreva o local"
@@ -420,18 +401,18 @@ function campoDescricao(id){
 
 function blocoPresenciou(){
   const d = S.rascunho;
-  return `<div><p class="sec-label">Você presenciou?</p>
-    <div class="chips">
-      <button class="chip" aria-pressed="${d.presenciou}" onclick="app.campo('presenciou',true)">Presenciei</button>
-      <button class="chip" aria-pressed="${!d.presenciou}" onclick="app.campo('presenciou',false)">Fui informada</button>
-    </div>
+  return `<div>
+    ${campoLista({ id:'presenciou', rotulo:'Você presenciou?',
+      opcoes:[{ valor:'sim', nome:'Presenciei' }, { valor:'nao', nome:'Fui informada' }],
+      valor:d.presenciou ? 'sim' : 'nao', busca:false,
+      aoEscolher:v => { d.presenciou = v === 'sim'; S.faltas = null; } })}
     ${!d.presenciou ? `
       <div class="field" style="margin-top:10px"><label for="w-inf">Quem informou</label>
         <input class="input" id="w-inf" value="${esc(d.informanteNome)}" placeholder="Nome de quem relatou"
                oninput="app.campoTxt('informanteNome',this.value)"></div>
-      <div style="margin-top:9px"><p class="fs11 muted" style="margin:0 0 6px">Por qual canal</p>
-        <div class="chips">${CANAIS_INFORME.map(c => `<button class="chip sm" aria-pressed="${d.informanteCanal === c}" onclick="app.campo('informanteCanal','${esc(c)}')">${esc(c)}</button>`).join('')}</div>
-      </div>` : ''}
+      <div style="margin-top:9px">${campoLista({ id:'canal', rotulo:'Por qual canal',
+        opcoes:CANAIS_INFORME, valor:d.informanteCanal, placeholder:'Escolher',
+        aoEscolher:v => { d.informanteCanal = v; } })}</div>` : ''}
   </div>`;
 }
 
@@ -440,11 +421,13 @@ registrarTela('rapido', () => {
   const d = S.rascunho;
   return `<div class="stack s18">
     ${blocoFaltas()}
-    <div><p class="sec-label">1 · Categoria</p><div class="chips">
-      ${Object.keys(CATS).map(c => `<button class="chip" aria-pressed="${d.categoria === c}" onclick="app.escolherCat('${esc(c)}')">${esc(c)}</button>`).join('')}</div></div>
-    ${d.categoria ? `<div><p class="sec-label">Tipo</p><div class="chips">
-      ${CATS[d.categoria].concat([OUTRO]).map(t => `<button class="chip" aria-pressed="${d.tipo === t}" onclick="app.campo('tipo','${esc(t)}')">${esc(t)}</button>`).join('')}</div>
-      ${d.tipo === OUTRO ? `<div class="field" style="margin-top:9px"><input class="input" placeholder="Qual?" value="${esc(d.tipoOutro)}" oninput="app.campoTxt('tipoOutro',this.value)"></div>` : ''}</div>` : ''}
+    ${campoLista({ id:'cat-r', rotulo:'1 · Categoria', opcoes:Object.keys(CATS),
+      valor:d.categoria, placeholder:'Escolher categoria',
+      aoEscolher:c => { d.categoria = c; d.tipo = ''; d.tipoOutro = ''; S.faltas = null; } })}
+    ${d.categoria ? `${campoLista({ id:'tipo-r', rotulo:'Tipo',
+        opcoes:CATS[d.categoria].concat([OUTRO]), valor:d.tipo, placeholder:'Escolher tipo',
+        aoEscolher:v => { d.tipo = v; S.faltas = null; } })}
+      ${d.tipo === OUTRO ? `<div class="field" style="margin-top:9px"><input class="input" placeholder="Qual?" value="${esc(d.tipoOutro)}" oninput="app.campoTxt('tipoOutro',this.value)"></div>` : ''}` : ''}
     <div><p class="sec-label">2 · Quem</p>${seletorAlunos()}</div>
     ${dialogoAvulso()}
     ${sinalRecentes()}
@@ -464,12 +447,14 @@ registrarTela('wizard', () => {
   /* 1 — classificar o que aconteceu. Gravidade entra aqui, ao lado de categoria e
      tipo, porque é a mesma pergunta: que tipo de coisa foi, e quão séria. */
   if(st === 1) corpo = `<div class="stack s18">
-    <div><p class="sec-label">1 · Categoria do registro</p><div class="chips">
-      ${Object.keys(CATS).map(c => `<button class="chip" aria-pressed="${d.categoria === c}" onclick="app.escolherCat('${esc(c)}')">${esc(c)}</button>`).join('')}</div></div>
-    ${d.categoria ? `<div><p class="sec-label">Tipo</p><div class="chips">
-      ${CATS[d.categoria].concat([OUTRO]).map(t => `<button class="chip" aria-pressed="${d.tipo === t}" onclick="app.campo('tipo','${esc(t)}')">${esc(t)}</button>`).join('')}</div>
+    ${campoLista({ id:'cat', rotulo:'1 · Categoria do registro', opcoes:Object.keys(CATS),
+      valor:d.categoria, placeholder:'Escolher categoria',
+      aoEscolher:c => { d.categoria = c; d.tipo = ''; d.tipoOutro = ''; S.faltas = null; } })}
+    ${d.categoria ? `${campoLista({ id:'tipo', rotulo:'Tipo',
+        opcoes:CATS[d.categoria].concat([OUTRO]), valor:d.tipo, placeholder:'Escolher tipo',
+        aoEscolher:v => { d.tipo = v; S.faltas = null; } })}
       ${d.tipo === OUTRO ? `<div class="field" style="margin-top:9px"><label for="w-tipo">Qual?</label>
-        <input class="input" id="w-tipo" value="${esc(d.tipoOutro)}" oninput="app.campoTxt('tipoOutro',this.value)"></div>` : ''}</div>`
+        <input class="input" id="w-tipo" value="${esc(d.tipoOutro)}" oninput="app.campoTxt('tipoOutro',this.value)"></div>` : ''}`
       : `<p class="fs12 muted" style="margin:0">Escolha a categoria para ver os tipos.</p>`}
     ${d.tipo ? `<div><p class="sec-label">Gravidade</p>${sevPicker()}
       </div>` : ''}
@@ -506,8 +491,9 @@ registrarTela('wizard', () => {
   if(st === 4){
     const dest = destinoCiencia();
     corpo = `<div class="stack s18">
-      <div><p class="sec-label">4 · O que foi feito</p><div class="chips">
-        ${PROVIDENCIAS.map(p => `<button class="chip" aria-pressed="${d.prov.includes(p)}" onclick="app.togArr('prov','${esc(p)}')">${esc(p)}</button>`).join('')}</div></div>
+      ${campoLista({ id:'prov', rotulo:'4 · O que foi feito', opcoes:PROVIDENCIAS,
+        valor:d.prov, multipla:true, placeholder:'Escolher as providências',
+        aoEscolher:v => { const i = d.prov.indexOf(v); i >= 0 ? d.prov.splice(i, 1) : d.prov.push(v); } })}
 
       ${d.tipo === 'Mordida' ? `<div class="card flat"><p class="sec-label">Cuidados para mordida</p>
         <div class="stack s6 fs12">

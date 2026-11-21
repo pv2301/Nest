@@ -14,6 +14,11 @@ import { createRequire } from 'node:module';
 const { chromium } = createRequire(import.meta.url)('playwright');
 
 const BASE = process.env.BASE_TESTE || 'http://localhost:8222/';
+
+/* As escolhas viraram campo com lista: a suíte aciona o componente diretamente, em
+   vez de caçar chips. Quem exercita o componente pela interface é navegador-busca. */
+const escolher = (p, id, v) => p.evaluate(([i, x]) => app.escolherLista(i, x), [id, v]);
+
 let f=[]; const ok=(n,c,x)=>{ if(c) console.log('  OK '+n); else { f.push(n); console.log('  XX '+n+(x?'\n       '+x:'')); } };
 const SENHA_G='Gestora2026', SENHA_M='MissTeste2026';
 
@@ -73,13 +78,15 @@ async function entrarComo(p, login, senha){
 
  console.log('\n=== A Miss registra e corrige ===');
  await p.evaluate(()=>app.iniciar('completo')); await p.waitForTimeout(700);
- await p.click('.chip:text-is("Incidente")'); await p.waitForTimeout(300);
- await p.click('.chip:text-is("Mordida")'); await p.waitForTimeout(300);
+ await escolher(p, 'cat', 'Incidente'); await p.waitForTimeout(300);
+ await escolher(p, 'tipo', 'Mordida'); await p.waitForTimeout(300);
  await p.click('.sevpick button[data-n="2"]'); await p.waitForTimeout(300);
  await p.evaluate(()=>app.irPasso(2)); await p.waitForTimeout(700);
- await p.locator('.pick.kid').nth(0).click(); await p.waitForTimeout(400);
- await p.locator('.card.flat:has(.chip.sm)').nth(0).locator('.chip.sm:text-is("Sofreu")').click();
- await p.waitForTimeout(300);
+ await p.evaluate(()=>app.abrirLista('kids')); await p.waitForTimeout(500);
+ const primeiro = await p.evaluate(() =>
+   (document.querySelector('.cl-op').getAttribute('onclick').match(/,'([^']+)'/) || [])[1]);
+ await escolher(p, 'kids', primeiro); await p.waitForTimeout(400);
+ await escolher(p, 'papel-0', 'Sofreu'); await p.waitForTimeout(300);
  await p.evaluate(()=>app.irPasso(3)); await p.waitForTimeout(600);
  await p.fill('#w-desc','Texto origihal com erro de digitacao.'); await p.waitForTimeout(400);
  await p.evaluate(()=>app.irPasso(4)); await p.waitForTimeout(600);

@@ -277,6 +277,43 @@ textarea.input{min-height:96px;resize:vertical;line-height:1.55;font-size:14.5px
 .ch{color:var(--muted);font-size:20px;line-height:1;flex:none}
 .cnt{font-size:10px;background:var(--g4-mark);color:#fff;border-radius:99px;padding:1px 7px;font-weight:700;flex:none}
 
+/* ---------- campo com lista ---------- */
+.cl{min-width:0}
+.cl-campo{display:flex;align-items:center;gap:10px;width:100%;text-align:left;min-height:52px;
+  padding:8px 15px;border:0;border-radius:var(--r-sm);background:var(--surface);
+  box-shadow:var(--shadow);font-size:15px;color:var(--fg)}
+.cl.aberto .cl-campo{border-bottom-left-radius:0;border-bottom-right-radius:0}
+.cl-resumo{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-width:0}
+.cl-val{font-weight:500}
+.cl-ph{color:var(--muted)}
+.cl-seta{color:var(--muted);font-size:13px;flex:none}
+.cl-lista{background:var(--surface);border-radius:0 0 var(--r) var(--r);overflow:hidden;
+  box-shadow:var(--shadow);border-top:1px solid var(--line)}
+.cl-busca{display:flex;align-items:center;gap:10px;padding:12px 15px;border-bottom:1px solid var(--line)}
+.cl-busca .ic{color:var(--muted);display:grid;place-items:center;flex:none}
+.cl-busca .ic svg{width:17px;height:17px;display:block}
+.tok .x{cursor:pointer;padding:0 2px}
+.cl-busca input{border:0;outline:0;background:transparent;font:inherit;font-size:16px;width:100%;color:var(--fg)}
+.cl-ops{max-height:46vh;overflow-y:auto;overscroll-behavior:contain}
+.cl-op{display:flex;align-items:center;gap:11px;width:100%;text-align:left;min-height:52px;
+  padding:9px 15px;border:0;background:transparent;font-size:14.5px;color:var(--fg)}
+.cl-op+.cl-op{border-top:1px solid var(--line)}
+.cl-op .cl-nome{display:block}
+.cl-op .mk{width:24px;height:24px;border-radius:50%;border:2px solid var(--line);flex:none;
+  display:grid;place-items:center;font-size:13px;font-weight:800;color:transparent}
+.cl-op[aria-pressed="true"]{background:var(--accent-soft)}
+.cl-op[aria-pressed="true"] .cl-nome{font-weight:600;color:var(--accent-text)}
+.cl-op[aria-pressed="true"] .mk{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.cl-op[aria-pressed="true"] .mk::after{content:"\2713"}
+.cl-vazio{font-size:12.5px;color:var(--muted);padding:16px 15px;margin:0}
+.cl-rodape{display:block;width:100%;text-align:center;padding:14px;border:0;border-top:1px solid var(--line);
+  background:transparent;font:inherit;font-size:13.5px;font-weight:600;color:var(--accent-text);min-height:50px}
+/* Ficha de escolhida, no campo de escolha múltipla. */
+.tok{display:inline-flex;align-items:center;gap:7px;background:var(--cta-bg);color:var(--cta-fg);
+  border-radius:var(--r-pill);padding:0 11px 0 4px;min-height:36px;font-size:13px;font-weight:600}
+.tok .avatar{width:28px;height:28px;font-size:10px;background:rgba(255,255,255,.92);color:var(--cta-bg)}
+.tok .x{opacity:.8;font-size:15px}
+
 /* Linha selecionável: com dezenas de alunos, os chips viravam um bloco difícil de
    varrer. Uma linha por criança lê melhor e já vem com alvo de 62px. */
 .pick{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:12px 14px;

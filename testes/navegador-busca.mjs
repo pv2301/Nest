@@ -57,23 +57,29 @@ let f=[]; const ok=(n,c,x)=>{ if(c) console.log('  OK '+n); else { f.push(n); co
       'linhas: ' + await p.locator(alvo).count());
  }
 
- console.log('\n=== registro · #b-aluno ===');
+ console.log('\n=== registro · busca dentro do campo de crianças ===');
  await p.evaluate(()=>app.iniciar('completo')); await p.waitForTimeout(700);
  await p.evaluate(()=>app.irPasso(2)); await p.waitForTimeout(800);
- await espiar('b-aluno');
- await p.locator('#b-aluno').tap();
+ await p.evaluate(()=>app.abrirLista('kids')); await p.waitForTimeout(600);
+ ok('a lista abriu com busca', (await p.locator('#bl-kids').count()) === 1);
+ await espiar('bl-kids');
+ await p.locator('#bl-kids').tap();
  for(const ch of 'hel'){ await p.keyboard.type(ch); await p.waitForTimeout(240); }
  const c = await contar();
  ok('digitar não faz o campo perder o foco', c.perdas === 0, 'perdas: ' + c.perdas);
  ok('digitar não redesenha a tela', c.redesenhos === 0, 'redesenhos: ' + c.redesenhos);
- ok('filtrou para uma criança', (await p.locator('.pick.kid').count()) === 1);
+ ok('filtrou para uma criança', (await p.locator('.cl-op').count()) === 1,
+    'opções: ' + await p.locator('.cl-op').count());
  /* Digitar no meio da palavra, que o cursor forçado ao fim impedia. */
- await p.locator('#b-aluno').fill(''); await p.waitForTimeout(300);
- await p.locator('#b-aluno').tap();
+ await p.locator('#bl-kids').fill(''); await p.waitForTimeout(300);
+ await p.locator('#bl-kids').tap();
  await p.keyboard.type('hl'); await p.waitForTimeout(250);
  await p.keyboard.press('ArrowLeft'); await p.keyboard.type('e'); await p.waitForTimeout(250);
- ok('dá para inserir letra no meio', (await p.locator('#b-aluno').inputValue()) === 'hel',
-    JSON.stringify(await p.locator('#b-aluno').inputValue()));
+ ok('dá para inserir letra no meio', (await p.locator('#bl-kids').inputValue()) === 'hel',
+    JSON.stringify(await p.locator('#bl-kids').inputValue()));
+ ok('escolher na lista marca a criança',
+    await (async()=>{ await p.locator('.cl-op').first().click(); await p.waitForTimeout(700);
+      return (await p.locator('.tok').count()) === 1; })());
 
  console.log(f.length ? `\n=== ${f.length} FALHARAM ===` : '\n=== TUDO PASSOU ===');
  await b.close(); process.exit(f.length?1:0);
