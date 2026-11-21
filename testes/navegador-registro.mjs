@@ -63,6 +63,14 @@ async function entrarComo(p, login, senha){
  await entrarComo(p, 'miss.teste', SENHA_M);
  ok('a Miss entrou', (await p.locator('#view').innerText()).includes('Registrar ocorrência'));
 
+ console.log('\n=== Barra de abas ===');
+ /* A barra chegava a sete itens para a gestão. Agora a administração mora numa aba. */
+ ok('a Miss sem funções concedidas vê três abas',
+    (await p.locator('.tabbar button').count()) === 3,
+    'abas: ' + (await p.locator('.tabbar').innerText()).replace(/\n/g, ' · '));
+ ok('e não vê a aba Gestão',
+    (await p.locator('.tabbar button:has-text("Gestão")').count()) === 0);
+
  console.log('\n=== A Miss registra e corrige ===');
  await p.evaluate(()=>app.iniciar('completo')); await p.waitForTimeout(700);
  await p.click('.chip:text-is("Incidente")'); await p.waitForTimeout(300);
@@ -133,8 +141,23 @@ async function entrarComo(p, login, senha){
     (await p.locator('button:text-is("Corrigir registro")').count())===0);
  ok('e a tela explica por quê', /travado pela ciência/i.test(t), t.slice(-250));
 
- console.log('\n=== Remover aluno pela tela ===');
+ console.log('\n=== A aba Gestão reúne a administração ===');
  await entrarComo(p, 'tallita.lima', SENHA_G);
+ ok('a gestão vê quatro abas, não sete',
+    (await p.locator('.tabbar button').count()) === 4,
+    'abas: ' + (await p.locator('.tabbar').innerText()).replace(/\n/g, ' · '));
+ await p.locator('.tabbar button:has-text("Gestão")').click(); await p.waitForTimeout(900);
+ const hub = await p.locator('#view').innerText();
+ ok('a tela reúne painel, alunos e usuários',
+    /Painel/.test(hub) && /Alunos e turmas/.test(hub) && /Usuários/.test(hub), hub.slice(0, 200));
+ ok('cada entrada diz o seu estado', /turmas/.test(hub) && /conta/.test(hub));
+ await p.locator('.urow:has-text("Alunos e turmas")').click(); await p.waitForTimeout(1000);
+ ok('a entrada abre a tela certa, com botão voltar',
+    (await p.locator('.appbar .back').count()) === 1 &&
+    /Alunos/.test(await p.locator('.appbar h2').innerText()));
+ await p.evaluate(()=>app.voltar()); await p.waitForTimeout(800);
+
+ console.log('\n=== Remover aluno pela tela ===');
  await p.evaluate(()=>app.ir('alunos')); await p.waitForTimeout(1000);
  /* Uma criança que aparece em registro: a primeira que a Miss usou. */
  await p.locator('.urow').first().click(); await p.waitForTimeout(900);

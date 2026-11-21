@@ -1,10 +1,29 @@
 /* Gestão de usuários: aprovar cadastros, trocar perfis, conceder funções.
    Visível apenas para quem tem papel 'gestao'. */
 
-import { S, app, registrarTela, ir, toast, render, recarregar, rodape, pendentes, otimista } from './core.js';
+import { S, app, registrarTela, ir, toast, render, recarregar, rodape, pendentes, otimista,
+         entradasGestao } from './core.js';
 import { Store } from './store.js';
 import { esc, ICON, svgIc, iniciais, quandoLegivel, senhaTemporaria, semAcento } from './util.js';
 import { PAPEIS_CONTA, FUNCOES } from './dados.js';
+
+/* ---------------------------------------------------------------- gestão (índice)
+   Reúne o que antes ocupava até cinco abas na barra de baixo. Cada linha é um alvo
+   de 62px com ícone, uma frase de estado e o que estiver pendente. */
+registrarTela('gestao', () => `
+  <div class="stack s8">
+    ${entradasGestao().map(e => `
+      <button class="urow" onclick="app.ir('${e.tela}')">
+        <span class="icobox">${svgIc(e.ic)}</span>
+        <span class="grow">
+          <span class="lin-t">${esc(e.nome)}</span>
+          <span class="fs11 muted">${esc(e.sub)}</span>
+        </span>
+        ${e.n ? `<span class="cnt">${e.n}</span>` : ''}
+        <span class="ch" aria-hidden="true">&rsaquo;</span>
+      </button>`).join('')}
+    ${rodape()}
+  </div>`);
 
 const rotuloPapel = p => (PAPEIS_CONTA.find(x => x.id === p) || {}).nome || p;
 const gestoresAtivos = () => S.contas.filter(c => c.papel === 'gestao' && c.status === 'ativo');

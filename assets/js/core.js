@@ -186,16 +186,38 @@ export function sairDaConta(){
 app.sair = sairDaConta;
 
 /* ---------- abas ---------- */
+/* Quatro abas, não sete. Com todas as funções concedidas a barra chegava a sete
+   itens num aparelho de 430px: menos de 62px cada, rótulo de 10px cortando no meio.
+   Tudo o que é administração passa a morar numa aba só. */
 export function abas(){
   const c = S.conta; if(!c) return [];
-  const t = [['home', ICON.home, 'Início'], ['lista', ICON.lista, 'Registros']];
-  t.push(['ciencia', ICON.ciencia, 'Ciência', filaDe(c).length]);
-  if(temFuncao(c, 'painel'))   t.push(['painel', ICON.painel, 'Painel']);
-  if(temFuncao(c, 'horario'))  t.push(['horario', ICON.horario, 'Horário']);
-  if(temFuncao(c, 'relacoes')) t.push(['relacoes', ICON.relacoes, 'Relações']);
-  if(c.papel === 'gestao')     t.push(['alunos', ICON.alunos, 'Alunos']);
-  if(c.papel === 'gestao')     t.push(['usuarios', ICON.usuarios, 'Usuários', pendentes().length]);
+  const t = [['home', ICON.home, 'Início'], ['lista', ICON.lista, 'Registros'],
+             ['ciencia', ICON.ciencia, 'Ciência', filaDe(c).length]];
+  if(entradasGestao(c).length)
+    t.push(['gestao', ICON.mais, 'Gestão', c.papel === 'gestao' ? pendentes().length : 0]);
   return t;
+}
+
+/** O que a tela de Gestão reúne, conforme o perfil e as funções concedidas. Fica aqui
+    porque a barra precisa saber se há alguma entrada antes de mostrar a aba. */
+export function entradasGestao(c = S.conta){
+  if(!c) return [];
+  const e = [];
+  if(temFuncao(c, 'painel'))
+    e.push({ tela:'painel', ic:ICON.painel, nome:'Painel', sub:'Estatísticas do período' });
+  if(c.papel === 'gestao'){
+    const ativos = S.alunos.filter(a => a.ativo !== false).length;
+    e.push({ tela:'alunos', ic:ICON.alunos, nome:'Alunos e turmas',
+             sub:`${ativos} ${ativos === 1 ? 'aluno' : 'alunos'} · ${S.turmas.length} ${S.turmas.length === 1 ? 'turma' : 'turmas'}` });
+    const n = pendentes().length;
+    e.push({ tela:'usuarios', ic:ICON.usuarios, nome:'Usuários', n,
+             sub: n ? `${n} ${n === 1 ? 'conta aguardando' : 'contas aguardando'}` : `${S.contas.length} com acesso` });
+  }
+  if(temFuncao(c, 'horario'))
+    e.push({ tela:'horario', ic:ICON.horario, nome:'Quadro horário', sub:'Quem está em qual turma' });
+  if(temFuncao(c, 'relacoes'))
+    e.push({ tela:'relacoes', ic:ICON.relacoes, nome:'Relações', sub:'Vínculo entre Miss e crianças' });
+  return e;
 }
 
 export const pendentes = () => S.contas.filter(c => c.status === 'pendente');
@@ -242,9 +264,10 @@ function barraSuperior(){
     wizard: S.editando ? 'Corrigir registro' : 'Registro completo',
     detalhe:'Ocorrência ' + (S.detalhe || ''), usuario:'Usuário',
     conta:'Minha conta', alunos:'Alunos e turmas', aluno:'Aluno', ficha:'Gerar relatório',
-    ajuda:'Como funciona'
+    ajuda:'Como funciona', gestao:'Gestão'
   };
-  const comVoltar = ['detalhe','novo','rapido','wizard','usuario','conta','aluno','ficha','ajuda'].includes(S.tela);
+  const comVoltar = ['detalhe','novo','rapido','wizard','usuario','conta','aluno','ficha','ajuda',
+    'painel','alunos','usuarios','horario','relacoes'].includes(S.tela);
   const esquerda = comVoltar
     ? `<button class="back" onclick="app.voltar()" aria-label="Voltar">&lsaquo;</button>`
     : `<button class="avatar" onclick="app.ir('conta')" title="${esc(c.nome)}">${esc(c.ini)}</button>`;
