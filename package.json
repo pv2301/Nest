@@ -4,7 +4,9 @@
   "private": true,
   "description": "Registro interno de ocorrencias da equipe pedagogica.",
   "type": "commonjs",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "@vercel/blob": "0.27.3",
     "bcryptjs": "2.4.3",
@@ -14,6 +16,7 @@
     "pg-mem": "3.0.5"
   },
   "scripts": {
-    "test": "node testes/executar.mjs"
+    "test": "node testes/executar.mjs",
+    "test:navegador": "node testes/navegador.mjs"
   }
 }

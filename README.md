@@ -24,6 +24,13 @@ até a gestão aprovar.
 **Funções concedidas uma a uma.** Além do perfil, a gestão liga ou desliga o painel de
 estatísticas, o quadro horário e as relações, por usuário.
 
+**Relatório em dois destinos.** Uso interno, para o arquivo da escola, e comunicado
+para a família, com linha de assinatura. Sobre qualquer um dos dois corre a marca
+*sem identificar*, ligada por padrão: as crianças viram Criança A, Criança B —
+**inclusive dentro da narrativa escrita**, e também as que forem citadas de passagem.
+Quem é quem aparece na tela e nunca no papel. No comunicado, a criança daquela
+família é a única nomeada.
+
 ---
 
 ## Arquitetura
@@ -38,7 +45,7 @@ api/                  funções serverless (Node) executadas pelo Vercel
   cron.js             limpeza diária
   _db.js              Postgres e migrações automáticas
   _auth.js            sessão, senha e permissões
-testes/               suítes que rodam sem navegador, com Postgres em memória
+testes/               suítes de API (Postgres em memória) e de navegador
 backend-apps-script/  backend antigo, aposentado (histórico)
 ```
 
@@ -61,7 +68,10 @@ O projeto está no Vercel. Cada push na branch padrão publica sozinho.
    | Variável | Para que serve |
    |---|---|
    | `CODIGO_CONFIG` | Libera a criação da primeira conta de gestão. Use uma vez e apague. |
-   | `CRON_SECRET` | Opcional. Com ela, só o cron do Vercel dispara a limpeza diária. |
+   | `CRON_SECRET` | Sem ela, `/api/cron` responde a qualquer um. Com ela, só o cron do Vercel dispara a limpeza diária. |
+
+   Mudança em variável de ambiente **não** dispara build: depois de salvar, refaça o
+   deploy pelo menu do último deployment. Push na branch publica sozinho.
 
 4. Abra o site. Como não há conta nenhuma, ele mostra **Configuração inicial**:
    preencha nome, login (`nome.sobrenome`), senha e o `CODIGO_CONFIG`.
@@ -77,7 +87,8 @@ Não precisa de banco instalado: o servidor local usa Postgres em memória.
 ```bash
 npm install
 node testes/servidor-local.mjs      # http://localhost:8222
-npm test                            # suítes de API e de foto
+npm test                            # suítes de API, demonstração, foto e nomes
+npm run test:navegador              # suítes de navegador (requer Playwright)
 ```
 
 O servidor local roda **os mesmos handlers** que o Vercel executa, então o que passa
@@ -121,10 +132,40 @@ cita. Esvaziando esses campos e preenchendo a tabela `config` do banco
 
 ## Testes
 
-`npm test` roda as suítes de API e de foto contra um Postgres em memória — o mesmo
-código que vai para produção, incluindo os casos negativos: conta pendente não entra,
-Miss não acessa rotas de gestão, Miss de outra turma não vê a foto, sessão expirada é
-recusada, anexo some aos 90 dias e sobrevive quando preservado.
+**`npm test`** — 108 asserções contra um Postgres em memória, com o mesmo código que
+vai para produção. O que elas cobrem, além do caminho feliz:
 
-As suítes de navegador ficam fora do repositório, na área de trabalho da sessão, e
-rodam contra `testes/servidor-local.mjs`.
+| Suíte | O que trava |
+|---|---|
+| `api.test.mjs` | conta pendente não entra, Miss não acessa rotas de gestão, quem não é autora nem está na cadeia não altera um registro, aluno com registro não é removido |
+| `demo.test.mjs` | a limpeza da demonstração apaga só o que está marcado, nunca dado real que imite o formato das sementes |
+| `foto.test.mjs` | Miss de outra turma não vê a foto, o anexo some aos 90 dias e sobrevive quando preservado |
+| `nomes.test.mjs` | a troca de nomes na narrativa: nome parcial, acento, caixa, nomes seguidos, e o que **não** pode ser trocado |
+
+**`npm run test:navegador`** — o que só o navegador mostra, porque acontece ao desenhar
+a página: o relatório anonimizado, a correção de registro, a remoção de aluno e uma
+varredura de vocabulário pela interface inteira.
+
+Cada suíte recebe um servidor novo, numa porta própria: o banco em memória guarda o
+estado, e reaproveitá-lo faria a seguinte encontrar a escola já configurada.
+
+O Playwright não é dependência do projeto de propósito — baixa um navegador inteiro, e
+quem só quer rodar `npm test` não precisa dele:
+
+```bash
+npm i -D playwright && npx playwright install chromium
+```
+
+---
+
+## Continuar em outra máquina
+
+```bash
+git clone -b main https://github.com/pv2301/Nest.git
+cd Nest && npm install && npm test
+```
+
+O `-b main` importa: é nela que o trabalho acontece e é dela que o Vercel publica.
+Não é preciso banco, chave nem arquivo `.env` para desenvolver — o servidor local usa
+Postgres em memória. Os segredos de produção vivem só nas variáveis de ambiente do
+Vercel, nunca no repositório.
