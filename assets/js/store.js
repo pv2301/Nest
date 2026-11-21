@@ -13,7 +13,7 @@ import { DEMO_CONTAS, DEMO_OCORRENCIAS, SEMENTE_ALUNOS, SEMENTE_TURMAS } from '.
 
 const K = { contas:'reg.contas', ocs:'reg.ocorrencias', sessao:'reg.sessao',
             aparelho:'reg.aparelho', alunos:'reg.alunos', turmas:'reg.turmas',
-            rascunho:'reg.rascunho' };
+            rascunho:'reg.rascunho', tema:'reg.tema' };
 
 /* localStorage pode lançar (janela anônima, dados bloqueados): nunca deixar quebrar. */
 const memoria = {};
@@ -197,6 +197,12 @@ export const Store = {
   /* ---------- rascunho do formulário ----------
      Fica no aparelho: é trabalho em andamento, não registro. Sem isto, fechar a aba
      no meio do preenchimento perde tudo. */
+  /* Tema do aparelho, não da conta: a mesma pessoa pode querer escuro no celular e
+     claro no notebook, e o servidor não tem nada a ver com isso. A chave é lida
+     também pelo script do index.html, antes de este módulo existir. */
+  tema(){ const t = LS.ler(K.tema, null); return t === 'claro' || t === 'escuro' ? t : 'sistema'; },
+  guardarTema(v){ v === 'sistema' ? LS.apagar(K.tema) : LS.gravar(K.tema, v); },
+
   rascunho(){ return LS.ler(K.rascunho, null); },
   guardarRascunho(r){ LS.gravar(K.rascunho, r); },
   descartarRascunho(){ LS.apagar(K.rascunho); },

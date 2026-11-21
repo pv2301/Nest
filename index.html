@@ -6,6 +6,20 @@
 <meta name="description" content="Registro interno de ocorrências. Documento confidencial de uso da equipe.">
 <meta name="robots" content="noindex,nofollow">
 <meta name="theme-color" content="#00C5BB">
+<script>
+/* Antes da pintura, de propósito: aplicado pelo app.js a tela nasceria no tema do
+   sistema e corrigiria depois, piscando. Seis linhas no HTML valem o piscar a menos.
+   Sem preferência guardada, nada é escrito e o sistema decide. */
+(function(){
+  try {
+    var t = JSON.parse(localStorage.getItem('reg.tema') || 'null');
+    if(t !== 'claro' && t !== 'escuro') return;
+    document.documentElement.dataset.theme = t === 'escuro' ? 'dark' : 'light';
+    var m = document.querySelector('meta[name=theme-color]');
+    if(m) m.content = t === 'escuro' ? '#101713' : '#00C5BB';
+  } catch(e){}
+})();
+</script>
 <title>Registro de ocorrências</title>
 <link rel="icon" href="assets/logo.png">
 <link rel="apple-touch-icon" href="assets/logo.png">
@@ -19,9 +33,13 @@
   <div class="app">
     <div id="faixa"></div>
     <div id="chrome"></div>
-    <div class="scroll" id="scroll"><div class="pad" id="view">
-      <div class="empty"><div class="big">Carregando…</div></div>
-    </div></div>
+    <div class="scroll" id="scroll">
+      <!-- Fica atrás do conteúdo: aparece no vão que se abre quando a tela desce. -->
+      <div id="puxar" class="puxar" aria-hidden="true"><span class="roda"></span></div>
+      <div class="pad" id="view">
+        <div class="empty"><div class="big">Carregando…</div></div>
+      </div>
+    </div>
     <div id="tabs"></div>
   </div>
 

@@ -9,7 +9,7 @@ import {
   validaLogin, validaSenha, requisitosSenha, normalizaLogin, sugereLogin, senhaTemporaria,
   criptoDisponivel, tituloNome
 } from './util.js';
-import { PAPEIS_CONTA } from './vocabulario.js';
+import { PAPEIS_CONTA, FUNCOES } from './vocabulario.js';
 import { escolha } from './escolha.js';
 import { CONFIG } from '../../config.js';
 
@@ -355,33 +355,80 @@ app.submeterTroca = async ev => {
 };
 
 /* ---------------------------------------------------------------- minha conta */
+/* A tela do perfil tinha quatro linhas de ficha técnica e quatro botões de mesmo
+   peso. Três delas não diziam nada: "Perfil" repetia o rótulo logo abaixo do nome,
+   "Aparelho: desbloqueio rápido ativo" repetia o botão que o desliga, e "Modo:
+   compartilhado" era jargão sem ação possível — só o modo local é informação séria,
+   e aí vira aviso.
+
+   Agora são três grupos: o que é aparência, o que é deste aparelho e o que é da
+   conta. Sair fica separado do resto, porque é a única ação sem volta. */
 registrarTela('conta', () => {
-  const c = S.conta, lembrado = Store.aparelhoLembrado();
+  const c = S.conta, lembrado = Store.aparelhoLembrado(), tema = Store.tema();
+  /* O nome da função, não o seu id: a tela mostrava "painel" onde a Gestão escreve
+     "Painel de estatísticas". */
+  const funcoes = (c.funcoes || [])
+    .map(id => (FUNCOES.find(f => f.id === id) || {}).nome || id);
   return `<div class="stack s18">
     <div class="row">
       <div class="avatar" style="width:46px;height:46px;font-size:15px">${esc(c.ini)}</div>
       <div class="grow"><h1 style="font-size:17px">${esc(c.nome)}</h1>
         <p class="fs12 muted" style="margin:1px 0 0">${esc(c.login)} · ${esc(c.rotulo)}</p></div>
     </div>
-    <div class="card flat">
-      <dl class="kv">
-        <dt>Perfil</dt><dd>${esc(c.rotulo)}</dd>
-        <dt>Funções</dt><dd>${(c.funcoes||[]).length ? esc(c.funcoes.join(', ')) : '<span class="muted">nenhuma concedida</span>'}</dd>
-        <dt>Aparelho</dt><dd>${lembrado ? 'desbloqueio rápido ativo' : 'sem desbloqueio rápido'}</dd>
-        <dt>Modo</dt><dd>${S.modo === 'api' ? 'compartilhado' : 'local (só este aparelho)'}</dd>
-      </dl>
-    </div>
+
     <div class="stack s8">
-      ${lembrado
-        ? `<button class="btn ghost" onclick="app.revogarAparelho()">Desativar desbloqueio rápido</button>`
-        : `<button class="btn soft" onclick="app.lembrarEste()">Ativar desbloqueio rápido</button>`}
-      <button class="btn ghost" onclick="app.ir('trocarSenha')">Trocar minha senha</button>
-      <button class="btn ghost" onclick="app.ir('ajuda')">Como funciona</button>
-      <button class="btn danger" onclick="app.sair()">Sair da conta</button>
+      <p class="sec-label" style="margin:0">Aparência</p>
+      ${escolha({ id:'tema', opcoes:[
+          { valor:'claro',   nome:'Claro',   ic:'sol' },
+          { valor:'escuro',  nome:'Escuro',  ic:'lua' },
+          { valor:'sistema', nome:'Sistema', ic:'sistema' }
+        ], valor:tema, aoEscolher:v => app.tema(v) })}
     </div>
+
+    <div class="stack s8">
+      <p class="sec-label" style="margin:0">Este aparelho</p>
+      <button class="switch" aria-pressed="${!!lembrado}"
+        onclick="app.${lembrado ? 'revogarAparelho' : 'lembrarEste'}()">
+        <span class="grow">
+          <span style="display:block;font-size:13px;font-weight:600">Desbloqueio rápido</span>
+          <span class="fs11 muted">Entrar sem digitar a senha neste aparelho</span>
+        </span>
+        <span class="track"></span>
+      </button>
+      ${S.modo === 'api' ? '' : `<div class="notice info">Sem servidor configurado: os
+        registros ficam guardados só neste aparelho e ninguém mais os vê.</div>`}
+    </div>
+
+    <div class="stack s8">
+      <p class="sec-label" style="margin:0">Conta</p>
+      ${funcoes.length ? `<p class="fs12 muted" style="margin:-2px 0 2px">
+        Funções concedidas: ${esc(funcoes.join(', '))}</p>` : ''}
+      <button class="urow" onclick="app.ir('trocarSenha')">
+        <span class="grow"><span class="lin-t">Trocar minha senha</span></span>
+        <span class="ch" aria-hidden="true">&rsaquo;</span>
+      </button>
+      <button class="urow" onclick="app.ir('ajuda')">
+        <span class="grow"><span class="lin-t">Como funciona</span></span>
+        <span class="ch" aria-hidden="true">&rsaquo;</span>
+      </button>
+    </div>
+
+    <button class="btn danger" onclick="app.sair()">Sair da conta</button>
     ${rodape()}
   </div>`;
 });
+
+/* Guardado no aparelho e aplicado na raiz. O index.html relê a mesma chave antes da
+   pintura, para a próxima abertura já nascer no tema certo. */
+app.tema = v => {
+  Store.guardarTema(v);
+  const raiz = document.documentElement;
+  if(v === 'sistema') delete raiz.dataset.theme;
+  else raiz.dataset.theme = v === 'escuro' ? 'dark' : 'light';
+  const m = document.querySelector('meta[name=theme-color]');
+  if(m) m.content = raiz.dataset.theme === 'dark' ? '#101713' : '#00C5BB';
+  render();
+};
 
 app.revogarAparelho = () => { Store.esquecerAparelho(); toast('Desbloqueio rápido desativado.'); render(); };
 app.lembrarEste = () => { Store.lembrarAparelho(S.conta.login); toast('Desbloqueio rápido ativado.'); render(); };

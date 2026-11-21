@@ -17,6 +17,20 @@
   --g3:#9C3A22; --g3-soft:#FCE7DE; --g3-mark:#FF8969;
   --g4:#A31A1A; --g4-soft:#FAE3E3; --g4-mark:#C62828;
   --ok:#066058; --warn:#7C5A10;
+  /* Anel das marcas de evento. Medido: no tema claro os dois primeiros passos de
+     cada matiz ficam entre 1,2:1 e 2,5:1 contra o fundo — pálidos de propósito, mas
+     pálidos demais para se verem sozinhos. Quem garante que o ponto existe é o anel;
+     o preenchimento diz só o quão grave. A 38% ele chega a ~3:1 e ainda lê como
+     contorno, não como bolinha preta. */
+  --ev-anel:rgb(0 0 0/.38);
+  /* Escala de gravidade: um matiz, quatro luminosidades, do claro ao escuro. Cada
+     passo traz a sua tinta porque o ponto em que o fundo fica escuro demais para
+     texto escuro muda entre os temas. Valores conferidos a 4,5:1 ou mais. */
+  --sev:#2F4A41;
+  --sev1:#DFE8E4; --sev1-t:#243B34;
+  --sev2:#AEC4BC; --sev2-t:#243B34;
+  --sev3:#5E776F; --sev3-t:#FFFFFF;
+  --sev4:#2F4A41; --sev4-t:#FFFFFF;
   --shadow:0 1px 2px rgba(20,48,40,.04),0 6px 18px rgba(20,48,40,.07);
   --shadow-sm:0 1px 2px rgba(20,48,40,.04),0 3px 10px rgba(20,48,40,.05);
   --sh-cta:0 6px 18px rgba(6,96,88,.26);
@@ -33,6 +47,16 @@
   --g1:#8FD9C4; --g1-soft:#13302A; --g2:#FFCF45; --g2-soft:#2E2715;
   --g3:#FF8969; --g3-soft:#311F19; --g4:#FF6B6B; --g4-soft:#331A1A; --g4-mark:#FF6B6B;
   --ok:#8FD9C4; --warn:#FFCF45;
+  /* No escuro o preenchimento já se vira: o passo mais fraco medido dá 3,6:1. O anel
+     só define a borda. */
+  --ev-anel:rgb(255 255 255/.22);
+  /* No escuro a escala continua clara→escura, mas comprimida: o passo 4 ainda
+     precisa se distinguir de um fundo quase preto. */
+  --sev:#6B8E83;
+  --sev1:#CFE0D9; --sev1-t:#0C1A15;
+  --sev2:#9DBAB0; --sev2-t:#0C1A15;
+  --sev3:#6B8E83; --sev3-t:#0C1A15;
+  --sev4:#44645B; --sev4-t:#E6EEE9;
   --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.34);
   --shadow-sm:0 1px 2px rgba(0,0,0,.35),0 3px 10px rgba(0,0,0,.28);
   --sh-cta:0 6px 18px rgba(0,0,0,.45);
@@ -46,6 +70,16 @@
   --g1:#8FD9C4; --g1-soft:#13302A; --g2:#FFCF45; --g2-soft:#2E2715;
   --g3:#FF8969; --g3-soft:#311F19; --g4:#FF6B6B; --g4-soft:#331A1A; --g4-mark:#FF6B6B;
   --ok:#8FD9C4; --warn:#FFCF45;
+  /* No escuro o preenchimento já se vira: o passo mais fraco medido dá 3,6:1. O anel
+     só define a borda. */
+  --ev-anel:rgb(255 255 255/.22);
+  /* No escuro a escala continua clara→escura, mas comprimida: o passo 4 ainda
+     precisa se distinguir de um fundo quase preto. */
+  --sev:#6B8E83;
+  --sev1:#CFE0D9; --sev1-t:#0C1A15;
+  --sev2:#9DBAB0; --sev2-t:#0C1A15;
+  --sev3:#6B8E83; --sev3-t:#0C1A15;
+  --sev4:#44645B; --sev4-t:#E6EEE9;
   --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.34);
   --shadow-sm:0 1px 2px rgba(0,0,0,.35),0 3px 10px rgba(0,0,0,.28);
   --sh-cta:0 6px 18px rgba(0,0,0,.45);
@@ -73,9 +107,22 @@ input,textarea,select{font:inherit;color:inherit}
   .app{border:0;border-radius:26px;box-shadow:0 2px 8px rgba(20,48,40,.07),0 22px 54px rgba(20,48,40,.14);overflow:hidden;
     height:min(880px,calc(100vh - 36px))}
 }
-.scroll{flex:1;overflow-y:auto;overscroll-behavior:contain;min-width:0}
+.scroll{flex:1;overflow-y:auto;overscroll-behavior:contain;min-width:0;position:relative}
+
+/* ---------- puxar para atualizar ---------- */
+/* O indicador mora no topo do conteúdo rolável e o .pad o cobre; quando a tela desce
+   com o dedo, ele aparece no vão. Por isso o .pad precisa de fundo próprio: sem ele,
+   a roda ficaria visível por trás do texto o tempo todo. */
+.puxar{position:absolute;top:12px;left:0;right:0;display:flex;justify-content:center;
+  opacity:0;pointer-events:none;z-index:0;transition:opacity .12s}
+.puxar .roda{width:22px;height:22px;border-radius:50%;border:2.5px solid var(--line);
+  border-top-color:var(--accent);transition:transform .15s}
+.puxar.pronto .roda{transform:scale(1.12);border-top-color:var(--cta-bg)}
+.puxar.girando-ativo .roda{animation:gira .7s linear infinite}
+@media (prefers-reduced-motion:reduce){.puxar .roda{transition:none}
+  .puxar.girando-ativo .roda{animation:none;border-color:var(--accent)}}
 .pad{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
-  padding-block:16px}
+  padding-block:16px;background:var(--bg-app);position:relative;z-index:1;min-height:100%}
 
 /* ---------- barras ---------- */
 .appbar{display:flex;align-items:center;gap:10px;background:var(--bg-app);min-width:0;flex:none;
@@ -141,18 +188,29 @@ textarea.input{min-height:96px;resize:vertical;line-height:1.55;font-size:14.5px
 .chip[aria-pressed="true"] .avatar{background:rgba(255,255,255,.9);color:var(--cta-bg)}
 
 /* ---------- gravidade ---------- */
-.sev{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;white-space:nowrap}
-.sev.n1{background:var(--g1-soft);color:var(--g1)} .sev.n2{background:var(--g2-soft);color:var(--g2)}
-.sev.n3{background:var(--g3-soft);color:var(--g3)} .sev.n4{background:var(--g4-soft);color:var(--g4)}
+.sev{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;white-space:nowrap;
+  /* O nível 1 é quase da cor do cartão, de propósito: menos grave, mais discreto. O
+     fio de contorno é o que evita que pareça um selo que não carregou. */
+  box-shadow:inset 0 0 0 1px var(--ev-anel)}
+/* A gravidade é uma escala, não quatro cores: um matiz só, do claro ao escuro. O
+   verde-ardósia foi escolhido por não competir com os cinco matizes de categoria nem
+   com o --accent, e por deixar comparável um nível 3 de Doença com um de Queda —
+   coisa que o antigo verde/amarelo/laranja/vermelho não permitia.
+
+   --g1..--g4 ficam como estão: são erro, aviso e estado, usados em .btn.danger,
+   .input.erro, .pill.wait e no contador das abas. Repintá-los trocaria a cor de
+   mensagem de erro junto com a de gravidade. */
+.sev.n1{background:var(--sev1);color:var(--sev1-t)} .sev.n2{background:var(--sev2);color:var(--sev2-t)}
+.sev.n3{background:var(--sev3);color:var(--sev3-t)} .sev.n4{background:var(--sev4);color:var(--sev4-t)}
 .sevpick{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
 .sevpick button{border:0;border-radius:var(--r-sm);padding:10px 4px;text-align:center;background:var(--surface-2);min-height:56px}
 .sevpick b{display:block;font-family:var(--font-display);font-size:16px;line-height:1.2}
 .sevpick small{font-size:9.5px;font-weight:600}
 .sevpick button[aria-pressed="true"]{border-width:2px;border-style:solid;padding:8px 3px}
-.sevpick button[data-n="1"][aria-pressed="true"]{background:var(--g1-soft);border-color:var(--g1-mark);color:var(--g1)}
-.sevpick button[data-n="2"][aria-pressed="true"]{background:var(--g2-soft);border-color:var(--g2-mark);color:var(--g2)}
-.sevpick button[data-n="3"][aria-pressed="true"]{background:var(--g3-soft);border-color:var(--g3-mark);color:var(--g3)}
-.sevpick button[data-n="4"][aria-pressed="true"]{background:var(--g4-soft);border-color:var(--g4-mark);color:var(--g4)}
+.sevpick button[data-n="1"][aria-pressed="true"]{background:var(--sev1);border-color:var(--sev);color:var(--sev1-t)}
+.sevpick button[data-n="2"][aria-pressed="true"]{background:var(--sev2);border-color:var(--sev);color:var(--sev2-t)}
+.sevpick button[data-n="3"][aria-pressed="true"]{background:var(--sev3);border-color:var(--sev);color:var(--sev3-t)}
+.sevpick button[data-n="4"][aria-pressed="true"]{background:var(--sev4);border-color:var(--sev);color:var(--sev4-t)}
 
 .pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:99px;
   background:var(--surface-2);border:0;color:var(--muted);white-space:nowrap}
@@ -173,10 +231,11 @@ textarea.input{min-height:96px;resize:vertical;line-height:1.55;font-size:14.5px
   box-shadow:var(--shadow);transition:box-shadow .12s,transform .12s}
 .item:hover{box-shadow:0 1px 2px rgba(20,48,40,.05),0 10px 24px rgba(20,48,40,.11)}
 .item:active{transform:scale(.993)}
-/* A faixa de gravidade saiu: o selo ao lado do título já diz a mesma coisa. */
-.item .stripe{display:none}
-.item.n1 .stripe{background:var(--g1-mark)} .item.n2 .stripe{background:var(--g2-mark)}
-.item.n3 .stripe{background:var(--g3-mark)} .item.n4 .stripe{background:var(--g4-mark)}
+/* A tarja mostrava a gravidade, que o selo ao lado já dizia, e por isso tinha sido
+   escondida. Agora mostra a categoria — informação que o cartão não trazia em cor
+   nenhuma — e volta, fina, na borda de dentro. */
+.item .stripe{position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--cat,transparent)}
+.item.cat-sem .stripe{display:none}
 .item h4{font-size:14px;font-weight:600;margin-bottom:2px}
 
 .steps{display:flex;gap:4px;padding:0 16px 12px;background:var(--surface-2);flex:none}
@@ -213,6 +272,9 @@ textarea.input{min-height:96px;resize:vertical;line-height:1.55;font-size:14.5px
 .bar-row .lab{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bar-track{grid-column:1/-1;height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden}
 .bar-fill{height:100%;background:var(--accent);border-radius:3px}
+/* A barra de "Por categoria" toma o matiz da categoria; a de "Tipos mais
+   frequentes" continua no accent, porque tipo não tem cor. */
+.bar-fill.cor-cat{background:var(--cat,var(--accent))}
 .bar-n{text-align:right;font-variant-numeric:tabular-nums;font-weight:700;font-size:12px}
 
 .kv{display:grid;grid-template-columns:104px 1fr;gap:5px 10px;font-size:12.5px;min-width:0}
@@ -286,6 +348,48 @@ textarea.input{min-height:96px;resize:vertical;line-height:1.55;font-size:14.5px
   background:var(--surface-2);color:var(--muted);font-size:12px;font-weight:700;margin-top:1px}
 .dest b{font-weight:600}
 
+/* ---------- cor do evento: matiz = categoria, luminosidade = gravidade ----------
+
+   Duas informações em duas dimensões. O matiz diz O QUE aconteceu; o quanto a cor é
+   escura diz QUÃO sério. Um ponto roxo-escuro é uma doença grave; um coral-claro, um
+   incidente leve.
+
+   A gravidade sai de color-mix sobre o matiz, então são cinco valores e não vinte:
+   categoria nova precisa de uma linha, não de quatro.
+
+   O passo 1 é claro de propósito, e claro sobre branco quase não se vê — um âmbar a
+   34% dá contraste 1,6:1, abaixo dos 3:1 que um elemento gráfico pede. Em vez de
+   escurecer a escala e perder o "claro", a marca ganha um anel interno. Resolve os
+   cinco matizes de uma vez. */
+.cat-acidente     {--cat:#D99A20}
+.cat-doenca       {--cat:#8257C4}
+.cat-incidente    {--cat:#E8613A}
+.cat-comportamento{--cat:#1FA79B}
+.cat-rotina       {--cat:#5189C0}
+.ev1{background:color-mix(in srgb,var(--cat) 42%,#fff)}
+.ev2{background:color-mix(in srgb,var(--cat) 70%,#fff)}
+.ev3{background:var(--cat)}
+.ev4{background:color-mix(in srgb,var(--cat) 72%,#000)}
+.anel{box-shadow:inset 0 0 0 1px var(--ev-anel)}
+
+/* No escuro a escala continua clara→escura, mas comprimida: um ponto quase preto
+   sobre fundo quase preto não se vê. O passo 4 passa a ser o matiz puro e os
+   anteriores clareiam a partir dele. */
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]) .ev1{background:color-mix(in srgb,var(--cat) 30%,#fff)}
+  :root:not([data-theme="light"]) .ev2{background:color-mix(in srgb,var(--cat) 58%,#fff)}
+  :root:not([data-theme="light"]) .ev3{background:color-mix(in srgb,var(--cat) 84%,#fff)}
+  :root:not([data-theme="light"]) .ev4{background:var(--cat)}
+}
+:root[data-theme="dark"] .ev1{background:color-mix(in srgb,var(--cat) 30%,#fff)}
+:root[data-theme="dark"] .ev2{background:color-mix(in srgb,var(--cat) 58%,#fff)}
+:root[data-theme="dark"] .ev3{background:color-mix(in srgb,var(--cat) 84%,#fff)}
+:root[data-theme="dark"] .ev4{background:var(--cat)}
+
+/* Legenda do calendário: sem ela a grade é bonita e muda. */
+.cal-leg{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:2px}
+.cal-leg span{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;color:var(--muted);font-weight:600}
+.cal-leg i{width:8px;height:8px;border-radius:50%;display:block}
+
 /* ---------- calendário ---------- */
 .cal{display:flex;flex-direction:column;gap:10px}
 .cal-topo{display:flex;align-items:center;gap:12px}
@@ -304,10 +408,8 @@ textarea.input{min-height:96px;resize:vertical;line-height:1.55;font-size:14.5px
 .cal-d .n{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-weight:500}
 .cal-d.hoje .n{box-shadow:inset 0 0 0 1.5px var(--accent);font-weight:700;color:var(--accent-text)}
 .cal-d.sel .n{background:var(--cta-bg);color:var(--cta-fg);font-weight:700}
-.cal-pts{display:flex;gap:3px;height:5px}
-.cal-pts i{width:5px;height:5px;border-radius:50%;display:block}
-.cal-pts i.n1{background:var(--g1-mark)} .cal-pts i.n2{background:var(--g2-mark)}
-.cal-pts i.n3{background:var(--g3-mark)} .cal-pts i.n4{background:var(--g4-mark)}
+.cal-pts{display:flex;gap:3px;height:6px}
+.cal-pts i{width:6px;height:6px;border-radius:50%;display:block}
 .cal-lista{margin-top:6px}
 .cal-ano{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
 .cal-mini{background:transparent;border:0;text-align:left;padding:0}
@@ -322,7 +424,9 @@ textarea.input{min-height:96px;resize:vertical;line-height:1.55;font-size:14.5px
    toque. É o controle que Material e o guia da Apple pedem nesse tamanho. */
 .seg{display:flex;background:var(--surface-2);border-radius:var(--r-sm);padding:4px;gap:4px}
 .seg button{flex:1;min-height:44px;border:0;border-radius:9px;background:transparent;
-  font:inherit;font-size:14px;font-weight:600;color:var(--muted);transition:background .12s}
+  font:inherit;font-size:14px;font-weight:600;color:var(--muted);transition:background .12s;
+  display:flex;align-items:center;justify-content:center;gap:7px}
+.seg button svg{width:17px;height:17px;flex:none}
 .seg button[aria-checked="true"]{background:var(--surface);color:var(--accent-text);
   box-shadow:0 1px 3px rgba(20,48,40,.12)}
 

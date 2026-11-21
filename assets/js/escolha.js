@@ -52,6 +52,8 @@ const aria = cfg => `${cfg.rotulo ? `aria-labelledby="lab-${esc(cfg.id)}"` : ''}
   ${cfg.erro ? `aria-invalid="true" aria-describedby="err-${esc(cfg.id)}"` : ''}`;
 
 /* ---------------------------------------------------------------- segmentado */
+/* Opção pode trazer `ic`, o nome de um ícone do ICON. Só o segmentado desenha: nos
+   chips e no campo com lista a marca competiria com o texto em vez de ajudar. */
 function segmentado(cfg){
   const lista = normaliza(cfg.opcoes);
   const sel = selecionados(cfg);
@@ -59,7 +61,8 @@ function segmentado(cfg){
     ${rotuloHTML(cfg)}
     <div class="seg" role="radiogroup" ${aria(cfg)} data-escolha="${esc(cfg.id)}">
       ${lista.map(o => `<button type="button" role="radio" aria-checked="${sel.includes(o.valor)}"
-        onclick="app.escolherLista('${esc(cfg.id)}','${esc(o.valor)}')">${esc(o.nome)}</button>`).join('')}
+        onclick="app.escolherLista('${esc(cfg.id)}','${esc(o.valor)}')"
+        >${o.ic && ICON[o.ic] ? svgIc(ICON[o.ic]) : ''}${esc(o.nome)}</button>`).join('')}
     </div>
     ${erroHTML(cfg)}
   </div>`;

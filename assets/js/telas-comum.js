@@ -6,7 +6,7 @@
 
 import { S, app, ir, aluno } from './core.js';
 import { esc, quandoLegivel } from './util.js';
-import { OUTRO, SEVL } from './vocabulario.js';
+import { OUTRO, SEVL, catId } from './vocabulario.js';
 
 const sevTag = n => `<span class="sev n${n}">${n} · ${SEVL[n]}</span>`;
 const tipoDe = o => o.tipo === OUTRO && o.tipoOutro ? o.tipoOutro : o.tipo;
@@ -23,7 +23,9 @@ function statusPill(o){
 
 function itemHTML(o){
   const nomes = (o.envolvidos || []).map(e => aluno(e.kid).nome).join(' · ');
-  return `<button class="item n${o.sev}" onclick="app.abrirOc('${esc(o.id)}')">
+  /* A tarja da esquerda era a gravidade, que o selo ao lado já dizia — por isso
+     estava escondida. Agora diz a categoria, que é outra informação, e volta. */
+  return `<button class="item cat-${catId(o.categoria) || 'sem'}" onclick="app.abrirOc('${esc(o.id)}')">
     <span class="stripe"></span>
     <div class="row" style="gap:8px;margin-bottom:5px"><h4 class="grow">${esc(tipoDe(o))}</h4>${sevTag(o.sev)}</div>
     <div class="fs12 muted" style="margin-bottom:7px">${esc(nomes)} · ${esc(localDe(o))} · ${esc(quandoTexto(o))}</div>
@@ -39,9 +41,8 @@ app.abrirOc = id => { S.detalhe = id; ir('detalhe'); };
 function primeirosPassos(u){
   if(u.papel !== 'gestao') return '';
   const passos = [
-    { ok: S.turmas.length > 0,  txt:'Cadastre as turmas',           tela:'alunos' },
-    { ok: S.alunos.length > 0,  txt:'Cadastre os alunos',           tela:'alunos' },
-    { ok: S.contas.filter(c => c.status === 'ativo').length > 1, txt:'Compartilhe o link com a equipe', tela:'usuarios' }
+    { ok: S.turmas.length > 0, txt:'Cadastre as turmas', tela:'alunos' },
+    { ok: S.alunos.length > 0, txt:'Cadastre os alunos', tela:'alunos' }
   ];
   if(passos.every(p => p.ok)) return '';
   return `<div class="card flat stack s8">

@@ -11,6 +11,7 @@
 import { S, app, render, visiveis } from './core.js';
 import { quandoDe } from './metricas.js';
 import { itemHTML } from './telas-comum.js';
+import { CAT_ID, catId } from './vocabulario.js';
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -43,9 +44,15 @@ function porDia(){
   return mapa;
 }
 
+/* Cada ponto carrega duas informações: o matiz é a categoria, o quão escuro é a
+   gravidade. Três no máximo — mais que isso vira borrão sob o número do dia. */
 const pontos = ocs => !ocs || !ocs.length ? ''
   : `<span class="cal-pts">${ocs.slice(0, 3).map(o =>
-      `<i class="n${o.sev || 1}"></i>`).join('')}</span>`;
+      `<i class="anel cat-${catId(o.categoria) || 'sem'} ev${o.sev || 1}"></i>`).join('')}</span>`;
+
+/* Sem isto a grade é bonita e muda: nada na tela diz o que cada matiz significa. */
+const legenda = () => `<div class="cal-leg">${Object.entries(CAT_ID).map(([nome, id]) =>
+  `<span><i class="anel cat-${id} ev3"></i>${nome.split(' e ')[0]}</span>`).join('')}</div>`;
 
 function celula(d, mapa, c, foraDoMes){
   const k = chaveDia(d);
@@ -138,6 +145,7 @@ export function corpoCalendario(){
     </div>
 
     ${c.modo === 'mes' ? grade(mapa, c) : c.modo === 'semana' ? faixa(mapa, c) : ano(mapa, c)}
+    ${c.modo === 'ano' ? '' : legenda()}
 
     ${c.modo === 'ano' ? '' : `<div class="cal-lista stack s8">
       <p class="sec-label">${DIAS[dia.getDay()]}, ${dia.getDate()} de ${MESES[dia.getMonth()].toLowerCase()}

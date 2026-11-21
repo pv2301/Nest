@@ -36,6 +36,21 @@ export const CATS = {
   ]
 };
 
+/* A ponte entre a categoria e a cor: o sufixo da classe CSS que lhe dá o matiz.
+   Existe porque chave de objeto com acento e espaço não vira nome de classe, e
+   porque a tradução tem de morar num lugar só — um teste confere que toda categoria
+   daqui tem a sua regra .cat-* na folha de estilo. */
+export const CAT_ID = {
+  'Acidente':                 'acidente',
+  'Doença':                   'doenca',
+  'Incidente':                'incidente',
+  'Comportamento e emocional':'comportamento',
+  'Rotina e cuidados':        'rotina'
+};
+
+/** Sufixo da classe de cor desta categoria. Sem categoria, nenhum matiz. */
+export const catId = c => CAT_ID[c] || '';
+
 export const OUTRO = 'Outro';
 
 /* Exemplo mostrado no campo de descrição, por categoria. É modelo de linguagem de

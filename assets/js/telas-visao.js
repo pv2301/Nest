@@ -8,7 +8,7 @@
 
 import { S, app, registrarTela, render, rodape, posRender, aluno } from './core.js';
 import { esc } from './util.js';
-import { PERIODOS } from './vocabulario.js';
+import { PERIODOS, catId } from './vocabulario.js';
 import { filtraPorPeriodo, agregaPorHoraLocal, contaPor, recorrencia, paresRecorrentes,
          resumo } from './metricas.js';
 import { tipoDe, vazio } from './telas-comum.js';
@@ -97,9 +97,11 @@ function corpoPainel(){
 
     <div class="card">
       <p class="sec-label">Por categoria</p>
+      <!-- Cada barra no matiz da sua categoria: assim o painel vira, de graça, a
+           chave de leitura dos pontos do calendário. -->
       <div class="bars">${cats.map(([t, n]) => `
-        <div><div class="bar-row"><span class="lab">${esc(t)}</span><span class="bar-n">${n}</span>
-          <div class="bar-track"><div class="bar-fill" style="width:${Math.round(n/maxCat*100)}%"></div></div></div></div>`).join('')}</div>
+        <div class="cat-${catId(t) || 'sem'}"><div class="bar-row"><span class="lab">${esc(t)}</span><span class="bar-n">${n}</span>
+          <div class="bar-track"><div class="bar-fill cor-cat" style="width:${Math.round(n/maxCat*100)}%"></div></div></div></div>`).join('')}</div>
     </div>
 
     <div class="card">

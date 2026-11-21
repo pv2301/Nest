@@ -3,6 +3,7 @@
 import { S, render, autenticar } from './core.js';
 import { Store } from './store.js';
 import { criptoDisponivel } from './util.js';
+import { ligarPuxar } from './puxar.js';
 
 /* Os módulos de tela se registram ao serem importados. */
 import './telas-auth.js';
@@ -22,6 +23,7 @@ async function iniciar(){
   S.modo = Store.modo();
   aplicarIdentidade();
   render();
+  ligarPuxar();
 
   if(!criptoDisponivel()){
     S.formErro = 'Este navegador não oferece as funções de segurança necessárias. Abra o site por https (ou localhost).';
