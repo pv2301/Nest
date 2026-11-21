@@ -243,3 +243,31 @@ export function trocarNomes(texto, pares){
   }
   return fora;
 }
+
+/* ---------- maiúscula de nome próprio ----------
+   "maria da silva" digitada às pressas sai impressa num relatório que vai à família.
+   O teclado do celular ajuda com autocapitalize, mas o de computador não tem, então
+   a normalização acontece ao salvar.
+
+   Partículas ficam minúsculas quando não abrem o nome: "Maria da Silva", não
+   "Maria Da Silva". */
+const PARTICULAS = new Set(['de','da','do','das','dos','e','du','del','di','la','van','von']);
+
+export function tituloNome(valor){
+  const t = String(valor ?? '').trim().replace(/\s+/g, ' ');
+  if(!t) return '';
+  /* Baixa tudo primeiro: assim "MARIA SILVA" também se acerta. Depois sobe a inicial
+     de cada palavra, inclusive depois de apóstrofo e hífen — D'Ávila, Jean-Pierre. */
+  const subido = t.toLocaleLowerCase('pt-BR')
+    .replace(/(^|[\s'’-])(\p{L})/gu, (_, sep, ch) => sep + ch.toLocaleUpperCase('pt-BR'));
+  return subido.split(' ')
+    .map((w, i) => i > 0 && PARTICULAS.has(w.toLocaleLowerCase('pt-BR'))
+      ? w.toLocaleLowerCase('pt-BR') : w)
+    .join(' ');
+}
+
+/** Para frases, não nomes: sobe só a primeira letra. */
+export function primeiraMaiuscula(valor){
+  const t = String(valor ?? '').trim();
+  return t ? t.charAt(0).toLocaleUpperCase('pt-BR') + t.slice(1) : '';
+}

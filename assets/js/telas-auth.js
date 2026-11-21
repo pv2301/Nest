@@ -7,9 +7,10 @@ import { Store } from './store.js';
 import {
   esc, RINGBG, SEAL, ICON, svgIc,
   validaLogin, validaSenha, requisitosSenha, normalizaLogin, sugereLogin, senhaTemporaria,
-  criptoDisponivel
+  criptoDisponivel, tituloNome
 } from './util.js';
 import { PAPEIS_CONTA } from './dados.js';
+import { escolha } from './escolha.js';
 import { CONFIG } from '../../config.js';
 
 const val = id => (document.getElementById(id) || {}).value || '';
@@ -116,7 +117,7 @@ registrarTela('criar', () => {
       <form class="card lift stack" onsubmit="app.submeterCriar(event)">
         <div class="field">
           <label for="c-nome">Nome completo</label>
-          <input class="input" id="c-nome" autocomplete="name" oninput="app.sugerir()">
+          <input class="input" id="c-nome" autocapitalize="words" autocomplete="name" oninput="app.sugerir()">
         </div>
         <div class="field">
           <label for="c-login">Login</label>
@@ -131,21 +132,15 @@ registrarTela('criar', () => {
           <label for="c-senha2">Repetir a senha</label>
           <input class="input" id="c-senha2" type="password" autocomplete="new-password">
         </div>
-        <div>
-          <p class="sec-label">Sua função</p>
-          <div class="chips" data-grupo="papel">
-            ${PAPEIS_CONTA.map(p => `
-              <button type="button" class="chip" data-valor="${p.id}" aria-pressed="${n.papel === p.id}" onclick="app.campoNova('papel','${p.id}')">${esc(p.nome)}</button>`).join('')}
-          </div>
-        </div>
-        <div>
-          <p class="sec-label">Turma</p>
-          ${turmasDisponiveis().length ? `
-            <div class="chips" data-grupo="turma">
-              ${turmasDisponiveis().map(t => `<button type="button" class="chip" data-valor="${esc(t)}" aria-pressed="${n.turma === t}" onclick="app.campoNova('turma','${t}')">${esc(t)}</button>`).join('')}
-            </div>`
-            : `<p class="fs12 muted" style="margin:0">A gestão definirá sua turma.</p>`}
-        </div>
+        ${escolha({ id:'nc-papel', rotulo:'Sua função',
+          opcoes:PAPEIS_CONTA.map(p => ({ valor:p.id, nome:p.nome })),
+          valor:n.papel, aoEscolher:v => { n.papel = v; } })}
+        ${turmasDisponiveis().length
+          ? escolha({ id:'nc-turma', rotulo:'Turma', opcoes:turmasDisponiveis(),
+              valor:n.turma, placeholder:'Escolher a turma',
+              aoEscolher:v => { n.turma = n.turma === v ? '' : v; } })
+          : `<p class="sec-label">Turma</p>
+             <p class="fs12 muted" style="margin:0">A gestão definirá sua turma.</p>`}
         <button class="btn" type="submit" ${S.ocupado ? 'disabled' : ''}>${S.ocupado ? 'Enviando…' : 'Enviar para aprovação'}</button>
         <button class="btn ghost sm" type="button" style="width:100%" onclick="app.voltar()">Voltar</button>
       </form>
@@ -178,20 +173,10 @@ document.addEventListener('input', ev => {
   if(ev.target && ev.target.id === 'c-login') ev.target.dataset.tocado = '1';
 });
 
-/* Alterna o chip direto no DOM. Re-renderizar aqui apagaria o que já foi digitado
-   nos campos do formulário, inclusive as senhas. */
-app.campoNova = (campo, valor) => {
-  S.novaConta = S.novaConta || {};
-  const atual = S.novaConta[campo];
-  S.novaConta[campo] = (campo === 'turma' && atual === valor) ? '' : valor;
-  document.querySelectorAll(`[data-grupo="${campo}"] .chip`).forEach(b => {
-    b.setAttribute('aria-pressed', String(b.dataset.valor === S.novaConta[campo]));
-  });
-};
 
 app.submeterCriar = async ev => {
   ev.preventDefault();
-  const nome = val('c-nome').trim();
+  const nome = tituloNome(val('c-nome'));
   const login = normalizaLogin(val('c-login'));
   const senha = val('c-senha'), senha2 = val('c-senha2');
   const n = S.novaConta || {};
@@ -269,7 +254,7 @@ registrarTela('configurar', () => `
       <form class="card lift stack" onsubmit="app.submeterConfig(event)">
         <div class="field">
           <label for="g-nome">Nome completo</label>
-          <input class="input" id="g-nome" autocomplete="name" oninput="app.sugerirGestao()">
+          <input class="input" id="g-nome" autocapitalize="words" autocomplete="name" oninput="app.sugerirGestao()">
         </div>
         <div class="field">
           <label for="g-login">Login</label>
@@ -307,7 +292,7 @@ app.checarSenhaG = () => {
 
 app.submeterConfig = async ev => {
   ev.preventDefault();
-  const nome = val('g-nome').trim(), login = normalizaLogin(val('g-login'));
+  const nome = tituloNome(val('g-nome')), login = normalizaLogin(val('g-login'));
   const senha = val('g-senha'), senha2 = val('g-senha2'), codigo = val('g-codigo');
   if(nome.split(/\s+/).filter(Boolean).length < 2) return erro('Informe o nome completo.');
   const eL = validaLogin(login); if(eL) return erro(eL);

@@ -81,6 +81,52 @@ let f=[]; const ok=(n,c,x)=>{ if(c) console.log('  OK '+n); else { f.push(n); co
     await (async()=>{ await p.locator('.cl-op').first().click(); await p.waitForTimeout(700);
       return (await p.locator('.tok').count()) === 1; })());
 
+ console.log('\n=== O controle segue o número de opções ===');
+ await p.evaluate(()=>app.irPasso(3)); await p.waitForTimeout(700);
+ ok('2 opções vêm segmentadas, lado a lado',
+    (await p.locator('.seg [role=radio]').count()) === 2,
+    'segmentos: ' + await p.locator('.seg [role=radio]').count());
+ ok('9 opções vêm como campo com lista',
+    (await p.locator('.cl-campo').count()) >= 1);
+
+ console.log('\n=== Teclado ===');
+ await p.evaluate(()=>app.abrirLista('local')); await p.waitForTimeout(600);
+ ok('a lista abriu', (await p.locator('.cl-ops [role=option]').count()) > 0);
+ ok('a lista se anuncia como listbox',
+    (await p.locator('.cl-ops[role=listbox]').count()) === 1);
+ ok('o campo se anuncia como combobox aberto',
+    (await p.locator('.cl-campo[role=combobox][aria-expanded=true]').count()) === 1);
+ await p.keyboard.press('Escape'); await p.waitForTimeout(500);
+ ok('Esc fecha a lista', (await p.locator('.cl-ops').count()) === 0);
+ ok('e devolve o foco ao campo',
+    (await p.evaluate(()=>document.activeElement && document.activeElement.id)) === 'cp-local');
+
+ await p.evaluate(()=>app.abrirLista('local')); await p.waitForTimeout(600);
+ await p.locator('.cl-ops [role=option]').first().focus();
+ await p.keyboard.press('ArrowDown'); await p.waitForTimeout(200);
+ await p.keyboard.press('Enter'); await p.waitForTimeout(700);
+ ok('seta e Enter escolhem sem o mouse',
+    (await p.locator('.cl-campo .cl-val').first().innerText()).trim().length > 0,
+    'valor: ' + (await p.locator('.cl-campo').first().innerText()).trim());
+
+ console.log('\n=== Voltar nativo fecha a lista ===');
+ await p.evaluate(()=>app.abrirLista('local')); await p.waitForTimeout(600);
+ await p.goBack(); await p.waitForTimeout(800);
+ ok('voltar fecha a lista em vez de sair da tela',
+    (await p.locator('.cl-ops').count()) === 0 &&
+    (await p.locator('.appbar h2').innerText()).includes('Registro'),
+    'tela: ' + (await p.locator('.appbar h2').innerText()));
+
+ console.log('\n=== Campo obrigatório em branco ===');
+ await p.evaluate(()=>app.irPasso(4)); await p.waitForTimeout(600);
+ await p.click('#btn-enviar'); await p.waitForTimeout(900);
+ await p.evaluate(()=>app.irPasso(1)); await p.waitForTimeout(700);
+ ok('o campo que faltou fica marcado como inválido',
+    (await p.locator('[aria-invalid=true]').count()) >= 1,
+    'marcados: ' + await p.locator('[aria-invalid=true]').count());
+ ok('e diz o que falta junto do campo',
+    (await p.locator('.esc.com-erro .erromsg').count()) >= 1);
+
  console.log(f.length ? `\n=== ${f.length} FALHARAM ===` : '\n=== TUDO PASSOU ===');
  await b.close(); process.exit(f.length?1:0);
 })();

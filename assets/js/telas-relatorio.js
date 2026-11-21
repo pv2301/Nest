@@ -18,7 +18,7 @@
 
 import { S, app, registrarTela, ir, toast, render, aluno } from './core.js';
 import { Store } from './store.js';
-import { campoLista } from './campo-lista.js';
+import { escolha } from './escolha.js';
 import { esc, SEAL, iniciais, dataCompleta, soData, posicaoNome, trocarNomes } from './util.js';
 import { SEVL } from './dados.js';
 import { tipoDe, localDe } from './telas-registro.js';
@@ -336,7 +336,7 @@ registrarTela('ficha', () => {
         <span class="track"></span></button>
 
       ${f.destino === 'familia' && envolvidos.length > 1
-        ? campoLista({ id:'foco', rotulo:'Qual criança',
+        ? escolha({ id:'foco', rotulo:'Qual criança',
             opcoes:envolvidos.map(e => ({ valor:e.kid, nome:aluno(e.kid).nome,
               ini:iniciais(aluno(e.kid).nome) })),
             valor:f.focoKid, placeholder:'Escolher a criança',
@@ -348,6 +348,7 @@ registrarTela('ficha', () => {
       ${f.destino === 'familia' ? `<div class="field">
         <label for="f-familia">O que aconteceu</label>
         <textarea class="input" id="f-familia" rows="5"
+          spellcheck="true" autocorrect="on" autocapitalize="sentences"
           oninput="app.checarFamilia()">${esc(textoFamilia(o))}</textarea>
         <div id="f-vaza" style="margin-top:8px">${avisoVazamento(o, textoFamilia(o))}</div>
       </div>` : ''}

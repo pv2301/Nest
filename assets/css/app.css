@@ -220,9 +220,6 @@ textarea.input{min-height:96px;resize:vertical;line-height:1.55;font-size:14.5px
 
 .photo{height:84px;border-radius:var(--r-sm);background:var(--surface-2);border:1px dashed var(--line);
   display:grid;place-items:center;font-size:11.5px;color:var(--muted);text-align:center;padding:8px}
-.bodymap{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
-.bodymap button{font-size:12px;padding:8px 4px;border:0;border-radius:10px;background:var(--surface-2);font-weight:500;min-height:44px}
-.bodymap button[aria-pressed="true"]{background:var(--g3-soft);border-color:var(--g3-mark);color:var(--g3);font-weight:600}
 .legend{display:flex;gap:10px;flex-wrap:wrap;font-size:10.5px;color:var(--muted);align-items:center}
 .legend i{width:9px;height:9px;border-radius:2px;display:inline-block;margin-right:3px;vertical-align:-1px}
 
@@ -277,6 +274,53 @@ textarea.input{min-height:96px;resize:vertical;line-height:1.55;font-size:14.5px
 .ch{color:var(--muted);font-size:20px;line-height:1;flex:none}
 .cnt{font-size:10px;background:var(--g4-mark);color:#fff;border-radius:99px;padding:1px 7px;font-weight:700;flex:none}
 
+/* ---------- calendário ---------- */
+.cal{display:flex;flex-direction:column;gap:10px}
+.cal-topo{display:flex;align-items:center;gap:12px}
+.cal-mes{font-family:var(--font-display);font-size:20px;font-weight:800}
+.cal-ano-n{color:var(--muted);font-weight:600;font-size:15px;margin-left:4px}
+.cal-nav{margin-left:auto;display:flex;gap:6px}
+.cal-nav button{width:38px;height:38px;border-radius:50%;background:var(--surface-2);color:var(--muted);
+  font-size:18px;line-height:1;display:grid;place-items:center}
+.cal-sem{display:grid;grid-template-columns:repeat(7,1fr)}
+.cal-sem span{text-align:center;font-size:10.5px;font-weight:700;color:var(--muted);letter-spacing:.04em}
+.cal-grade{display:grid;grid-template-columns:repeat(7,1fr);row-gap:2px}
+.cal-faixa{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal-d{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  background:transparent;border:0;padding:6px 0;font-size:14.5px;color:var(--fg);min-height:52px}
+.cal-d.fora{color:var(--muted);opacity:.5}
+.cal-d .n{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-weight:500}
+.cal-d.hoje .n{box-shadow:inset 0 0 0 1.5px var(--accent);font-weight:700;color:var(--accent-text)}
+.cal-d.sel .n{background:var(--cta-bg);color:var(--cta-fg);font-weight:700}
+.cal-pts{display:flex;gap:3px;height:5px}
+.cal-pts i{width:5px;height:5px;border-radius:50%;display:block}
+.cal-pts i.n1{background:var(--g1-mark)} .cal-pts i.n2{background:var(--g2-mark)}
+.cal-pts i.n3{background:var(--g3-mark)} .cal-pts i.n4{background:var(--g4-mark)}
+.cal-lista{margin-top:6px}
+.cal-ano{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.cal-mini{background:transparent;border:0;text-align:left;padding:0}
+.cal-mini b{display:block;font-family:var(--font-display);font-size:12.5px;font-weight:700;margin-bottom:5px}
+.cal-mini .g{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.cal-mini .g i{aspect-ratio:1;border-radius:2px;background:var(--surface-2);display:block}
+.cal-mini .g i.t1{background:var(--g1-soft)} .cal-mini .g i.t2{background:var(--mint)}
+.cal-mini .g i.t3{background:var(--accent)}
+
+/* ---------- seleção ---------- */
+/* Segmentado: até três opções ficam lado a lado, porque trocar tem de custar um
+   toque. É o controle que Material e o guia da Apple pedem nesse tamanho. */
+.seg{display:flex;background:var(--surface-2);border-radius:var(--r-sm);padding:4px;gap:4px}
+.seg button{flex:1;min-height:44px;border:0;border-radius:9px;background:transparent;
+  font:inherit;font-size:14px;font-weight:600;color:var(--muted);transition:background .12s}
+.seg button[aria-checked="true"]{background:var(--surface);color:var(--accent-text);
+  box-shadow:0 1px 3px rgba(20,48,40,.12)}
+
+/* Campo obrigatório que ficou em branco: antes o aviso vinha só no topo da tela e a
+   pessoa tinha de caçar qual era. */
+.esc.com-erro .cl-campo,.esc.com-erro .seg{box-shadow:inset 0 0 0 1.5px var(--g4)}
+.esc.com-erro .chips,.esc.com-erro .sevpick{outline:1.5px solid var(--g4);outline-offset:4px;border-radius:var(--r-sm)}
+.narrativa.com-erro{box-shadow:var(--shadow),inset 0 0 0 1.5px var(--g4)}
+.narrativa.com-erro textarea[aria-invalid],.narrativa.com-erro .input{background:var(--g4-soft)}
+
 /* ---------- campo com lista ---------- */
 .cl{min-width:0}
 .cl-campo{display:flex;align-items:center;gap:10px;width:100%;text-align:left;min-height:52px;
@@ -313,22 +357,6 @@ textarea.input{min-height:96px;resize:vertical;line-height:1.55;font-size:14.5px
   border-radius:var(--r-pill);padding:0 11px 0 4px;min-height:36px;font-size:13px;font-weight:600}
 .tok .avatar{width:28px;height:28px;font-size:10px;background:rgba(255,255,255,.92);color:var(--cta-bg)}
 .tok .x{opacity:.8;font-size:15px}
-
-/* Linha selecionável: com dezenas de alunos, os chips viravam um bloco difícil de
-   varrer. Uma linha por criança lê melhor e já vem com alvo de 62px. */
-.pick{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:12px 14px;
-  border:0;border-radius:var(--r);background:var(--surface);box-shadow:var(--shadow);min-height:62px;
-  transition:background .12s}
-.pick .avatar{width:38px;height:38px;font-size:12px}
-.pick .lin-t{display:block;font-size:14.5px}
-.pick .mk{width:26px;height:26px;border-radius:50%;border:2px solid var(--line);flex:none;
-  display:grid;place-items:center;font-size:13px;font-weight:800;color:transparent}
-.pick[aria-pressed="true"]{background:var(--cta-bg)}
-.pick[aria-pressed="true"] .lin-t{color:var(--cta-fg)}
-.pick[aria-pressed="true"] .muted{color:var(--cta-fg);opacity:.85}
-.pick[aria-pressed="true"] .avatar{background:rgba(255,255,255,.92);color:var(--cta-bg)}
-.pick[aria-pressed="true"] .mk{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
-.pick[aria-pressed="true"] .mk::after{content:"\2713"}
 
 /* A narrativa é o coração do registro: ganha cartão próprio em vez de se confundir
    com os demais campos. */

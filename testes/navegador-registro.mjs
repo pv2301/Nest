@@ -191,6 +191,25 @@ async function entrarComo(p, login, senha){
  await p.fill('#b-al','Descartavel'); await p.waitForTimeout(800);
  ok('o aluno sumiu do cadastro', (await p.locator(linhaAluno).count())===0);
 
+ console.log('\n=== Calendário ===');
+ await p.evaluate(()=>app.ir('calendario')); await p.waitForTimeout(1000);
+ ok('o calendário abre no mês', (await p.locator('.cal-grade .cal-d').count()) >= 28);
+ ok('tem botão voltar', (await p.locator('.appbar .back').count()) === 1);
+ const hoje = await p.evaluate(() => { const d = new Date();
+   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; });
+ await p.locator(`.cal-d[onclick*="${hoje}"]`).click(); await p.waitForTimeout(700);
+ const nLista = await p.locator('.cal-lista .item').count();
+ ok('o dia de hoje traz os registros de hoje', nLista >= 1, 'registros: ' + nLista);
+ await p.locator('.cal-lista .item').first().click(); await p.waitForTimeout(1200);
+ ok('tocar no registro abre o registro completo',
+    /Ocorr[êe]ncia/i.test(await p.locator('.appbar h2').innerText()),
+    'tela: ' + await p.locator('.appbar h2').innerText());
+ await p.evaluate(()=>app.ir('calendario')); await p.waitForTimeout(800);
+ await p.evaluate(()=>app.calModo('ano')); await p.waitForTimeout(700);
+ ok('o ano mostra doze meses', (await p.locator('.cal-mini').count()) === 12);
+ await p.locator('.cal-mini').nth(0).click(); await p.waitForTimeout(700);
+ ok('tocar no mês volta para o mês', (await p.locator('.cal-grade').count()) === 1);
+
  ok('nenhum erro de JavaScript', errs.length===0, errs.join(' | '));
  console.log(f.length ? `\n=== ${f.length} FALHARAM: ${f.join(', ')} ===` : '\n=== TUDO PASSOU ===');
  await b.close(); process.exit(f.length?1:0);

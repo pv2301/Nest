@@ -10,6 +10,7 @@ import './telas-auth.js';
 import './telas-registro.js';
 import './telas-gestao.js';
 import './telas-relatorio.js';
+import './telas-calendario.js';
 
 function aplicarIdentidade(){
   const nome = S.escola.nome;

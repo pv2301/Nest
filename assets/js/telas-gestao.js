@@ -4,8 +4,9 @@
 import { S, app, registrarTela, ir, toast, render, recarregar, rodape, pendentes, otimista,
          entradasGestao } from './core.js';
 import { Store } from './store.js';
-import { campoLista } from './campo-lista.js';
-import { esc, ICON, svgIc, iniciais, quandoLegivel, senhaTemporaria, semAcento } from './util.js';
+import { escolha } from './escolha.js';
+import { esc, ICON, svgIc, iniciais, quandoLegivel, senhaTemporaria, semAcento,
+         tituloNome } from './util.js';
 import { PAPEIS_CONTA, FUNCOES } from './dados.js';
 
 /* ---------------------------------------------------------------- gestão (índice)
@@ -152,7 +153,7 @@ registrarTela('usuario', () => {
         /* Sem campo quando a troca não é permitida: os avisos acima já explicam. */
         ? `<p class="sec-label">Perfil</p><div class="card flat"><dl class="kv">
              <dt>Perfil</dt><dd>${esc(rotuloPapel(c.papel))}</dd></dl></div>`
-        : campoLista({ id:'perfil', rotulo:'Perfil',
+        : escolha({ id:'perfil', rotulo:'Perfil',
             opcoes:PAPEIS_CONTA.map(p => ({ valor:p.id, nome:p.nome })),
             valor:c.papel, busca:false,
             aoEscolher:v => app.mudarPapel(c.login, v) })}
@@ -161,7 +162,7 @@ registrarTela('usuario', () => {
 
     <div>
       ${S.turmas.length
-        ? campoLista({ id:'turma-conta', rotulo:'Turma', opcoes:S.turmas.map(t => t.nome),
+        ? escolha({ id:'turma-conta', rotulo:'Turma', opcoes:S.turmas.map(t => t.nome),
             valor:c.turma || '', placeholder:'Sem turma',
             aoEscolher:v => app.mudarTurma(c.login, v) })
         : `<p class="sec-label">Turma</p><span class="fs12 muted">Cadastre as turmas na aba Alunos.</span>`}
@@ -346,7 +347,7 @@ registrarTela('alunos', () => {
           </button>`;
         }).join('') : `<p class="fs12 muted" style="margin:0">Nenhuma turma cadastrada.</p>`}
         <div class="row" style="gap:8px">
-          <input class="input" id="t-nova" placeholder="Nome da turma" style="flex:1">
+          <input class="input" id="t-nova" autocapitalize="words" placeholder="Nome da turma" style="flex:1">
           <button class="btn sm" onclick="app.novaTurma()">Adicionar</button>
         </div>
       </div>
@@ -415,7 +416,7 @@ app.buscaAlunoGestao = v => {
 app.filtroTurmaGestao = t => { S.filtroTurma = S.filtroTurma === t ? '' : t; render(); };
 
 app.novaTurma = async () => {
-  const nome = ((document.getElementById('t-nova') || {}).value || '').trim();
+  const nome = tituloNome((document.getElementById('t-nova') || {}).value);
   if(!nome) return toast('Informe o nome da turma.');
   if(S.turmas.some(t => t.nome.toLowerCase() === nome.toLowerCase())) return toast('Essa turma já existe.');
   const t = { id:'t' + Date.now().toString(36), nome, faixa:'' };
@@ -463,12 +464,12 @@ registrarTela('turma', () => {
   return `<div class="stack s18">
     <div class="card stack s8">
       <div class="field"><label for="tu-nome">Nome da turma</label>
-        <input class="input" id="tu-nome" value="${esc(t.nome)}"></div>
+        <input class="input" id="tu-nome" autocapitalize="words" value="${esc(t.nome)}"></div>
       <button class="btn soft" onclick="app.renomearTurma()">Salvar nome</button>
     </div>
 
     ${misses.length
-      ? campoLista({ id:'miss-turma', rotulo:'Quem recebe a ciência',
+      ? escolha({ id:'miss-turma', rotulo:'Quem recebe a ciência',
           opcoes:misses.map(m => ({ valor:m.login, nome:m.nome, ini:iniciais(m.nome) })),
           valor:t.missResponsavel || '', placeholder:'Sem Miss: a ciência vai à gestão',
           aoEscolher:v => app.missDaTurma(t.id, v) })
@@ -486,7 +487,7 @@ registrarTela('turma', () => {
 
 app.renomearTurma = async () => {
   const t = S.turmaSel;
-  const nome = ((document.getElementById('tu-nome') || {}).value || '').trim();
+  const nome = tituloNome((document.getElementById('tu-nome') || {}).value);
   if(!nome) return toast('Informe o nome da turma.');
   if(nome === t.nome) return;
   if(S.turmas.some(x => x.id !== t.id && x.nome.toLowerCase() === nome.toLowerCase()))
@@ -514,9 +515,9 @@ registrarTela('aluno', () => {
       Adicionada durante um registro. Confira o nome e a turma.</div></div>` : ''}
     <div class="card stack">
       <div class="field"><label for="al-nome">Nome completo</label>
-        <input class="input" id="al-nome" value="${esc(a.nome)}"></div>
+        <input class="input" id="al-nome" autocapitalize="words" value="${esc(a.nome)}"></div>
       ${turmaNomes().length
-        ? campoLista({ id:'turma-aluno', rotulo:'Turma', opcoes:turmaNomes(),
+        ? escolha({ id:'turma-aluno', rotulo:'Turma', opcoes:turmaNomes(),
             valor:a.turma || '', placeholder:'Escolher a turma',
             aoEscolher:v => app.alunoCampo('turma', v) })
         : `<p class="sec-label">Turma</p><span class="fs12 muted">Cadastre uma turma primeiro.</span>`}
@@ -563,7 +564,7 @@ app.alunoCampo = (k, v) => {
 
 app.salvarAlunoFicha = async () => {
   const a = S.alunoSel;
-  const nome = ((document.getElementById('al-nome') || {}).value || '').trim();
+  const nome = tituloNome((document.getElementById('al-nome') || {}).value);
   if(!nome) return toast('Informe o nome do aluno.');
   const dados = {
     id:a.id, nome,

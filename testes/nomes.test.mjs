@@ -87,6 +87,21 @@ t('acha o nome citado', U.posicaoNome('Depois Helena chamou a Miss.', 'Helena So
 t('devolve -1 quando não cita', U.posicaoNome('Ninguém viu.', 'Helena Souza') === -1);
 t('não confunde pedaço de palavra', U.posicaoNome('A helicóptero.', 'Hel Souza') === -1);
 
+console.log('\n=== Maiúscula de nome próprio ===');
+const T = U.tituloNome;
+t('nome em minúsculas sobe', T('maria silva') === 'Maria Silva', T('maria silva'));
+t('partícula fica minúscula', T('maria da silva') === 'Maria da Silva', T('maria da silva'));
+t('partícula que abre o nome sobe', T('da silva junior') === 'Da Silva Junior', T('da silva junior'));
+t('CAIXA ALTA também se acerta', T('MARIA DA SILVA') === 'Maria da Silva', T('MARIA DA SILVA'));
+t('acento preservado', T('cecília almeida') === 'Cecília Almeida', T('cecília almeida'));
+t('apóstrofo sobe a seguinte', T("maria d'ávila") === "Maria D'Ávila", T("maria d'ávila"));
+t('hífen sobe a seguinte', T('jean-pierre lima') === 'Jean-Pierre Lima', T('jean-pierre lima'));
+t('espaços sobrando somem', T('  ana   paula  ') === 'Ana Paula', JSON.stringify(T('  ana   paula  ')));
+t('vazio continua vazio', T('') === '' && T(null) === '');
+t('"e" entre nomes fica minúsculo', T('ana e beatriz') === 'Ana e Beatriz', T('ana e beatriz'));
+t('frase sobe só a primeira', U.primeiraMaiuscula('sala dos professores') === 'Sala dos professores',
+  U.primeiraMaiuscula('sala dos professores'));
+
 console.log(falhas
   ? `\n=== ${falhas} de ${total} FALHARAM ===`
   : `\n=== ${total} TESTES DE NOMES PASSARAM ===`);

@@ -80,6 +80,9 @@ export function avancarPasso(){
 
 /** Navegação real. Chamada pelo popstate — e diretamente só quando não há histórico. */
 export function voltar(){
+  /* Com uma lista aberta, voltar fecha a lista em vez de sair da tela — é o que o
+     voltar nativo do Android faz com qualquer menu aberto. */
+  if(S.listaAberta){ S.listaAberta = null; return render(); }
   if(S.tela === 'wizard' && S.passo > 1){
     S.passo--;
     S.faltas = null;
@@ -205,6 +208,11 @@ export function entradasGestao(c = S.conta){
   const e = [];
   if(temFuncao(c, 'painel'))
     e.push({ tela:'painel', ic:ICON.painel, nome:'Painel', sub:'Estatísticas do período' });
+  /* Da gestão, como pedido. Sem a condição, uma Miss sem função nenhuma passava a
+     ver a aba Gestão só por causa desta entrada. */
+  if(c.papel === 'gestao')
+    e.push({ tela:'calendario', ic:ICON.horario, nome:'Calendário',
+             sub:'Os registros dia a dia' });
   if(c.papel === 'gestao'){
     const ativos = S.alunos.filter(a => a.ativo !== false).length;
     e.push({ tela:'alunos', ic:ICON.alunos, nome:'Alunos e turmas',
@@ -264,11 +272,11 @@ function barraSuperior(){
     wizard: S.editando ? 'Corrigir registro' : 'Registro completo',
     detalhe:'Ocorrência ' + (S.detalhe || ''), usuario:'Usuário',
     conta:'Minha conta', alunos:'Alunos e turmas', aluno:'Aluno', ficha:'Gerar relatório',
-    ajuda:'Como funciona', gestao:'Gestão',
+    ajuda:'Como funciona', gestao:'Gestão', calendario:'Calendário',
     turma:'Turma' + (S.turmaSel && S.turmaSel.nome ? ' ' + S.turmaSel.nome : '')
   };
   const comVoltar = ['detalhe','novo','rapido','wizard','usuario','conta','aluno','ficha','ajuda',
-    'painel','alunos','usuarios','horario','relacoes','turma'].includes(S.tela);
+    'painel','alunos','usuarios','horario','relacoes','turma','calendario'].includes(S.tela);
   const esquerda = comVoltar
     ? `<button class="back" onclick="app.voltar()" aria-label="Voltar">&lsaquo;</button>`
     : `<button class="avatar" onclick="app.ir('conta')" title="${esc(c.nome)}">${esc(c.ini)}</button>`;

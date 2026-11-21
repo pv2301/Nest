@@ -4,8 +4,9 @@ import { S, app, registrarTela, ir, toast, render, recarregar, rodape, otimista,
          filaDe, meusRegistros, visiveis, posRender, temFuncao, aluno, nomesTurmas,
          avancarPasso, voltar, rascunhoGuardado } from './core.js';
 import { Store } from './store.js';
-import { campoLista } from './campo-lista.js';
-import { esc, semAcento, quandoLegivel, agoraHora, iniciais, ICON, svgIc } from './util.js';
+import { escolha } from './escolha.js';
+import { esc, semAcento, quandoLegivel, agoraHora, iniciais, ICON, svgIc,
+         tituloNome } from './util.js';
 import { CONFIG } from '../../config.js';
 import { CATS, OUTRO, EXEMPLOS, LOCAIS, PROVIDENCIAS, CONDICOES, REGIOES,
          PAPEIS_ENVOLVIDO, CANAIS_INFORME, SEVL, JULGAMENTO, PERIODOS } from './dados.js';
@@ -74,7 +75,8 @@ registrarTela('home', () => {
   if(r) out += `<button class="rascunho" onclick="app.retomarRascunho()">
     <span class="grow"><b>Continuar registro</b>
       <span class="fs11">${esc(r.rascunho.tipo || r.rascunho.categoria || 'sem tipo ainda')} · começado ${esc(quandoLegivel(r.em))}</span></span>
-    <span class="chip sm" onclick="event.stopPropagation();app.descartarRascunho()">Descartar</span>
+    <span class="acao-txt" role="button" tabindex="0"
+      onclick="event.stopPropagation();app.descartarRascunho()">Descartar</span>
   </button>`;
 
   out += `<button class="btn" style="padding:16px" onclick="app.ir('novo')">+ &nbsp;Registrar ocorrência</button>`;
@@ -103,7 +105,7 @@ registrarTela('novo', () => `<div class="stack">
 app.iniciar = modo => {
   /* Sem isto, começar um registro logo depois de uma correção sobrescreveria o
      registro corrigido: o envio ainda acharia que está editando. */
-  S.editando = null;
+  S.editando = null; S.tentouEnviar = false;
   S.modoRegistro = modo; S.passo = 1; S.buscaAluno = ''; S.filtroTurma = '';
   S.rascunho = { categoria:'', tipo:'', tipoOutro:'', envolvidos:[],
                  quandoOpcao:'Agora', quandoISO:new Date().toISOString(),
@@ -114,23 +116,37 @@ app.iniciar = modo => {
 };
 
 /* ---------------------------------------------------------------- o que falta */
+/* Cada falta diz também QUAL campo ficou em branco, para o campo poder se marcar.
+   Antes o aviso vinha só no topo e a pessoa tinha de caçar na tela qual era. */
 function faltas(d){
   const f = [];
-  if(!d.categoria) f.push({ passo:1, texto:'Escolher a categoria' });
-  else if(!d.tipo) f.push({ passo:1, texto:'Escolher o tipo' });
-  if(d.tipo === OUTRO && !String(d.tipoOutro).trim()) f.push({ passo:1, texto:'Descrever o tipo em "Outro"' });
-  if(!d.sev) f.push({ passo:1, texto:'Escolher a gravidade' });
-  if(!d.envolvidos.length) f.push({ passo:2, texto:'Selecionar ao menos uma criança' });
-  else if(d.envolvidos.some(e => !e.papel)) f.push({ passo:2, texto:'Marcar o papel de cada criança' });
-  if(String(d.desc).trim().length <= 8) f.push({ passo:3, texto:'Escrever a descrição do ocorrido' });
-  if(!d.presenciou && !String(d.informanteNome).trim()) f.push({ passo:3, texto:'Informar quem relatou' });
+  if(!d.categoria) f.push({ passo:1, campo:'categoria', texto:'Escolher a categoria' });
+  else if(!d.tipo) f.push({ passo:1, campo:'tipo', texto:'Escolher o tipo' });
+  if(d.tipo === OUTRO && !String(d.tipoOutro).trim()) f.push({ passo:1, campo:'tipoOutro', texto:'Descrever o tipo em "Outro"' });
+  if(!d.sev) f.push({ passo:1, campo:'gravidade', texto:'Escolher a gravidade' });
+  if(!d.envolvidos.length) f.push({ passo:2, campo:'criancas', texto:'Selecionar ao menos uma criança' });
+  else if(d.envolvidos.some(e => !e.papel)) f.push({ passo:2, campo:'papel', texto:'Marcar o papel de cada criança' });
+  if(String(d.desc).trim().length <= 8) f.push({ passo:3, campo:'descricao', texto:'Escrever a descrição do ocorrido' });
+  if(!d.presenciou && !String(d.informanteNome).trim()) f.push({ passo:3, campo:'informante', texto:'Informar quem relatou' });
   return f;
 }
+
+/** Texto da falta daquele campo, ou vazio.
+
+    Recalculado a cada desenho, e só depois da primeira tentativa de enviar: marcar
+    de saída um formulário em branco seria agressivo, e guardar a lista de faltas
+    deixava a marca velha — o campo continuava vermelho depois de preenchido. */
+const erroDe = campo => {
+  if(!S.tentouEnviar || !S.rascunho) return '';
+  const x = faltas(S.rascunho).find(f => f.campo === campo);
+  return x ? x.texto : '';
+};
 
 /* O botão nunca fica desabilitado sem explicação: ao tocar, mostra o que falta e
    cada item leva ao passo certo. Antes ele só ficava cinza, sem dizer por quê. */
 app.tentarEnviar = () => {
   const f = faltas(S.rascunho);
+  S.tentouEnviar = true;
   if(!f.length) return app.enviar();
   S.faltas = f;
   render();
@@ -139,7 +155,10 @@ app.tentarEnviar = () => {
 };
 
 function blocoFaltas(){
-  if(!S.faltas || !S.faltas.length) return '';
+  /* Refeito a cada desenho: o aviso encolhe conforme a pessoa preenche. */
+  if(!S.tentouEnviar || !S.rascunho) return '';
+  S.faltas = faltas(S.rascunho);
+  if(!S.faltas.length) return '';
   const temPassos = S.modoRegistro === 'completo';
   return `<div class="notice alert" id="faltas"><span class="ic">!</span><div>
     <b>Falta preencher ${S.faltas.length === 1 ? 'um item' : S.faltas.length + ' itens'}:</b>
@@ -150,7 +169,7 @@ function blocoFaltas(){
     </ul></div></div>`;
 }
 
-app.irPasso = p => { S.passo = p; S.faltas = null; render(); };
+app.irPasso = p => { S.passo = p; render(); };
 
 /* ---------------------------------------------------------------- seleção de crianças */
 /* Sem filtro de texto: quem busca é o próprio campo com lista. Aqui fica só o filtro
@@ -171,12 +190,12 @@ function seletorAlunos(){
       <button class="chip sm" aria-pressed="${!S.filtroTurma}" onclick="app.filtrarTurma('')">Todas</button>
       ${turmas.map(t => `<button class="chip sm" aria-pressed="${S.filtroTurma === t}" onclick="app.filtrarTurma('${esc(t)}')">${esc(t)}</button>`).join('')}
     </div>` : ''}
-    ${campoLista({
+    ${escolha({
       id:'kids',
       opcoes: listaAlunos().map(a => ({ valor:a.id, nome:a.nome,
         sub: a.turma ? 'Turma ' + a.turma : '', ini: iniciais(a.nome) })),
       valor: d.envolvidos.map(e => e.kid),
-      multipla:true, busca:true,
+      multipla:true, busca:true, erro:erroDe('criancas'),
       placeholder: S.alunos.length ? 'Escolher as crianças' : 'Nenhum aluno cadastrado ainda',
       vazio:'Nenhum aluno encontrado.',
       rodape:`<button class="cl-rodape" onclick="app.abrirAvulso()">+ Não está na lista</button>`,
@@ -201,7 +220,7 @@ app.fecharAvulso = () => { S.avulso = null; render(); };
 app.salvarAvulso = async () => {
   const nome = (document.getElementById('av-nome') || {}).value || '';
   if(nome.trim().split(/\s+/).filter(Boolean).length < 1) return toast('Informe o nome da criança.');
-  const novo = { id:'a' + Date.now().toString(36), nome:nome.trim(),
+  const novo = { id:'a' + Date.now().toString(36), nome:tituloNome(nome),
                  turma:S.avulso.turma || '', ativo:true, avulso:true, criadoEm:new Date().toISOString() };
   try {
     await Store.salvarAluno(novo);
@@ -218,8 +237,8 @@ function dialogoAvulso(){
   return `<div class="card lift stack s8" style="border-color:var(--accent-text)">
     <p class="sec-label" style="margin:0">Criança fora da lista</p>
     <div class="field"><label for="av-nome">Nome da criança</label>
-      <input class="input" id="av-nome" autofocus></div>
-    ${turmas.length ? campoLista({ id:'turma-avulso', rotulo:'Turma', opcoes:turmas,
+      <input class="input" id="av-nome" autocapitalize="words" autofocus></div>
+    ${turmas.length ? escolha({ id:'turma-avulso', rotulo:'Turma', opcoes:turmas,
       valor:S.avulso.turma || '', placeholder:'Escolher a turma',
       aoEscolher:v => app.avulsoTurma(v) }) : ''}
     <div class="row" style="gap:8px">
@@ -263,22 +282,22 @@ function cardEnvolvido(e, i){
       <span class="avatar sm">${esc(iniciais(a.nome))}</span>
       <b class="fs13 grow">${esc(a.nome)}</b>
       ${e.turma ? `<span class="pill">${esc(e.turma)}</span>` : '<span class="pill off">sem turma</span>'}
-      <button class="chip sm" style="min-height:28px;padding:4px 9px" onclick="app.togKid('${esc(e.kid)}')" aria-label="Remover">&times;</button>
+      <button class="icone-x" onclick="app.togKid('${esc(e.kid)}')" aria-label="Tirar ${esc(a.nome)}">&times;</button>
     </div>
 
-    ${campoLista({ id:'papel-' + i, rotulo:'Papel nesta ocorrência', opcoes:PAPEIS_ENVOLVIDO,
-      valor:e.papel, placeholder:'Escolher o papel',
+    ${escolha({ id:'papel-' + i, rotulo:'Papel nesta ocorrência', opcoes:PAPEIS_ENVOLVIDO,
+      valor:e.papel, placeholder:'Escolher o papel', erro:e.papel ? '' : erroDe('papel'),
       aoEscolher:v => { e.papel = v; S.faltas = null; } })}
 
-    ${turmas.length ? campoLista({ id:'turma-' + i, rotulo:'Turma', opcoes:turmas,
+    ${turmas.length ? escolha({ id:'turma-' + i, rotulo:'Turma', opcoes:turmas,
       valor:e.turma, placeholder:'Escolher a turma',
       aoEscolher:v => { e.turma = e.turma === v ? '' : v; } }) : ''}
 
-    ${campoLista({ id:'cond-' + i, rotulo:'Como ficou', opcoes:CONDICOES, valor:cond,
+    ${escolha({ id:'cond-' + i, rotulo:'Como ficou', opcoes:CONDICOES, valor:cond,
       busca:true, placeholder:'Escolher',
       aoEscolher:v => { d.cond[e.kid] = d.cond[e.kid] === v ? '' : v; } })}
 
-    ${temLesao ? campoLista({ id:'lesao-' + i, rotulo:'Onde é a marca ou lesão',
+    ${temLesao ? escolha({ id:'lesao-' + i, rotulo:'Onde é a marca ou lesão',
       opcoes:REGIOES.filter(r => r !== 'Não se aplica'), valor:d.lesao[e.kid],
       placeholder:'Escolher a região',
       aoEscolher:v => { d.lesao[e.kid] = d.lesao[e.kid] === v ? '' : v; } }) : ''}
@@ -311,7 +330,7 @@ function blocoQuando(){
   const opcoes = [['Agora',0],['Há 15 min',15],['Há 30 min',30],['Há 1h',60]];
   const minutos = Object.fromEntries(opcoes);
   return `<div>
-    ${campoLista({ id:'quando', rotulo:'Quando aconteceu',
+    ${escolha({ id:'quando', rotulo:'Quando aconteceu',
       opcoes:[...opcoes.map(([rot]) => rot), { valor:'manual', nome:'Outro horário' }],
       valor:d.quandoOpcao, placeholder:'Escolher',
       aoEscolher:v => v === 'manual' ? app.quandoManual() : app.quandoRelativo(v, minutos[v]) })}
@@ -350,7 +369,7 @@ app.quandoDigitado = v => {
 function blocoOnde(){
   const d = S.rascunho;
   return `<div>
-    ${campoLista({ id:'local', rotulo:'Onde aconteceu',
+    ${escolha({ id:'local', rotulo:'Onde aconteceu',
       opcoes:[...LOCAIS, { valor:OUTRO, nome:'Outro local' }],
       valor:d.local, placeholder:'Escolher o local',
       aoEscolher:v => { d.local = v; S.faltas = null; } })}
@@ -387,30 +406,33 @@ app.usarExemplo = () => {
 function campoDescricao(id){
   const d = S.rascunho;
   const ex = EXEMPLOS[d.categoria] || EXEMPLOS['Incidente'];
-  return `<div class="narrativa">
+  const err = erroDe('descricao');
+  return `<div class="narrativa${err ? ' com-erro' : ''}">
     <div class="row" style="margin-bottom:7px">
       <label for="${id}" class="grow" style="margin:0">Descrição do ocorrido</label>
       <button class="btn ghost sm" style="padding:5px 10px;min-height:0;font-size:11.5px" onclick="app.usarExemplo()">Usar exemplo</button>
     </div>
     <textarea class="input" id="${id}" placeholder="${esc(ex)}"
+      spellcheck="true" autocorrect="on" autocapitalize="sentences"${err ? ' aria-invalid="true"' : ''}
       oninput="app.checarTexto('desc','${id}-chk',this.value)">${esc(d.desc)}</textarea>
     <div id="${id}-chk" style="margin-top:8px">${checagemLinguagem(d.desc)}</div>
     <p class="hint">Descreva o que foi observado, antes e depois.</p>
+    ${err ? `<p class="erromsg">${esc(err)}</p>` : ''}
   </div>`;
 }
 
 function blocoPresenciou(){
   const d = S.rascunho;
   return `<div>
-    ${campoLista({ id:'presenciou', rotulo:'Você presenciou?',
+    ${escolha({ id:'presenciou', rotulo:'Você presenciou?',
       opcoes:[{ valor:'sim', nome:'Presenciei' }, { valor:'nao', nome:'Fui informada' }],
       valor:d.presenciou ? 'sim' : 'nao', busca:false,
       aoEscolher:v => { d.presenciou = v === 'sim'; S.faltas = null; } })}
     ${!d.presenciou ? `
       <div class="field" style="margin-top:10px"><label for="w-inf">Quem informou</label>
-        <input class="input" id="w-inf" value="${esc(d.informanteNome)}" placeholder="Nome de quem relatou"
+        <input class="input" id="w-inf" autocapitalize="words" value="${esc(d.informanteNome)}" placeholder="Nome de quem relatou"
                oninput="app.campoTxt('informanteNome',this.value)"></div>
-      <div style="margin-top:9px">${campoLista({ id:'canal', rotulo:'Por qual canal',
+      <div style="margin-top:9px">${escolha({ id:'canal', rotulo:'Por qual canal',
         opcoes:CANAIS_INFORME, valor:d.informanteCanal, placeholder:'Escolher',
         aoEscolher:v => { d.informanteCanal = v; } })}</div>` : ''}
   </div>`;
@@ -421,11 +443,11 @@ registrarTela('rapido', () => {
   const d = S.rascunho;
   return `<div class="stack s18">
     ${blocoFaltas()}
-    ${campoLista({ id:'cat-r', rotulo:'1 · Categoria', opcoes:Object.keys(CATS),
-      valor:d.categoria, placeholder:'Escolher categoria',
+    ${escolha({ id:'cat-r', rotulo:'1 · Categoria', opcoes:Object.keys(CATS),
+      valor:d.categoria, placeholder:'Escolher categoria', erro:erroDe('categoria'),
       aoEscolher:c => { d.categoria = c; d.tipo = ''; d.tipoOutro = ''; S.faltas = null; } })}
-    ${d.categoria ? `${campoLista({ id:'tipo-r', rotulo:'Tipo',
-        opcoes:CATS[d.categoria].concat([OUTRO]), valor:d.tipo, placeholder:'Escolher tipo',
+    ${d.categoria ? `${escolha({ id:'tipo-r', rotulo:'Tipo',
+        opcoes:CATS[d.categoria].concat([OUTRO]), valor:d.tipo, placeholder:'Escolher tipo', erro:erroDe('tipo'),
         aoEscolher:v => { d.tipo = v; S.faltas = null; } })}
       ${d.tipo === OUTRO ? `<div class="field" style="margin-top:9px"><input class="input" placeholder="Qual?" value="${esc(d.tipoOutro)}" oninput="app.campoTxt('tipoOutro',this.value)"></div>` : ''}` : ''}
     <div><p class="sec-label">2 · Quem</p>${seletorAlunos()}</div>
@@ -447,16 +469,18 @@ registrarTela('wizard', () => {
   /* 1 — classificar o que aconteceu. Gravidade entra aqui, ao lado de categoria e
      tipo, porque é a mesma pergunta: que tipo de coisa foi, e quão séria. */
   if(st === 1) corpo = `<div class="stack s18">
-    ${campoLista({ id:'cat', rotulo:'1 · Categoria do registro', opcoes:Object.keys(CATS),
-      valor:d.categoria, placeholder:'Escolher categoria',
+    ${escolha({ id:'cat', rotulo:'1 · Categoria do registro', opcoes:Object.keys(CATS),
+      valor:d.categoria, placeholder:'Escolher categoria', erro:erroDe('categoria'),
       aoEscolher:c => { d.categoria = c; d.tipo = ''; d.tipoOutro = ''; S.faltas = null; } })}
-    ${d.categoria ? `${campoLista({ id:'tipo', rotulo:'Tipo',
-        opcoes:CATS[d.categoria].concat([OUTRO]), valor:d.tipo, placeholder:'Escolher tipo',
+    ${d.categoria ? `${escolha({ id:'tipo', rotulo:'Tipo',
+        opcoes:CATS[d.categoria].concat([OUTRO]), valor:d.tipo, placeholder:'Escolher tipo', erro:erroDe('tipo'),
         aoEscolher:v => { d.tipo = v; S.faltas = null; } })}
       ${d.tipo === OUTRO ? `<div class="field" style="margin-top:9px"><label for="w-tipo">Qual?</label>
         <input class="input" id="w-tipo" value="${esc(d.tipoOutro)}" oninput="app.campoTxt('tipoOutro',this.value)"></div>` : ''}`
       : `<p class="fs12 muted" style="margin:0">Escolha a categoria para ver os tipos.</p>`}
-    ${d.tipo ? `<div><p class="sec-label">Gravidade</p>${sevPicker()}
+    ${d.tipo ? `<div class="esc${erroDe('gravidade') ? ' com-erro' : ''}">
+      <p class="sec-label">Gravidade</p>${sevPicker()}
+      ${erroDe('gravidade') ? `<p class="erromsg">${esc(erroDe('gravidade'))}</p>` : ''}
       </div>` : ''}
   </div>`;
 
@@ -491,7 +515,7 @@ registrarTela('wizard', () => {
   if(st === 4){
     const dest = destinoCiencia();
     corpo = `<div class="stack s18">
-      ${campoLista({ id:'prov', rotulo:'4 · O que foi feito', opcoes:PROVIDENCIAS,
+      ${escolha({ id:'prov', rotulo:'4 · O que foi feito', opcoes:PROVIDENCIAS,
         valor:d.prov, multipla:true, placeholder:'Escolher as providências',
         aoEscolher:v => { const i = d.prov.indexOf(v); i >= 0 ? d.prov.splice(i, 1) : d.prov.push(v); } })}
 
@@ -655,7 +679,7 @@ app.enviar = async () => {
     desc:d.desc, prov:d.prov, foto:d.foto,
     fotoDias: d.foto ? CONFIG.REGRAS.retencaoFotoDias : undefined,
     presenciou:d.presenciou,
-    informante: d.presenciou ? null : { nome:d.informanteNome, canal:d.informanteCanal },
+    informante: d.presenciou ? null : { nome:tituloNome(d.informanteNome), canal:d.informanteCanal },
     duas: [...new Set(d.envolvidos.map(e => e.turma || aluno(e.kid).turma))].filter(Boolean).length > 1
   };
 
@@ -691,7 +715,7 @@ app.enviar = async () => {
         S.ocs = [oc, ...S.ocs];
       }
       S.rascunho = null; S.passo = 1; S.faltas = null; S.pilha = [];
-      S.avisouRascunho = false; S.editando = null;
+      S.avisouRascunho = false; S.editando = null; S.tentouEnviar = false;
       Store.descartarRascunho();
       ir(antigo ? 'detalhe' : 'home', { guardar:false });
     },
@@ -796,7 +820,7 @@ registrarTela('detalhe', () => {
     <div><p class="sec-label">Descrição</p><p class="fs13" style="margin:0">${esc(o.desc)}</p></div>
 
     ${(o.prov || []).length ? `<div><p class="sec-label">Providências</p><div class="chips">
-      ${o.prov.map(p => `<span class="chip sm">${esc(p)}</span>`).join('')}</div></div>` : ''}
+      ${o.prov.map(p => `<span class="pill">${esc(p)}</span>`).join('')}</div></div>` : ''}
 
     ${o.foto ? `<div><p class="sec-label">Anexo</p>${fotoBloco(o)}</div>` : ''}
 
@@ -824,7 +848,7 @@ registrarTela('detalhe', () => {
       <div><p class="fs12 muted" style="margin:0 0 6px">Confirme ou corrija a gravidade</p>
         <div class="sevpick">${[1,2,3,4].map(n => `<button data-n="${n}" aria-pressed="${o.sev === n}" onclick="app.mudarSev('${esc(o.id)}',${n})"><b>${n}</b><small>${SEVL[n]}</small></button>`).join('')}</div></div>
       <div class="field"><label for="d-par">Parecer ou orientação (opcional)</label>
-        <textarea class="input" id="d-par" style="min-height:66px" placeholder="Volta visível para quem registrou."></textarea></div>
+        <textarea class="input" id="d-par" style="min-height:66px" placeholder="Volta visível para quem registrou." spellcheck="true" autocorrect="on" autocapitalize="sentences"></textarea></div>
       <button class="btn" onclick="app.darCiencia('${esc(o.id)}')">&check; Dar ciência</button>
       <button class="btn ghost" onclick="app.pedirComplemento('${esc(o.id)}')">Pedir complemento</button>
     </div>` : ''}
@@ -976,4 +1000,4 @@ posRender.push(() => {
   });
 });
 
-export { tipoDe, localDe, quandoTexto, sevTag };
+export { tipoDe, localDe, quandoTexto, sevTag, itemHTML };
