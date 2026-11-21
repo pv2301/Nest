@@ -40,14 +40,14 @@ const prim = n => n.split(' ')[0];
  /* O chip é: iniciais, nome, turma. O nome é a linha do meio — pegar a última
     trazia a TURMA, e a narrativa do teste saía com "Verde e Verde". */
  const nomeDoChip = async i => {
-   const linhas = (await p.locator('.chip.kid').nth(i).innerText())
+   const linhas = (await p.locator('.pick.kid').nth(i).innerText())
      .split('\n').map(x => x.trim()).filter(Boolean);
    return linhas[1] || linhas[0];
  };
  const n1 = await nomeDoChip(0), n2 = await nomeDoChip(1), n3 = await nomeDoChip(2);
  console.log(`  (crianças do teste: ${n1} / ${n2} / ${n3})`);
- await p.locator('.chip.kid').nth(0).click(); await p.waitForTimeout(450);
- await p.locator('.chip.kid').nth(1).click(); await p.waitForTimeout(450);
+ await p.locator('.pick.kid').nth(0).click(); await p.waitForTimeout(450);
+ await p.locator('.pick.kid').nth(1).click(); await p.waitForTimeout(450);
  const cartoes=p.locator('.card.flat:has(.chip.sm)');
  await cartoes.nth(0).locator('.chip.sm:text-is("Sofreu")').click(); await p.waitForTimeout(250);
  await cartoes.nth(0).locator('.chip.sm:text-is("Permaneceu chorosa")').click(); await p.waitForTimeout(250);

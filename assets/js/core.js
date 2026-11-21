@@ -264,10 +264,11 @@ function barraSuperior(){
     wizard: S.editando ? 'Corrigir registro' : 'Registro completo',
     detalhe:'Ocorrência ' + (S.detalhe || ''), usuario:'Usuário',
     conta:'Minha conta', alunos:'Alunos e turmas', aluno:'Aluno', ficha:'Gerar relatório',
-    ajuda:'Como funciona', gestao:'Gestão'
+    ajuda:'Como funciona', gestao:'Gestão',
+    turma:'Turma' + (S.turmaSel && S.turmaSel.nome ? ' ' + S.turmaSel.nome : '')
   };
   const comVoltar = ['detalhe','novo','rapido','wizard','usuario','conta','aluno','ficha','ajuda',
-    'painel','alunos','usuarios','horario','relacoes'].includes(S.tela);
+    'painel','alunos','usuarios','horario','relacoes','turma'].includes(S.tela);
   const esquerda = comVoltar
     ? `<button class="back" onclick="app.voltar()" aria-label="Voltar">&lsaquo;</button>`
     : `<button class="avatar" onclick="app.ir('conta')" title="${esc(c.nome)}">${esc(c.ini)}</button>`;

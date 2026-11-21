@@ -77,7 +77,7 @@ async function entrarComo(p, login, senha){
  await p.click('.chip:text-is("Mordida")'); await p.waitForTimeout(300);
  await p.click('.sevpick button[data-n="2"]'); await p.waitForTimeout(300);
  await p.evaluate(()=>app.irPasso(2)); await p.waitForTimeout(700);
- await p.locator('.chip.kid').nth(0).click(); await p.waitForTimeout(400);
+ await p.locator('.pick.kid').nth(0).click(); await p.waitForTimeout(400);
  await p.locator('.card.flat:has(.chip.sm)').nth(0).locator('.chip.sm:text-is("Sofreu")').click();
  await p.waitForTimeout(300);
  await p.evaluate(()=>app.irPasso(3)); await p.waitForTimeout(600);
@@ -159,8 +159,10 @@ async function entrarComo(p, login, senha){
 
  console.log('\n=== Remover aluno pela tela ===');
  await p.evaluate(()=>app.ir('alunos')); await p.waitForTimeout(1000);
- /* Uma criança que aparece em registro: a primeira que a Miss usou. */
- await p.locator('.urow').first().click(); await p.waitForTimeout(900);
+ /* Turmas também são linhas nesta tela, então o seletor mira a ação do aluno.
+    Esta é a criança que a Miss usou no registro. */
+ const linhaAluno = '.urow[onclick^="app.abrirAluno"]';
+ await p.locator(linhaAluno).first().click(); await p.waitForTimeout(900);
  t = await p.locator('#view').innerText();
  const comRegistro = /Não dá para remover/i.test(t);
  ok('com registros, explica que não dá para remover', comRegistro, t.slice(-300));
@@ -172,7 +174,7 @@ async function entrarComo(p, login, senha){
  await p.fill('#al-nome','Aluno Descartavel'); await p.waitForTimeout(300);
  await p.click('button:has-text("Adicionar aluno")'); await p.waitForTimeout(2200);
  await p.fill('#b-al','Descartavel'); await p.waitForTimeout(800);
- await p.locator('.urow').first().click(); await p.waitForTimeout(900);
+ await p.locator(linhaAluno).first().click(); await p.waitForTimeout(900);
  ok('sem registros, oferece remover',
     (await p.locator('button:text-is("Remover do cadastro")').count())===1,
     (await p.locator('#view').innerText()).slice(-300));
@@ -180,7 +182,7 @@ async function entrarComo(p, login, senha){
  ok('pede confirmação', /Não dá para desfazer/i.test(await p.locator('#view').innerText()));
  await p.click('button:text-is("Remover")'); await p.waitForTimeout(2400);
  await p.fill('#b-al','Descartavel'); await p.waitForTimeout(800);
- ok('o aluno sumiu do cadastro', (await p.locator('.urow').count())===0);
+ ok('o aluno sumiu do cadastro', (await p.locator(linhaAluno).count())===0);
 
  ok('nenhum erro de JavaScript', errs.length===0, errs.join(' | '));
  console.log(f.length ? `\n=== ${f.length} FALHARAM: ${f.join(', ')} ===` : '\n=== TUDO PASSOU ===');

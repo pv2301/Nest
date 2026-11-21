@@ -165,6 +165,7 @@ function seletorAlunos(){
   const d = S.rascunho, turmas = nomesTurmas();
   const lista = listaAlunos();
   const escolhido = a => d.envolvidos.some(e => e.kid === a.id);
+  const escolhidas = (S.rascunho.envolvidos || []).length;
   return `<div class="stack s8">
     <div class="busca">
       <span class="ic">${svgIc(ICON.busca)}</span>
@@ -175,10 +176,17 @@ function seletorAlunos(){
       <button class="chip sm" aria-pressed="${!S.filtroTurma}" onclick="app.filtrarTurma('')">Todas</button>
       ${turmas.map(t => `<button class="chip sm" aria-pressed="${S.filtroTurma === t}" onclick="app.filtrarTurma('${esc(t)}')">${esc(t)}</button>`).join('')}
     </div>` : ''}
-    ${lista.length ? `<div class="chips">${lista.map(a => `
-      <button class="chip kid" aria-pressed="${escolhido(a)}" onclick="app.togKid('${esc(a.id)}')">
-        <span class="avatar sm">${esc(iniciais(a.nome))}</span>${esc(a.nome)}
-        ${a.turma ? `<span class="fs11" style="opacity:.7">${esc(a.turma)}</span>` : ''}
+    ${lista.length ? `
+      <p class="cont fs12 muted" style="margin:0">${escolhidas} ${escolhidas === 1 ? 'selecionada' : 'selecionadas'}${
+        lista.length < S.alunos.length ? ` · ${lista.length} de ${S.alunos.length}` : ''}</p>
+      <div class="stack s8">${lista.map(a => `
+      <button class="pick kid" aria-pressed="${escolhido(a)}" onclick="app.togKid('${esc(a.id)}')">
+        <span class="avatar">${esc(iniciais(a.nome))}</span>
+        <span class="grow">
+          <span class="lin-t">${esc(a.nome)}</span>
+          ${a.turma ? `<span class="fs11 muted">Turma ${esc(a.turma)}</span>` : ''}
+        </span>
+        <span class="mk" aria-hidden="true"></span>
       </button>`).join('')}</div>`
       : `<p class="fs12 muted" style="margin:0">${S.alunos.length ? 'Nenhum aluno encontrado com esse filtro.' : 'Nenhum aluno cadastrado ainda.'}</p>`}
     <button class="btn ghost sm" style="width:100%" onclick="app.abrirAvulso()">+ Não está na lista</button>
@@ -388,8 +396,8 @@ app.usarExemplo = () => {
 function campoDescricao(id){
   const d = S.rascunho;
   const ex = EXEMPLOS[d.categoria] || EXEMPLOS['Incidente'];
-  return `<div class="field">
-    <div class="row" style="margin-bottom:5px">
+  return `<div class="narrativa">
+    <div class="row" style="margin-bottom:7px">
       <label for="${id}" class="grow" style="margin:0">Descrição do ocorrido</label>
       <button class="btn ghost sm" style="padding:5px 10px;min-height:0;font-size:11.5px" onclick="app.usarExemplo()">Usar exemplo</button>
     </div>
