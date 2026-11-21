@@ -172,3 +172,74 @@ export const soData = iso => {
   const d = new Date(iso);
   return isNaN(d) ? '' : d.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric' });
 };
+
+/* ---------- nomes dentro de texto livre ----------
+   Usado para anonimizar a narrativa do relatório. Fica aqui, e não na tela, por ser
+   função pura: assim o Node consegue testá-la sem navegador, e é a parte do app onde
+   um erro passa despercebido com mais facilidade — um nome que escapa não quebra
+   nada, só vaza.
+
+   A comparação ignora acento e caixa SEM reescrever o texto: cada letra vira a classe
+   das suas variantes. Normalizar para comparar deslocaria as posições — "Cecília"
+   encolhe ao virar "Cecilia" — e o recorte sairia torto. */
+const VARIANTES = { a:'aáàâãä', e:'eéèêë', i:'iíìîï', o:'oóòôõö', u:'uúùûü', c:'cç', n:'nñ' };
+const LETRA = 'A-Za-zÀ-ÿ';
+
+export function padraoDoNome(nome){
+  return semAcento(String(nome)).toLowerCase().split('').map(ch => {
+    if(/\s/.test(ch)) return '\\s+';
+    const v = VARIANTES[ch] || (/[a-z0-9]/.test(ch) ? ch : null);
+    if(!v) return ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return '[' + v + v.toUpperCase() + ']';
+  }).join('');
+}
+
+/** Formas de um nome, das que cobrem mais partes para as que cobrem menos.
+
+    Não basta listar o nome inteiro e as partes soltas: "Paulo Victor Silva" escrito
+    como "Paulo Victor" trocaria parte por parte e sairia "Criança A Criança A". Por
+    isso entram todas as combinações que preservam a ordem — "Paulo Victor", "Paulo
+    Silva", "Victor Silva" —, e a mais abrangente é aplicada primeiro.
+
+    Partes de até duas letras ficam de fora: "de", "da" e afins pegariam meio texto. */
+export function formasDoNome(nome){
+  const partes = String(nome || '').trim().split(/\s+/).filter(p => p.length > 2);
+  if(!partes.length) return [];
+  const formas = [];
+  /* Cada bit de um contador binário diz se a parte entra na combinação. Nomes têm
+     poucas partes, então o total é pequeno. */
+  for(let mascara = 1; mascara < (1 << partes.length); mascara++){
+    const grupo = partes.filter((_, i) => mascara & (1 << i));
+    formas.push({ texto: grupo.join(' '), n: grupo.length });
+  }
+  return formas
+    .sort((a, b) => b.n - a.n || b.texto.length - a.texto.length)
+    .map(f => f.texto);
+}
+
+/* A borda da frente é consumida; a de trás é só espiada, para dois nomes seguidos não
+   perderem o segundo. */
+const regexNome = forma =>
+  new RegExp(`(^|[^${LETRA}])(${padraoDoNome(forma)})(?![${LETRA}])`, 'g');
+
+/** Posição da primeira citação do nome no texto, ou -1 se não houver. */
+export function posicaoNome(texto, nome){
+  let menor = -1;
+  for(const forma of formasDoNome(nome)){
+    const m = regexNome(forma).exec(String(texto || ''));
+    if(m && (menor < 0 || m.index < menor)) menor = m.index;
+  }
+  return menor;
+}
+
+/** Troca cada nome pelo seu rótulo. `pares` é [{nome, rotulo}]. */
+export function trocarNomes(texto, pares){
+  if(!texto) return texto;
+  let fora = String(texto);
+  for(const p of pares || []){
+    for(const forma of formasDoNome(p.nome)){
+      fora = fora.replace(regexNome(forma), (_m, antes) => antes + p.rotulo);
+    }
+  }
+  return fora;
+}

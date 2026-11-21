@@ -447,8 +447,18 @@ registrarTela('aluno', () => {
       <button class="btn" onclick="app.salvarAlunoFicha()">${a.novo ? 'Adicionar aluno' : (a.avulso ? 'Confirmar cadastro' : 'Salvar')}</button>
       ${!a.novo ? (a.ativo === false
         ? `<button class="btn soft" onclick="app.arquivarAluno(false)">Reativar</button>`
-        : `<button class="btn danger" onclick="app.arquivarAluno(true)">Arquivar aluno</button>`) : ''}
-      ${!a.novo ? `<p class="fs11 muted center" style="margin:0">Os registros antigos são preservados.</p>` : ''}
+        : `<button class="btn soft" onclick="app.arquivarAluno(true)">Arquivar aluno</button>`) : ''}
+      ${!a.novo ? `<p class="fs11 muted center" style="margin:0">Arquivar preserva os registros antigos.</p>` : ''}
+      ${!a.novo ? (nRegistros
+        ? `<p class="fs11 muted center" style="margin:0">Não dá para remover: aparece em ${nRegistros} ${nRegistros === 1 ? 'registro' : 'registros'}.</p>`
+        : (S.confirmarRemocaoAluno === a.id
+          ? `<div class="notice alert"><span class="ic">!</span><div>
+               Remover <b>${esc(a.nome)}</b> do cadastro? Não dá para desfazer.</div></div>
+             <div class="row" style="gap:8px">
+               <button class="btn danger" style="flex:1" onclick="app.removerAluno()">Remover</button>
+               <button class="btn ghost" style="flex:1" onclick="app.cancelarRemocaoAluno()">Cancelar</button>
+             </div>`
+          : `<button class="btn danger" onclick="app.pedirRemocaoAluno()">Remover do cadastro</button>`)) : ''}
     </div>
     ${rodape()}
   </div>`;
@@ -482,6 +492,22 @@ app.salvarAlunoFicha = async () => {
     },
     () => Store.salvarAluno(dados),
     a.novo ? 'Aluno adicionado.' : 'Aluno salvo.'
+  );
+};
+
+app.pedirRemocaoAluno = () => { S.confirmarRemocaoAluno = S.alunoSel.id; render(); };
+app.cancelarRemocaoAluno = () => { S.confirmarRemocaoAluno = null; render(); };
+
+app.removerAluno = async () => {
+  const id = S.alunoSel.id;
+  S.confirmarRemocaoAluno = null;
+  await otimista(
+    () => {
+      S.alunos = S.alunos.filter(x => x.id !== id);
+      ir('alunos', { guardar:false });
+    },
+    () => Store.removerAluno(id),
+    'Aluno removido do cadastro.'
   );
 };
 

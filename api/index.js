@@ -253,6 +253,26 @@ async function removerTurma(eu, d){
   return (await todas('SELECT * FROM turmas ORDER BY nome')).map(turmaPublica);
 }
 
+async function removerAluno(eu, d){
+  const a = await uma('SELECT * FROM alunos WHERE id=$1', [d.id]);
+  if(!a) throw new ErroApi('Aluno não encontrado.', 'inexistente', 404);
+
+  /* "Em uso" é aparecer em qualquer ocorrência. Apagar deixaria registros apontando
+     para uma criança que não existe mais — e são justamente os registros que a escola
+     precisa guardar. Nesse caso o caminho é arquivar.
+
+     A varredura é em JavaScript, e não por consulta ao JSON, porque a forma do texto
+     muda entre json e jsonb e o banco em memória dos testes não cobre os mesmos
+     operadores. O volume de uma escola cabe folgado na memória. */
+  const linhas = await todas('SELECT dados FROM ocorrencias');
+  const emUso = linhas.some(l => ((l.dados || {}).envolvidos || []).some(e => e.kid === d.id));
+  if(emUso) throw new ErroApi('Este aluno aparece em registros. Arquive em vez de remover.', 'em_uso');
+
+  await consultar('DELETE FROM alunos WHERE id=$1', [d.id]);
+  await registrar(eu.login, 'remove_aluno', a.nome);
+  return (await todas('SELECT * FROM alunos ORDER BY nome')).map(alunoPublico);
+}
+
 /* ---------- ocorrências ---------- */
 
 async function salvarOcorrencia(eu, d){
@@ -356,6 +376,7 @@ async function despachar(acao, dados, req, res){
     case 'ocorrencias':      return ocorrenciasDe(await A.exigeSessao(req));
     case 'salvarOcorrencia': return salvarOcorrencia(await A.exigeSessao(req), dados);
     case 'salvarAluno':      return salvarAluno(await A.exigeSessao(req), dados);
+    case 'removerAluno':     return removerAluno(await A.exigeGestao(req), dados);
     case 'contas':           return (await A.exigeGestao(req)) &&
                                     (await todas('SELECT * FROM contas ORDER BY nome')).map(A.contaPublica);
     case 'atualizarConta':   return atualizarConta(await A.exigeGestao(req), dados);

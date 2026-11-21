@@ -203,6 +203,24 @@ t('textoFamilia é guardado no registro',
 t('a descrição interna continua separada do texto da família',
   !!comTexto && comTexto.desc !== comTexto.textoFamilia);
 
+console.log('\n=== Remover aluno do cadastro ===');
+cookieAtual = cookieMiss;
+r = await chamar('removerAluno', { id:'c9' });
+t('Miss não remove aluno', !r.ok && r.codigo === 'permissao' && r.http === 403);
+
+cookieAtual = cookieGestao;
+r = await chamar('removerAluno', { id:'c1' });
+t('aluno que aparece em registro NÃO é removido', !r.ok && r.codigo === 'em_uso', JSON.stringify(r));
+r = await chamar('alunos');
+t('e continua no cadastro', r.ok && r.dados.some(a => a.id === 'c1'));
+
+r = await chamar('removerAluno', { id:'c9' });
+t('aluno sem registro é removido', r.ok && !r.dados.some(a => a.id === 'c9'),
+  JSON.stringify(r.dados && r.dados.map(a => a.id)));
+
+r = await chamar('removerAluno', { id:'nao-existe' });
+t('aluno inexistente responde 404', !r.ok && r.codigo === 'inexistente' && r.http === 404);
+
 console.log('\n=== Sincronizar: uma requisição só ===');
 r = await chamar('sincronizar');
 const d = r.dados || {};

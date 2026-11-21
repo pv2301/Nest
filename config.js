@@ -40,7 +40,6 @@ export const CONFIG = {
      --------------------------------------------------------------------------- */
   REGRAS: {
     nivel1EncerraNaMiss: true,  // nível 1 sem gatilho se encerra na ciência da Miss
-    travaEdicaoHoras: 24,       // trava a edição 24h após o envio, mesmo sem ciência
     retencaoFotoDias: 90        // foto apagada 90 dias após o fato ou a conclusão
   }
 };

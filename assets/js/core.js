@@ -238,7 +238,8 @@ function barraSuperior(){
   const titulos = {
     home:'Início', lista:'Registros', ciencia:'Ciência', painel:'Painel',
     horario:'Quadro horário', relacoes:'Relações', usuarios:'Usuários',
-    novo:'Novo registro', rapido:'Registro rápido', wizard:'Registro completo',
+    novo:'Novo registro', rapido:'Registro rápido',
+    wizard: S.editando ? 'Corrigir registro' : 'Registro completo',
     detalhe:'Ocorrência ' + (S.detalhe || ''), usuario:'Usuário',
     conta:'Minha conta', alunos:'Alunos e turmas', aluno:'Aluno', ficha:'Gerar relatório',
     ajuda:'Como funciona'
@@ -317,6 +318,9 @@ export function render(){
    no meio do preenchimento deixava de perder tudo. */
 function guardarRascunho(){
   if(!S.conta) return;
+  /* Durante uma correção não se guarda rascunho: retomado depois, ele criaria um
+     registro novo em vez de corrigir o que estava aberto. */
+  if(S.editando) return;
   if(S.rascunho && (S.tela === 'wizard' || S.tela === 'rapido')){
     /* Confirmação momentânea, uma vez por preenchimento: antes um parágrafo fixo
        anunciava a cada tela que o rascunho estava sendo salvo. */

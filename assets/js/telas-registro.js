@@ -100,6 +100,9 @@ registrarTela('novo', () => `<div class="stack">
 </div>`);
 
 app.iniciar = modo => {
+  /* Sem isto, começar um registro logo depois de uma correção sobrescreveria o
+     registro corrigido: o envio ainda acharia que está editando. */
+  S.editando = null;
   S.modoRegistro = modo; S.passo = 1; S.buscaAluno = ''; S.filtroTurma = '';
   S.rascunho = { categoria:'', tipo:'', tipoOutro:'', envolvidos:[],
                  quandoOpcao:'Agora', quandoISO:new Date().toISOString(),
@@ -431,7 +434,7 @@ registrarTela('rapido', () => {
       ${d.envolvidos.map((e, i) => cardEnvolvido(e, i)).join('')}</div></div>` : ''}
     <div><p class="sec-label">3 · Gravidade</p>${sevPicker()}</div>
     ${campoDescricao('r-desc')}
-    <button class="btn" onclick="app.tentarEnviar()">Enviar registro</button>
+    <button class="btn" onclick="app.tentarEnviar()">${S.editando ? 'Salvar correção' : 'Enviar registro'}</button>
   </div>`;
 });
 
@@ -515,7 +518,7 @@ registrarTela('wizard', () => {
           <div class="gut"><div class="dot">${i+1}</div>${i < dest.length-1 ? '<div class="line"></div>' : ''}</div>
           <div class="body"><b class="fs13">${esc(n.q)}</b><div class="fs11 muted">${esc(n.p)}</div></div></div>`).join('')}</div></div>
 
-      <button class="btn" id="btn-enviar" onclick="app.tentarEnviar()">Enviar registro</button>
+      <button class="btn" id="btn-enviar" onclick="app.tentarEnviar()">${S.editando ? 'Salvar correção' : 'Enviar registro'}</button>
     </div>`;
   }
 
@@ -585,19 +588,63 @@ function destinoCiencia(){
   return out;
 }
 
+/** Quem corrige: a autora enquanto ninguém deu ciência, e a gestão sempre. É o mesmo
+    conjunto que a guarda do servidor já autoriza em salvarOcorrencia. */
+function podeCorrigir(o){
+  const u = S.conta;
+  if(!u || !o) return false;
+  if(u.papel === 'gestao') return true;
+  if(o.autorLogin !== u.login) return false;
+  return !(o.chain || []).some(c => c.st === 'ok');
+}
+
+/** Reabre o formulário com o registro preenchido. O registro guarda cond e lesao
+    achatados dentro de cada envolvido; o formulário os quer como mapas por criança. */
+app.corrigirRegistro = id => {
+  const o = S.ocs.find(x => x.id === id);
+  if(!o || !podeCorrigir(o)) return;
+  const cond = {}, lesao = {};
+  for(const e of (o.envolvidos || [])){
+    if(e.cond && e.cond !== '—') cond[e.kid] = e.cond;
+    if(e.lesao) lesao[e.kid] = e.lesao;
+  }
+  S.editando = id;
+  S.modoRegistro = 'completo';
+  S.passo = 1; S.buscaAluno = ''; S.filtroTurma = ''; S.faltas = null;
+  S.rascunho = {
+    categoria:o.categoria || '', tipo:o.tipo || '', tipoOutro:o.tipoOutro || '',
+    envolvidos: (o.envolvidos || []).map(e => ({ kid:e.kid, papel:e.papel, turma:e.turma || '' })),
+    quandoOpcao:'manual', quandoISO:o.quandoISO || o.criadoEm,
+    local:o.local || '', localOutro:o.localOutro || '', sev:o.sev || 0,
+    presenciou: o.presenciou !== false,
+    informanteNome:(o.informante && o.informante.nome) || '',
+    informanteCanal:(o.informante && o.informante.canal) || '',
+    desc:o.desc || '', prov:(o.prov || []).slice(), foto:!!o.foto,
+    cond, lesao
+  };
+  ir('wizard');
+};
+
+/** A cadeia de ciência que o conteúdo atual do formulário pede. */
+function cadeiaNova(){
+  const c = destinoCiencia()
+    .filter(x => !x.q.startsWith('Encerra'))
+    .map((x, i) => ({ nivel: x.q.startsWith('Encerrado') ? 'Gestão' : x.q,
+                      st: i === 0 ? 'now' : 'wait' }));
+  return c.length ? c : [{ nivel:'Gestão', st:'now' }];
+}
+
 app.enviar = async () => {
-  const u = S.conta, d = S.rascunho, dest = destinoCiencia();
+  const u = S.conta, d = S.rascunho;
   const arquivoFoto = d.fotoArquivo || null;
-  const id = String(Date.now()).slice(-4);
-  const chain = dest.filter(x => !x.q.startsWith('Encerra')).map((x, i) => ({
-    nivel: x.q.startsWith('Encerrado') ? 'Gestão' : x.q,
-    st: i === 0 ? 'now' : 'wait'
-  }));
-  const oc = {
-    id, categoria:d.categoria, tipo:d.tipo, tipoOutro:d.tipoOutro, sev:d.sev,
-    local:d.local, localOutro:d.localOutro,
-    quandoISO:d.quandoISO, criadoEm:new Date().toISOString(),
-    autor:u.nome, autorLogin:u.login, autorPapel:u.papel,
+  const antigo = S.editando ? S.ocs.find(x => x.id === S.editando) : null;
+  const id = antigo ? antigo.id : String(Date.now()).slice(-4);
+
+  /* O que o formulário diz. Identidade, autoria e ciência ficam de fora: numa
+     correção elas não mudam. */
+  const conteudo = {
+    categoria:d.categoria, tipo:d.tipo, tipoOutro:d.tipoOutro, sev:d.sev,
+    local:d.local, localOutro:d.localOutro, quandoISO:d.quandoISO,
     envolvidos: d.envolvidos.map(e => ({ kid:e.kid, papel:e.papel,
       turma: e.turma || aluno(e.kid).turma || '',
       cond:d.cond[e.kid] || '—', lesao:d.lesao[e.kid] || '' })),
@@ -605,21 +652,44 @@ app.enviar = async () => {
     fotoDias: d.foto ? CONFIG.REGRAS.retencaoFotoDias : undefined,
     presenciou:d.presenciou,
     informante: d.presenciou ? null : { nome:d.informanteNome, canal:d.informanteCanal },
-    chain: chain.length ? chain : [{ nivel:'Gestão', st:'now' }],
-    status:'aguarda_miss', prazo:CONFIG.REGRAS.travaEdicaoHoras + 'h restantes',
     duas: [...new Set(d.envolvidos.map(e => e.turma || aluno(e.kid).turma))].filter(Boolean).length > 1
   };
-  if(u.papel === 'gestao'){
-    oc.chain = [{ nivel:'Gestão', st:'ok', quandoISO:new Date().toISOString(),
-      quando:agoraHora(), parecer:'Registrado e encerrado pela gestão.' }];
-    oc.status = 'concluido'; oc.prazo = null;
+
+  let oc;
+  if(antigo){
+    /* Corrigir muda o conteúdo, não quem registrou nem quem já tomou conhecimento.
+       A cadeia só é refeita quando ninguém deu ciência e as turmas mudaram — refazer
+       depois de uma ciência apagaria o que já foi dado. */
+    const comCiencia = (antigo.chain || []).some(c => c.st === 'ok');
+    const turmas = l => [...new Set((l || []).map(e => e.turma))].filter(Boolean).sort().join('|');
+    const mudouTurma = turmas(antigo.envolvidos) !== turmas(conteudo.envolvidos);
+    oc = { ...antigo, ...conteudo, id,
+      corrigidoEm:new Date().toISOString(), corrigidoPor:u.nome,
+      chain: (!comCiencia && mudouTurma) ? cadeiaNova() : antigo.chain };
+  } else {
+    oc = { ...conteudo, id, criadoEm:new Date().toISOString(),
+      autor:u.nome, autorLogin:u.login, autorPapel:u.papel,
+      chain: cadeiaNova(), status:'aguarda_miss' };
+    if(u.papel === 'gestao'){
+      oc.chain = [{ nivel:'Gestão', st:'ok', quandoISO:new Date().toISOString(),
+        quando:agoraHora(), parecer:'Registrado e encerrado pela gestão.' }];
+      oc.status = 'concluido';
+    }
   }
+
   await otimista(
     () => {
-      S.ocs = [oc, ...S.ocs];
-      S.rascunho = null; S.passo = 1; S.faltas = null; S.pilha = []; S.avisouRascunho = false;
+      if(antigo){
+        const i = S.ocs.findIndex(x => x.id === oc.id);
+        if(i >= 0) S.ocs[i] = oc;
+        S.detalhe = oc.id;
+      } else {
+        S.ocs = [oc, ...S.ocs];
+      }
+      S.rascunho = null; S.passo = 1; S.faltas = null; S.pilha = [];
+      S.avisouRascunho = false; S.editando = null;
       Store.descartarRascunho();
-      ir('home', { guardar:false });
+      ir(antigo ? 'detalhe' : 'home', { guardar:false });
     },
     async () => {
       await Store.salvarOcorrencia(oc);
@@ -635,7 +705,9 @@ app.enviar = async () => {
         } catch(e){ toast('Registro salvo, mas a foto não subiu: ' + e.message); }
       }
     },
-    u.papel === 'gestao' ? `Registro #${id} criado e encerrado` : `Registro #${id} enviado para ciência`
+    antigo ? `Registro #${id} corrigido`
+      : u.papel === 'gestao' ? `Registro #${id} criado e encerrado`
+      : `Registro #${id} enviado para ciência`
   );
 };
 
@@ -735,6 +807,10 @@ registrarTela('detalhe', () => {
     <button class="btn soft" onclick="app.abrirFicha('${esc(o.id)}')">
       ${svgIc(ICON.exportar).replace('<svg','<svg width="17" height="17"')} Gerar relatório</button>
 
+    ${podeCorrigir(o) ? `<button class="btn ghost" onclick="app.corrigirRegistro('${esc(o.id)}')">Corrigir registro</button>`
+      : (o.autorLogin === u.login
+        ? `<p class="fs11 muted center" style="margin:0">Registro travado pela ciência.</p>` : '')}
+
     ${souDestino ? `<div class="card lift stack s8" style="border-color:var(--accent-text)">
       <p class="sec-label" style="margin:0">Sua ciência</p>
       <div><p class="fs12 muted" style="margin:0 0 6px">Confirme ou corrija a gravidade</p>
@@ -782,7 +858,6 @@ app.darCiencia = id => {
   if(prox >= 0){ o.chain[prox].st = 'now'; o.status = 'aguarda_miss'; }
   else {
     o.status = u.papel === 'gestao' ? 'acompanhamento' : 'concluido';
-    o.prazo = null;
     if(u.papel === 'gestao') o.acomp = 'Definir encaminhamento · ' + u.curto;
   }
   salvar(o, prox >= 0 ? 'Ciência registrada. Segue para ' + o.chain[prox].nivel.split(' (')[0]

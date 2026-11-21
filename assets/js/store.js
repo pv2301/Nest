@@ -275,6 +275,11 @@ export const Store = {
     return turma;
   },
 
+  async removerAluno(id){
+    if(temApi()) return await api('removerAluno', { id });
+    LS.gravar(K.alunos, LS.ler(K.alunos, []).filter(a => a.id !== id));
+  },
+
   async removerTurma(id){
     if(temApi()) return await api('removerTurma', { id });
     LS.gravar(K.turmas, LS.ler(K.turmas, []).filter(t => t.id !== id));
