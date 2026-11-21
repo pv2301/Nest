@@ -303,8 +303,25 @@ function alunosFiltrados(){
                  || a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 
-registrarTela('alunos', () => {
+/* Só o resultado da busca: digitar reescreve esta parte, nunca o campo. */
+function resultadoAlunosGestao(){
   const lista = alunosFiltrados();
+  if(!lista.length)
+    return `<div class="empty"><div class="big">Nenhum aluno</div>
+      <p class="fs12" style="margin:0">Adicione os alunos para que apareçam no registro de ocorrência.</p></div>`;
+  return lista.map(a => `<button class="urow" onclick="app.abrirAluno('${esc(a.id)}')">
+      <span class="avatar sm">${esc(iniciais(a.nome))}</span>
+      <span class="grow">
+        <span class="lin-t">${esc(a.nome)}</span>
+        <span class="fs11 muted">${esc(a.turma || 'sem turma')}${a.saude ? ' · ' + esc(a.saude) : ''}</span>
+      </span>
+      ${a.demo ? '<span class="pill demo">demonstração</span>' : ''}
+      ${a.avulso ? '<span class="pill wait">confirmar</span>' : ''}
+      ${a.ativo === false ? '<span class="pill off">arquivado</span>' : ''}
+    </button>`).join('');
+}
+
+registrarTela('alunos', () => {
   const avulsos = S.alunos.filter(a => a.avulso).length;
   return `<div class="stack s18">
     ${avulsos ? `<div class="notice info"><span class="ic">◆</span><div>
@@ -348,17 +365,7 @@ registrarTela('alunos', () => {
           <button class="chip sm" aria-pressed="${!S.filtroTurma}" onclick="app.filtroTurmaGestao('')">Todas</button>
           ${turmaNomes().map(t => `<button class="chip sm" aria-pressed="${S.filtroTurma === t}" onclick="app.filtroTurmaGestao('${esc(t)}')">${esc(t)}</button>`).join('')}
         </div>` : ''}
-        ${lista.length ? lista.map(a => `<button class="urow" onclick="app.abrirAluno('${esc(a.id)}')">
-          <span class="avatar sm">${esc(iniciais(a.nome))}</span>
-          <span class="grow">
-            <span style="display:block;font-size:13.5px;font-weight:600">${esc(a.nome)}</span>
-            <span class="fs11 muted">${esc(a.turma || 'sem turma')}${a.saude ? ' · ' + esc(a.saude) : ''}</span>
-          </span>
-          ${a.demo ? '<span class="pill demo">demonstração</span>' : ''}
-          ${a.avulso ? '<span class="pill wait">confirmar</span>' : ''}
-          ${a.ativo === false ? '<span class="pill off">arquivado</span>' : ''}
-        </button>`).join('')
-        : `<div class="empty"><div class="big">Nenhum aluno</div><p class="fs12" style="margin:0">Adicione os alunos para que apareçam no registro de ocorrência.</p></div>`}
+        <div id="lista-al" class="stack s8">${resultadoAlunosGestao()}</div>
       </div>
     </div>
 
@@ -399,9 +406,9 @@ app.pedirLimpeza = () => { S.confirmarLimpeza = true; render(); };
 app.cancelarLimpeza = () => { S.confirmarLimpeza = false; render(); };
 
 app.buscaAlunoGestao = v => {
-  S.buscaAluno = v; render();
-  const el = document.getElementById('b-al');
-  if(el){ el.focus(); try { el.setSelectionRange(99, 99); } catch {} }
+  S.buscaAluno = v;
+  const alvo = document.getElementById('lista-al');
+  if(alvo) alvo.innerHTML = resultadoAlunosGestao();
 };
 app.filtroTurmaGestao = t => { S.filtroTurma = S.filtroTurma === t ? '' : t; render(); };
 

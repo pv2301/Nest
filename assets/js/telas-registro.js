@@ -176,10 +176,25 @@ function seletorAlunos(){
       <button class="chip sm" aria-pressed="${!S.filtroTurma}" onclick="app.filtrarTurma('')">Todas</button>
       ${turmas.map(t => `<button class="chip sm" aria-pressed="${S.filtroTurma === t}" onclick="app.filtrarTurma('${esc(t)}')">${esc(t)}</button>`).join('')}
     </div>` : ''}
-    ${lista.length ? `
-      <p class="cont fs12 muted" style="margin:0">${escolhidas} ${escolhidas === 1 ? 'selecionada' : 'selecionadas'}${
-        lista.length < S.alunos.length ? ` · ${lista.length} de ${S.alunos.length}` : ''}</p>
-      <div class="stack s8">${lista.map(a => `
+    <div id="lista-alunos" class="stack s8">${resultadoAlunos()}</div>
+    <button class="btn ghost sm" style="width:100%" onclick="app.abrirAvulso()">+ Não está na lista</button>
+  </div>`;
+}
+
+/* Só o resultado da busca. Separado para a digitação reescrever esta parte e não a
+   tela inteira: redesenhar destruía o campo a cada tecla, e com isso o teclado
+   preditivo do celular perdia a sessão de composição. */
+function resultadoAlunos(){
+  const d = S.rascunho || { envolvidos: [] };
+  const lista = listaAlunos();
+  const escolhido = a => (d.envolvidos || []).some(e => e.kid === a.id);
+  const escolhidas = (d.envolvidos || []).length;
+  if(!lista.length)
+    return `<p class="fs12 muted" style="margin:0">${S.alunos.length
+      ? 'Nenhum aluno encontrado com esse filtro.' : 'Nenhum aluno cadastrado ainda.'}</p>`;
+  return `<p class="cont fs12 muted" style="margin:0">${escolhidas} ${escolhidas === 1 ? 'selecionada' : 'selecionadas'}${
+      lista.length < S.alunos.length ? ` · ${lista.length} de ${S.alunos.length}` : ''}</p>
+    ${lista.map(a => `
       <button class="pick kid" aria-pressed="${escolhido(a)}" onclick="app.togKid('${esc(a.id)}')">
         <span class="avatar">${esc(iniciais(a.nome))}</span>
         <span class="grow">
@@ -187,18 +202,13 @@ function seletorAlunos(){
           ${a.turma ? `<span class="fs11 muted">Turma ${esc(a.turma)}</span>` : ''}
         </span>
         <span class="mk" aria-hidden="true"></span>
-      </button>`).join('')}</div>`
-      : `<p class="fs12 muted" style="margin:0">${S.alunos.length ? 'Nenhum aluno encontrado com esse filtro.' : 'Nenhum aluno cadastrado ainda.'}</p>`}
-    <button class="btn ghost sm" style="width:100%" onclick="app.abrirAvulso()">+ Não está na lista</button>
-  </div>`;
+      </button>`).join('')}`;
 }
 
 app.buscarAluno = v => {
   S.buscaAluno = v;
   const alvo = document.getElementById('lista-alunos');
-  render();
-  const el = document.getElementById('b-aluno');
-  if(el){ el.focus(); try { el.setSelectionRange(99, 99); } catch {} }
+  if(alvo) alvo.innerHTML = resultadoAlunos();
 };
 app.filtrarTurma = t => { S.filtroTurma = S.filtroTurma === t ? '' : t; render(); };
 
@@ -720,31 +730,35 @@ app.enviar = async () => {
 };
 
 /* ---------------------------------------------------------------- listas */
-registrarTela('lista', () => {
-  const u = S.conta;
+/* Só o resultado: a digitação reescreve esta parte, nunca o campo de busca. */
+function resultadoLista(){
   const q = semAcento(String(S.buscaLista || '')).toLowerCase();
-  let v = visiveis(u);
+  let v = visiveis(S.conta);
   if(q) v = v.filter(o =>
     (o.envolvidos || []).some(e => semAcento(aluno(e.kid).nome).toLowerCase().includes(q) ||
                                     semAcento(aluno(e.kid).turma || '').toLowerCase().includes(q)) ||
     semAcento(tipoDe(o)).toLowerCase().includes(q));
+  return v.length ? v.map(o => itemHTML(o)).join('')
+    : vazio('Nenhum registro', q ? 'Nada corresponde a essa busca.'
+        : 'Assim que houver registros visíveis para você, eles aparecem aqui.');
+}
+
+registrarTela('lista', () => {
   return `<div class="stack s18">
     <div class="busca">
       <span class="ic">${svgIc(ICON.busca)}</span>
       <input class="input" id="b-lista" placeholder="Buscar por aluno, turma ou tipo" value="${esc(S.buscaLista || '')}"
              oninput="app.buscarLista(this.value)">
     </div>
-    <div class="stack s8">${v.length ? v.map(o => itemHTML(o)).join('')
-      : vazio('Nenhum registro', q ? 'Nada corresponde a essa busca.' : 'Assim que houver registros visíveis para você, eles aparecem aqui.')}</div>
+    <div class="stack s8" id="lista-registros">${resultadoLista()}</div>
     ${rodape()}
   </div>`;
 });
 
 app.buscarLista = v => {
   S.buscaLista = v;
-  render();
-  const el = document.getElementById('b-lista');
-  if(el){ el.focus(); try { el.setSelectionRange(99, 99); } catch {} }
+  const alvo = document.getElementById('lista-registros');
+  if(alvo) alvo.innerHTML = resultadoLista();
 };
 
 registrarTela('ciencia', () => {
