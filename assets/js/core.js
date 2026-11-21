@@ -158,7 +158,19 @@ export async function recarregar({ silencioso = false } = {}){
    mas deixam de ser espera: é a diferença entre "travou" e "é rápido".
    Se a gravação falhar, desfaz e explica. */
 export async function otimista(aplicar, gravar, msgOk){
+  /* O que o rollback precisa devolver. O rascunho entra aqui porque o `aplicar` do
+     envio o descarta antes da gravação: sem isto, uma falha de rede levava embora
+     tudo o que a pessoa tinha escrito, e a mensagem ainda dizia "tente de novo" sem
+     haver com o que tentar. Reproduzido com a rede cortada antes de existir esta
+     linha. */
   const antes = JSON.parse(JSON.stringify({ ocs: S.ocs, contas: S.contas, alunos: S.alunos, turmas: S.turmas }));
+  const forma = { rascunho: S.rascunho, passo: S.passo, modo: S.modoRegistro,
+                  editando: S.editando, tela: S.tela, pilha: S.pilha.slice(),
+                  /* Também esta: o `aplicar` do envio zera a marca, e o autosave
+                     reanunciava "Rascunho salvo" por cima da mensagem de erro. */
+                  avisou: S.avisouRascunho };
+  const rascunhoGravado = Store.rascunho();
+
   aplicar();
   S.salvando = true;
   render();
@@ -169,6 +181,19 @@ export async function otimista(aplicar, gravar, msgOk){
   } catch(e){
     S.ocs = antes.ocs; S.contas = antes.contas; S.alunos = antes.alunos; S.turmas = antes.turmas;
     S.salvando = false;
+
+    /* Só quando havia um formulário em curso: as outras escritas otimistas (ciência,
+       cadastro, turma) não têm rascunho e não devem ser levadas de volta a lugar
+       nenhum. */
+    if(forma.rascunho){
+      S.rascunho = forma.rascunho; S.passo = forma.passo; S.modoRegistro = forma.modo;
+      S.editando = forma.editando; S.pilha = forma.pilha; S.tela = forma.tela;
+      S.avisouRascunho = forma.avisou;
+      if(rascunhoGravado) Store.guardarRascunho(rascunhoGravado);
+      render();
+      toast('Não enviei: ' + (e.message || 'falha no servidor') + ' O que você escreveu está aqui.');
+      return;
+    }
     toast('Não foi salvo: ' + (e.message || 'falha no servidor') + '. Tente de novo.');
   }
 }

@@ -315,6 +315,16 @@ async function salvarOcorrencia(eu, d){
   const oc = d.ocorrencia;
   if(!oc || !oc.id) throw new ErroApi('Ocorrência sem identificador.', 'dados');
   const existe = await uma('SELECT autor_login, dados FROM ocorrencias WHERE id=$1', [oc.id]);
+
+  /* Criar e editar se distinguiam só por achar a linha. Com o id antigo de quatro
+     dígitos, que dava a volta a cada dez segundos, um registro novo podia nascer com
+     o número de outro — e esta função o tratava como edição, sobrescrevendo em
+     silêncio um registro de verdade. O cliente agora diz qual é a intenção, e um id
+     já ocupado num registro novo é erro. */
+  if(existe && d.novo)
+    throw new ErroApi('Já existe um registro com este número. Tente enviar de novo.',
+      'id_ocupado', 409);
+
   if(existe){
     /* Quem pode escrever é quem pode ver: a autora corrige, e quem está na cadeia
        registra a própria ciência. Antes isto usava podeVer de foto.js — a regra do

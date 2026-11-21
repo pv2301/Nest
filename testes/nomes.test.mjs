@@ -102,6 +102,25 @@ t('"e" entre nomes fica minúsculo', T('ana e beatriz') === 'Ana e Beatriz', T('
 t('frase sobe só a primeira', U.primeiraMaiuscula('sala dos professores') === 'Sala dos professores',
   U.primeiraMaiuscula('sala dos professores'));
 
+console.log('\n=== Identificador de registro ===');
+/* O antigo era String(Date.now()).slice(-4): quatro dígitos que davam a volta a cada
+   dez segundos, e dois registros feitos com 10s de diferença recebiam o mesmo número.
+
+   Mil sorteios não provam aleatoriedade, mas provam o tamanho do espaço: com sufixo
+   de quatro caracteres esta asserção reprovava uma vez a cada três execuções, o que
+   foi justamente como o espaço curto apareceu. Com seis, uma em três mil. */
+const ids = Array.from({ length: 1000 }, () => U.novoId());
+t('mil ids seguidos, nenhum repetido', new Set(ids).size === 1000,
+  `${1000 - new Set(ids).size} repetidos`);
+t('a data abre o id', /^\d{6}-[0-9A-HJ-NP-Z]{6}$/.test(ids[0]), ids[0]);
+t('a data é a de hoje', ids[0].startsWith(
+  [new Date().getFullYear() % 100, new Date().getMonth()+1, new Date().getDate()]
+    .map(n => String(n).padStart(2,'0')).join('')), ids[0]);
+t('o sufixo não usa I nem O, que se confundem com 1 e 0',
+  ids.every(x => !/[IO]/.test(x.split('-')[1])));
+t('o id antigo de quatro dígitos repetiria',
+  new Set(Array.from({length:50}, () => String(Date.now()).slice(-4))).size < 50);
+
 console.log(falhas
   ? `\n=== ${falhas} de ${total} FALHARAM ===`
   : `\n=== ${total} TESTES DE NOMES PASSARAM ===`);

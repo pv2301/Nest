@@ -144,6 +144,36 @@ export function senhaTemporaria(){
 }
 
 /* ---------- datas ---------- */
+/** Identificador de registro.
+
+    O antigo era `String(Date.now()).slice(-4)`: quatro dígitos, que dão a volta a
+    cada dez segundos. Dois registros criados com 10s, 20s ou um minuto de diferença
+    recebiam o mesmo número, e para o servidor isso não era um registro novo — era
+    uma edição do que já existia. Um sobrescrevia o outro, em silêncio.
+
+    Agora a data abre (serve para ler e ordenar) e seis caracteres aleatórios fecham.
+    Seis, e não quatro: com quatro o alfabeto de 34 letras dá 1,3 milhão de combinações,
+    e a chance de duas baterem em mil sorteios é de quase um terço — o paradoxo do
+    aniversário. Com seis são 1,5 bilhão, e mil sorteios colidem uma vez em três mil.
+    Mesmo assim o servidor recusa número ocupado e o cliente sorteia outro: o acaso não
+    é garantia.
+
+    O acaso vem do crypto quando existe; Math.random é só a rede de segurança para um
+    navegador antigo. */
+export function novoId(agora = new Date()){
+  const d = [agora.getFullYear() % 100, agora.getMonth() + 1, agora.getDate()]
+    .map(n => String(n).padStart(2, '0')).join('');
+  const letras = '0123456789ABCDEFGHJKLMNPQRSTUVWXYZ';  /* sem I e O, que viram 1 e 0 */
+  let sufixo = '';
+  const c = globalThis.crypto;
+  const bytes = c && c.getRandomValues ? c.getRandomValues(new Uint8Array(6)) : null;
+  for(let i = 0; i < 6; i++){
+    const n = bytes ? bytes[i] : Math.floor(Math.random() * 256);
+    sufixo += letras[n % letras.length];
+  }
+  return d + '-' + sufixo;
+}
+
 export const agoraHora = () => new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
 export const agoraData = () => new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
 export const carimbo = () => new Date().toISOString();

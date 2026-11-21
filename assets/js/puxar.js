@@ -12,11 +12,19 @@
    do arrasto) é o que faz o gesto parecer preso ao dedo em vez de solto; sem ela, um
    deslize distraído já dispara a atualização.
 
+   A FOLGA É O QUE NÃO PODE SUMIR DAQUI. A primeira versão chamava preventDefault()
+   assim que o dedo andava 1px, e isso cancela o clique que o navegador sintetiza ao
+   fim do toque: medido num Pixel 7, 2px de deriva já matavam qualquer seleção, o
+   botão "Sem identificar" e a linha "Continuar registro". Nenhum dedo real encosta
+   na tela sem andar dois pixels. Enquanto o arrasto não passa de FOLGA, aqui não se
+   barra nada e não se move nada — o toque segue sendo um toque.
+
    O navegador não tem o gesto nativo aqui: .scroll usa overscroll-behavior:contain,
    então este é o único que existe e não há dois a disputar. */
 
 import { S, recarregar } from './core.js';
 
+const FOLGA  = 10;    /* antes disto é toque, não arrasto — como Android e iOS */
 const LIMITE = 56;    /* a partir daqui, soltar atualiza */
 const TETO   = 96;    /* o conteúdo não desce mais que isto */
 const ATRITO = 0.45;  /* quanto do arrasto vira deslocamento */
@@ -44,9 +52,15 @@ function arrastar(e){
   const cru = e.touches[0].clientY - inicioY;
   /* Subindo, ou já rolou: o gesto é rolagem. Devolve o controle ao navegador. */
   if(cru <= 0 || caixa.scrollTop > 0){ cancelar(); return; }
+  /* Dentro da folga ainda pode ser um toque. Sair daqui sem barrar nada é o que
+     mantém os botões funcionando no celular. */
+  if(!puxando && cru < FOLGA) return;
   puxando = true;
-  dist = Math.min(cru * ATRITO, TETO);
-  /* Só agora: um preventDefault antes de saber a direção mataria a rolagem normal. */
+  /* Desconta a folga: senão o conteúdo saltaria 4px no instante em que o gesto
+     assume. */
+  dist = Math.min((cru - FOLGA) * ATRITO, TETO);
+  /* Só agora: um preventDefault antes de saber a direção mataria a rolagem normal e
+     o toque. */
   if(e.cancelable) e.preventDefault();
   mover(dist);
 }

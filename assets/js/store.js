@@ -297,10 +297,14 @@ export const Store = {
     return LS.ler(K.ocs, []);
   },
 
-  async salvarOcorrencia(oc){
-    if(temApi()) return await api('salvarOcorrencia', { ocorrencia: oc });
+  /* `novo` diz a intenção: é um registro nascendo, não uma edição. Sem isso os dois
+     casos se distinguiam só por achar a linha, e um id repetido virava sobrescrita
+     silenciosa de um registro alheio. */
+  async salvarOcorrencia(oc, { novo = false } = {}){
+    if(temApi()) return await api('salvarOcorrencia', { ocorrencia: oc, novo });
     const os = LS.ler(K.ocs, []);
     const i = os.findIndex(x => x.id === oc.id);
+    if(i >= 0 && novo) throw new ErroStore('Já existe um registro com este número.', 'id_ocupado');
     if(i >= 0) os[i] = oc; else os.unshift(oc);
     LS.gravar(K.ocs, os);
     return oc;

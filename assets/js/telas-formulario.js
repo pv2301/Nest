@@ -9,7 +9,7 @@ import { S, app, registrarTela, ir, toast, render, rodape, otimista, aluno,
 import { Store } from './store.js';
 import { escolha } from './escolha.js';
 import { montarDestinos, paraCadeia, oQueFalta, podeCorrigir } from './regras.mjs';
-import { esc, quandoLegivel, agoraHora, iniciais, tituloNome } from './util.js';
+import { esc, quandoLegivel, agoraHora, iniciais, tituloNome, novoId } from './util.js';
 import { CONFIG } from '../../config.js';
 import { CATS, OUTRO, EXEMPLOS, LOCAIS, PROVIDENCIAS, CONDICOES, REGIOES,
          PAPEIS_ENVOLVIDO, CANAIS_INFORME, SEVL, JULGAMENTO } from './vocabulario.js';
@@ -32,6 +32,10 @@ const erroDe = campo => {
 /* O botão nunca fica desabilitado sem explicação: ao tocar, mostra o que falta e
    cada item leva ao passo certo. Antes ele só ficava cinza, sem dizer por quê. */
 app.tentarEnviar = () => {
+  /* Dois toques rápidos criavam dois registros: cada chamada gerava o seu id e as
+     duas gravavam. O `salvando` do core já existe para a barra de trabalho; aqui ele
+     também fecha a porta. */
+  if(S.salvando) return;
   const f = faltas(S.rascunho);
   S.tentouEnviar = true;
   if(!f.length) return app.enviar();
@@ -344,7 +348,8 @@ registrarTela('rapido', () => {
       ${d.envolvidos.map((e, i) => cardEnvolvido(e, i)).join('')}</div></div>` : ''}
     <div><p class="sec-label">3 · Gravidade</p>${sevPicker()}</div>
     ${campoDescricao('r-desc')}
-    <button class="btn" onclick="app.tentarEnviar()">${S.editando ? 'Salvar correção' : 'Enviar registro'}</button>
+    <button class="btn" ${S.salvando ? 'disabled' : ''} onclick="app.tentarEnviar()">${
+      S.salvando ? 'Enviando…' : S.editando ? 'Salvar correção' : 'Enviar registro'}</button>
   </div>`;
 });
 
@@ -433,7 +438,8 @@ registrarTela('wizard', () => {
           <div class="gut"><div class="dot">${i+1}</div>${i < dest.length-1 ? '<div class="line"></div>' : ''}</div>
           <div class="body"><b class="fs13">${esc(n.q)}</b><div class="fs11 muted">${esc(n.p)}</div></div></div>`).join('')}</div></div>
 
-      <button class="btn" id="btn-enviar" onclick="app.tentarEnviar()">${S.editando ? 'Salvar correção' : 'Enviar registro'}</button>
+      <button class="btn" id="btn-enviar" ${S.salvando ? 'disabled' : ''} onclick="app.tentarEnviar()">${
+        S.salvando ? 'Enviando…' : S.editando ? 'Salvar correção' : 'Enviar registro'}</button>
     </div>`;
   }
 
@@ -526,7 +532,7 @@ app.enviar = async () => {
   const u = S.conta, d = S.rascunho;
   const arquivoFoto = d.fotoArquivo || null;
   const antigo = S.editando ? S.ocs.find(x => x.id === S.editando) : null;
-  const id = antigo ? antigo.id : String(Date.now()).slice(-4);
+  const id = antigo ? antigo.id : novoId();
 
   /* O que o formulário diz. Identidade, autoria e ciência ficam de fora: numa
      correção elas não mudam. */
@@ -580,7 +586,18 @@ app.enviar = async () => {
       ir(antigo ? 'detalhe' : 'home', { guardar:false });
     },
     async () => {
-      await Store.salvarOcorrencia(oc);
+      try {
+        await Store.salvarOcorrencia(oc, { novo: !antigo });
+      } catch(e){
+        /* Número já ocupado: com seis caracteres aleatórios é raro, mas raro não é
+           nunca, e fazer a pessoa reescrever o registro por causa de um sorteio
+           infeliz seria absurdo. Sorteia outro e tenta uma vez. */
+        if(e.codigo !== 'id_ocupado' || antigo) throw e;
+        oc.id = novoId();
+        await Store.salvarOcorrencia(oc, { novo:true });
+        const i = S.ocs.findIndex(x => x.id === id);
+        if(i >= 0) S.ocs[i] = oc;
+      }
       if(arquivoFoto){
         /* A foto vai depois: só agora existe um id de ocorrência para prendê-la.
            Falhar aqui não invalida o registro, que já está salvo. */

@@ -190,6 +190,24 @@ cookieAtual = cookieMiss;
 r = await chamar('salvarOcorrencia', { ocorrencia: { ...ocMiss, acomp:'Família avisada no fim do turno.' } });
 t('a autora altera o próprio registro', r.ok === true, JSON.stringify(r));
 
+/* O id antigo tinha quatro dígitos e dava a volta a cada dez segundos: um registro
+   novo podia nascer com o número de outro, e o servidor tratava isso como edição —
+   sobrescrevendo um registro de verdade, sem avisar ninguém. Agora o cliente diz que
+   é novo, e número ocupado é erro. */
+r = await chamar('salvarOcorrencia', {
+  ocorrencia: { ...ocMiss, desc:'registro novo que calhou de repetir o número' },
+  novo: true });
+t('registro NOVO com número já usado é recusado',
+  !r.ok && r.codigo === 'id_ocupado' && r.http === 409, JSON.stringify(r));
+
+cookieAtual = cookieGestao;
+r = await chamar('ocorrencias');
+const naoSobrescrito = (r.dados || []).find(o => o.id === ocMiss.id);
+t('e o registro que estava lá continua intacto',
+  !!naoSobrescrito && !/calhou de repetir/.test(naoSobrescrito.desc || ''),
+  JSON.stringify(naoSobrescrito && naoSobrescrito.desc));
+cookieAtual = cookieMiss;
+
 cookieAtual = cookieGestao;
 r = await chamar('salvarOcorrencia', { ocorrencia: { ...ocMiss, acomp:'Família avisada no fim do turno.',
   textoFamilia:'Helena se desentendeu com outra criança e recebeu um arranhão no braço.' } });
