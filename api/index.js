@@ -5,6 +5,11 @@
 const { consultar, uma, todas, registrar } = require('./_db');
 const A = require('./_auth');
 const { podeVer } = require('./foto');
+
+/* As regras moram num módulo só, compartilhado com o navegador. É ESM e isto aqui é
+   CommonJS, então entra por import dinâmico, cacheado na primeira vez. */
+let _regras = null;
+const regras = async () => _regras || (_regras = await import('../assets/js/regras.mjs'));
 const { ErroApi } = A;
 
 /* ============================ ajudantes ============================ */
@@ -25,15 +30,14 @@ const turmaPublica = t => ({
 
 /** Ocorrências que esta pessoa pode ver. Gestão vê tudo; Miss vê o que criou, o que
     aguarda a sua ciência e o que já passou por ela. */
+/* Antes esta função tinha a sua própria versão da regra, mais frouxa que a da tela:
+   mandava à Miss todo registro cuja cadeia citasse a turma dela, inclusive os que
+   ainda estavam na fila atrás de outra turma e que a interface escondia. Agora as
+   duas chamam a mesma função, e o que a tela esconde não sai do banco. */
 async function ocorrenciasDe(eu){
+  const { quemVe } = await regras();
   const linhas = await todas('SELECT dados FROM ocorrencias ORDER BY criado_em DESC');
-  const tudo = linhas.map(l => l.dados);
-  if(eu.papel === 'gestao') return tudo;
-  return tudo.filter(o => {
-    if(o.autorLogin === eu.login) return true;
-    if(eu.turma) return (o.chain || []).some(c => String(c.nivel).includes(eu.turma));
-    return false;
-  });
+  return linhas.map(l => l.dados).filter(o => quemVe(eu, o));
 }
 
 async function diretorio(){
@@ -275,18 +279,70 @@ async function removerAluno(eu, d){
 
 /* ---------- ocorrências ---------- */
 
+/* Para quem vai a ciência. O navegador já calcula isto para mostrar na revisão, mas
+   quem grava é o servidor: a cadeia decide quem lê o registro depois, e uma cadeia
+   escolhida pelo cliente seria permissão escolhida pelo cliente. Mesma função dos
+   dois lados — regras.mjs —, então a tela e o banco não divergem. */
+async function cadeiaDoServidor(eu, oc){
+  const { montarDestinos, paraCadeia } = await regras();
+
+  const ids = (oc.envolvidos || []).map(e => e.kid).filter(Boolean);
+  const alunos = ids.length
+    ? await todas(`SELECT id, turma FROM alunos WHERE id = ANY($1)`, [ids])
+    : [];
+  const turmaDe = Object.fromEntries(alunos.map(a => [a.id, a.turma || '']));
+  const turmas = [...new Set((oc.envolvidos || [])
+    .map(e => turmaDe[e.kid] || e.turma || '').filter(Boolean))];
+
+  const ativos = await todas(
+    `SELECT nome, turma FROM contas WHERE papel='miss' AND status='ativo'`);
+  const missDaTurma = t => ativos.find(c => c.turma === t) || null;
+
+  /* "Já apareceu antes" conta registro anterior de qualquer criança envolvida. */
+  const linhas = ids.length
+    ? await todas('SELECT dados FROM ocorrencias WHERE id <> $1', [oc.id])
+    : [];
+  const temAnterior = linhas.some(l =>
+    ((l.dados || {}).envolvidos || []).some(e => ids.includes(e.kid)));
+
+  return paraCadeia(montarDestinos({
+    papelAutor: eu.papel, turmaAutor: eu.turma || '', turmas, missDaTurma,
+    temAnterior, sev: Number(oc.sev) || 0, temFoto: !!oc.foto
+  }));
+}
+
 async function salvarOcorrencia(eu, d){
   const oc = d.ocorrencia;
   if(!oc || !oc.id) throw new ErroApi('Ocorrência sem identificador.', 'dados');
-  const existe = await uma('SELECT autor_login FROM ocorrencias WHERE id=$1', [oc.id]);
+  const existe = await uma('SELECT autor_login, dados FROM ocorrencias WHERE id=$1', [oc.id]);
   if(existe){
-    /* Antes qualquer conta autenticada sobrescrevia qualquer ocorrência, inclusive uma
-       que nem consegue ver. podeVer já expressa a permissão certa: autora, gestão, ou
-       quem está na cadeia de ciência. */
-    if(!await podeVer(eu, oc.id))
+    /* Quem pode escrever é quem pode ver: a autora corrige, e quem está na cadeia
+       registra a própria ciência. Antes isto usava podeVer de foto.js — a regra do
+       anexo, emprestada por conveniência; agora é a mesma regra da listagem.
+
+       Não é podeCorrigir de propósito: dar ciência também é uma escrita, e vem de
+       quem não é a autora. */
+    const { quemVe } = await regras();
+    if(!quemVe(eu, existe.dados || {}))
       throw new ErroApi('Você não pode alterar este registro.', 'permissao', 403);
     await consultar('UPDATE ocorrencias SET dados=$1 WHERE id=$2', [oc, oc.id]);
   } else {
+    /* Registro novo: a autoria e a cadeia são do servidor, não do que chegou. A
+       gestão registra e encerra no mesmo ato, e montarDestinos já diz isso. */
+    oc.autorLogin = eu.login;
+    oc.autor = eu.nome;
+    oc.autorPapel = eu.papel;
+    const agora = new Date();
+    if(eu.papel === 'gestao'){
+      oc.chain = [{ nivel:'Gestão', st:'ok', quandoISO: agora.toISOString(),
+        quando: agora.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }),
+        parecer:'Registrado e encerrado pela gestão.' }];
+      oc.status = 'concluido';
+    } else {
+      oc.chain = await cadeiaDoServidor(eu, oc);
+      oc.status = 'aguarda_miss';
+    }
+    if(!oc.criadoEm) oc.criadoEm = agora.toISOString();
     await consultar('INSERT INTO ocorrencias (id,dados,autor_login) VALUES ($1,$2,$3)',
       [oc.id, oc, eu.login]);
   }

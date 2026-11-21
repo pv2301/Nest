@@ -8,10 +8,9 @@
    Não inventa permissão: quem decide o que aparece é visiveis(), de core.js. Quem
    diz a data de uma ocorrência é quandoDe(), de metricas.js. */
 
-import { S, app, registrarTela, ir, render, rodape, visiveis } from './core.js';
-import { esc } from './util.js';
+import { S, app, render, visiveis } from './core.js';
 import { quandoDe } from './metricas.js';
-import { itemHTML } from './telas-registro.js';
+import { itemHTML } from './telas-comum.js';
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -108,7 +107,7 @@ function ano(mapa, c){
 }
 
 /* ---------------------------------------------------------------- tela */
-registrarTela('calendario', () => {
+export function corpoCalendario(){
   const c = estado();
   const mapa = porDia();
   const ref = daChave(c.ref);
@@ -146,9 +145,8 @@ registrarTela('calendario', () => {
       ${doDia.length ? doDia.map(o => itemHTML(o)).join('')
         : `<p class="fs12 muted" style="margin:0">Nenhum registro neste dia.</p>`}
     </div>`}
-    ${rodape()}
   </div>`;
-});
+}
 
 app.calModo = m => { estado().modo = m; render(); };
 app.calDia = k => { const c = estado(); c.dia = k; c.ref = k; render(); };

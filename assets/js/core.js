@@ -4,6 +4,7 @@
 import { CONFIG } from '../../config.js';
 import { Store, perfil, temFuncao } from './store.js';
 import { esc, SEAL, ICON, svgIc, confRodape } from './util.js';
+import { quemVe, aguardaCiencia } from './regras.mjs';
 
 export { temFuncao };
 
@@ -206,13 +207,11 @@ export function abas(){
 export function entradasGestao(c = S.conta){
   if(!c) return [];
   const e = [];
+  /* Painel e Calendário eram duas entradas para o mesmo conjunto de dados. Hoje são
+     guias de uma tela só, então o índice tem uma linha. */
   if(temFuncao(c, 'painel'))
-    e.push({ tela:'painel', ic:ICON.painel, nome:'Painel', sub:'Estatísticas do período' });
-  /* Da gestão, como pedido. Sem a condição, uma Miss sem função nenhuma passava a
-     ver a aba Gestão só por causa desta entrada. */
-  if(c.papel === 'gestao')
-    e.push({ tela:'calendario', ic:ICON.horario, nome:'Calendário',
-             sub:'Os registros dia a dia' });
+    e.push({ tela:'visao', ic:ICON.painel, nome:'Visão geral',
+             sub:'Destaques, calendário e estatísticas' });
   if(c.papel === 'gestao'){
     const ativos = S.alunos.filter(a => a.ativo !== false).length;
     e.push({ tela:'alunos', ic:ICON.alunos, nome:'Alunos e turmas',
@@ -221,10 +220,9 @@ export function entradasGestao(c = S.conta){
     e.push({ tela:'usuarios', ic:ICON.usuarios, nome:'Usuários', n,
              sub: n ? `${n} ${n === 1 ? 'conta aguardando' : 'contas aguardando'}` : `${S.contas.length} com acesso` });
   }
-  if(temFuncao(c, 'horario'))
-    e.push({ tela:'horario', ic:ICON.horario, nome:'Quadro horário', sub:'Quem está em qual turma' });
-  if(temFuncao(c, 'relacoes'))
-    e.push({ tela:'relacoes', ic:ICON.relacoes, nome:'Relações', sub:'Vínculo entre Miss e crianças' });
+  /* Quadro horário e Relações continuam no código, com as funções que as concedem,
+     mas saem do índice até existirem de verdade: eram duas portas que não levavam a
+     lugar nenhum. Religar é descomentar. */
   return e;
 }
 
@@ -238,13 +236,7 @@ export const nomesTurmas = () => S.turmas.map(t => t.nome);
 
 /** Registros aguardando a ciência desta pessoa. */
 export function filaDe(u){
-  return S.ocs.filter(o => {
-    const n = (o.chain || []).find(c => c.st === 'now');
-    if(!n) return false;
-    if(u.papel === 'gestao') return n.nivel.startsWith('Gestão');
-    if(u.papel === 'miss')   return !!u.turma && n.nivel.includes(u.turma);
-    return false;
-  });
+  return S.ocs.filter(o => aguardaCiencia(u, o));
 }
 
 export function meusRegistros(u){
@@ -252,14 +244,10 @@ export function meusRegistros(u){
   return S.ocs.filter(o => o.autorLogin === u.login);
 }
 
+/* A regra vive em regras.mjs, usada também pelo servidor: eram duas implementações
+   que discordavam, e o navegador recebia registro que a tela escondia. */
 export function visiveis(u){
-  if(u.papel === 'gestao') return S.ocs;
-  const fila = filaDe(u).map(o => o.id);
-  return S.ocs.filter(o =>
-    o.autorLogin === u.login ||
-    fila.includes(o.id) ||
-    (u.papel === 'miss' && !!u.turma && (o.chain || []).some(c => c.nivel.includes(u.turma) && c.st === 'ok'))
-  );
+  return S.ocs.filter(o => quemVe(u, o));
 }
 
 /* ---------- render ---------- */
@@ -273,10 +261,12 @@ function barraSuperior(){
     detalhe:'Ocorrência ' + (S.detalhe || ''), usuario:'Usuário',
     conta:'Minha conta', alunos:'Alunos e turmas', aluno:'Aluno', ficha:'Gerar relatório',
     ajuda:'Como funciona', gestao:'Gestão', calendario:'Calendário',
+    visao:'Visão geral',
     turma:'Turma' + (S.turmaSel && S.turmaSel.nome ? ' ' + S.turmaSel.nome : '')
   };
   const comVoltar = ['detalhe','novo','rapido','wizard','usuario','conta','aluno','ficha','ajuda',
-    'painel','alunos','usuarios','horario','relacoes','turma','calendario'].includes(S.tela);
+    'painel','alunos','usuarios','horario','relacoes','turma','calendario',
+    'visao'].includes(S.tela);
   const esquerda = comVoltar
     ? `<button class="back" onclick="app.voltar()" aria-label="Voltar">&lsaquo;</button>`
     : `<button class="avatar" onclick="app.ir('conta')" title="${esc(c.nome)}">${esc(c.ini)}</button>`;

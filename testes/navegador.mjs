@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const SUITES = ['navegador-busca.mjs', 'navegador-relatorio.mjs', 'navegador-registro.mjs',
-                'navegador-vocabulario.mjs'];
+                'navegador-visao.mjs', 'navegador-vocabulario.mjs'];
 
 try {
   createRequire(import.meta.url)('playwright');

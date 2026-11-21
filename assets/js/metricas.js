@@ -3,7 +3,7 @@
 
    Antes o heatmap era uma constante com números inventados. Agora sai dos registros. */
 
-import { PERIODOS } from './dados.js';
+import { PERIODOS } from './vocabulario.js';
 
 /** Início do período, a partir de "agora". 'hoje' é a meia-noite de hoje, não 24h atrás. */
 export function inicioDoPeriodo(periodoId, agora = new Date()){

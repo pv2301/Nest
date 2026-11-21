@@ -9,7 +9,7 @@
 
 import { CONFIG } from '../../config.js';
 import { derivarChave, resumoLocal, carimbo, iniciais, primeiroNome } from './util.js';
-import { DEMO_CONTAS, DEMO_OCORRENCIAS, SEMENTE_ALUNOS, SEMENTE_TURMAS } from './dados.js';
+import { DEMO_CONTAS, DEMO_OCORRENCIAS, SEMENTE_ALUNOS, SEMENTE_TURMAS } from './demonstracao.js';
 
 const K = { contas:'reg.contas', ocs:'reg.ocorrencias', sessao:'reg.sessao',
             aparelho:'reg.aparelho', alunos:'reg.alunos', turmas:'reg.turmas',

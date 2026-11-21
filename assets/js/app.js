@@ -1,16 +1,17 @@
 /* Ponto de entrada. Decide a primeira tela e inicia o app. */
 
-import { CONFIG } from '../../config.js';
-import { S, render, ir, autenticar } from './core.js';
+import { S, render, autenticar } from './core.js';
 import { Store } from './store.js';
 import { criptoDisponivel } from './util.js';
 
 /* Os módulos de tela se registram ao serem importados. */
 import './telas-auth.js';
-import './telas-registro.js';
+import './telas-inicio.js';
+import './telas-formulario.js';
+import './telas-detalhe.js';
 import './telas-gestao.js';
 import './telas-relatorio.js';
-import './telas-calendario.js';
+import './telas-visao.js';
 
 function aplicarIdentidade(){
   const nome = S.escola.nome;

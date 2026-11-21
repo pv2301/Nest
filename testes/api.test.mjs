@@ -203,6 +203,69 @@ t('textoFamilia é guardado no registro',
 t('a descrição interna continua separada do texto da família',
   !!comTexto && comTexto.desc !== comTexto.textoFamilia);
 
+console.log('\n=== O servidor manda só o que a tela mostra ===');
+/* Antes o servidor tinha a sua própria versão da regra, mais frouxa: mandava à Miss
+   todo registro cuja cadeia citasse a turma dela, inclusive o que estava na fila
+   atrás de outra turma e que a interface escondia. Agora os dois lados chamam a
+   mesma função de regras.mjs. */
+/* Uma criança de cada turma, e a autora é de uma terceira: a cadeia nasce com a Miss
+   da Verde na vez e a da Azul atrás dela. Quem monta a cadeia é o servidor, então
+   aqui ela é consequência dos envolvidos, não um campo escolhido pelo cliente. */
+const CHAVE_A = 'e'.repeat(64);
+cookieAtual = cookieGestao;
+await chamar('salvarTurma', { turma:{ id:'t4', nome:'Amarela' } });
+await chamar('salvarAluno', { aluno:{ id:'c2', nome:'Davi Nunes', turma:'Azul' } });
+await chamar('criarConta', { nome:'Elisa Prado', login:'elisa.prado', chave:CHAVE_A, papel:'miss', turma:'Amarela' });
+await chamar('atualizarConta', { login:'elisa.prado', patch:{ status:'ativo', aprovadoPor:'tallita.lima' } });
+
+cookieAtual = '';
+await chamar('entrar', { login:'elisa.prado', chave:CHAVE_A });
+const ocFila = { id:'9003', tipo:'Empurrão', sev:2,
+  envolvidos:[{ kid:'c1', papel:'Sofreu', turma:'Verde' },
+              { kid:'c2', papel:'Causou', turma:'Azul' }],
+  /* Cadeia mentirosa de propósito: se o servidor a aceitasse, a autora escolheria
+     quem lê o registro. */
+  chain:[{ nivel:'Gestão', st:'ok' }] };
+r = await chamar('salvarOcorrencia', { ocorrencia: ocFila });
+t('registro com duas turmas foi gravado', r.ok === true, JSON.stringify(r));
+
+const cadeia = (r.dados || {}).chain || [];
+t('o servidor ignorou a cadeia do cliente',
+  cadeia.length === 3 && cadeia[0].st === 'now' && cadeia[0].nivel.includes('Verde'),
+  JSON.stringify(cadeia));
+t('a Miss da outra turma entra atrás, não junto',
+  cadeia[1] && cadeia[1].st === 'wait' && cadeia[1].nivel.includes('Azul'),
+  JSON.stringify(cadeia));
+t('e a gestão fecha a fila', cadeia[2] && cadeia[2].nivel === 'Gestão', JSON.stringify(cadeia));
+t('a autoria também é do servidor, não do que chegou',
+  (r.dados || {}).autorLogin === 'elisa.prado', JSON.stringify((r.dados || {}).autorLogin));
+
+cookieAtual = '';
+r = await chamar('entrar', { login:'bianca.rocha', chave:CHAVE_Z });
+const cookieAzul = cookieAtual;
+r = await chamar('ocorrencias');
+t('a Miss na fila NÃO recebe o registro',
+  r.ok && !r.dados.some(o => o.id === '9003'),
+  JSON.stringify(r.dados && r.dados.map(o => o.id)));
+
+cookieAtual = '';
+r = await chamar('entrar', { login:'carolina.mendes', chave:CHAVE_M });
+r = await chamar('ocorrencias');
+t('a Miss da vez recebe', r.ok && r.dados.some(o => o.id === '9003'));
+
+/* A vez passa para a turma Azul. A cadeia que vale é a que o servidor montou, não a
+   que o cliente mandou — então é dela que se parte. */
+cookieAtual = cookieGestao;
+await chamar('salvarOcorrencia', { ocorrencia: { ...ocFila,
+  chain:[ { ...cadeia[0], st:'ok' }, { ...cadeia[1], st:'now' }, cadeia[2] ] } });
+cookieAtual = cookieAzul;
+r = await chamar('ocorrencias');
+t('passada a vez, ela passa a receber', r.ok && r.dados.some(o => o.id === '9003'));
+
+r = await chamar('salvarOcorrencia', { ocorrencia: { ...ocFila, desc:'agora pode',
+  chain:[ { ...cadeia[0], st:'ok' }, { ...cadeia[1], st:'now' }, cadeia[2] ] } });
+t('e passa a poder escrever nele', r.ok === true, JSON.stringify(r));
+
 console.log('\n=== Remover aluno do cadastro ===');
 cookieAtual = cookieMiss;
 r = await chamar('removerAluno', { id:'c9' });

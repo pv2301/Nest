@@ -20,8 +20,8 @@ import { S, app, registrarTela, ir, toast, render, aluno } from './core.js';
 import { Store } from './store.js';
 import { escolha } from './escolha.js';
 import { esc, SEAL, iniciais, dataCompleta, soData, posicaoNome, trocarNomes } from './util.js';
-import { SEVL } from './dados.js';
-import { tipoDe, localDe } from './telas-registro.js';
+import { SEVL } from './vocabulario.js';
+import { tipoDe, localDe } from './telas-comum.js';
 
 app.abrirFicha = id => {
   const o = S.ocs.find(x => x.id === id);

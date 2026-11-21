@@ -1,135 +1,22 @@
-/* Telas do registro: início, novo, wizard, listas, fila de ciência, detalhe e painel. */
+/* O formulário: registro rápido, registro completo em passos, e o que os dois
+   precisam — seleção de crianças, quando e onde, descrição, foto, e o envio.
 
-import { S, app, registrarTela, ir, toast, render, recarregar, rodape, otimista,
-         filaDe, meusRegistros, visiveis, posRender, temFuncao, aluno, nomesTurmas,
-         avancarPasso, voltar, rascunhoGuardado } from './core.js';
+   O roteamento da ciência mora aqui porque é a revisão que o mostra, mas quem decide
+   é regras.mjs, e quem grava a cadeia é o servidor: este lado só exibe. */
+
+import { S, app, registrarTela, ir, toast, render, rodape, otimista, aluno,
+         nomesTurmas, avancarPasso, voltar } from './core.js';
 import { Store } from './store.js';
 import { escolha } from './escolha.js';
-import { esc, semAcento, quandoLegivel, agoraHora, iniciais, ICON, svgIc,
-         tituloNome } from './util.js';
+import { montarDestinos, paraCadeia, oQueFalta, podeCorrigir } from './regras.mjs';
+import { esc, quandoLegivel, agoraHora, iniciais, tituloNome } from './util.js';
 import { CONFIG } from '../../config.js';
 import { CATS, OUTRO, EXEMPLOS, LOCAIS, PROVIDENCIAS, CONDICOES, REGIOES,
-         PAPEIS_ENVOLVIDO, CANAIS_INFORME, SEVL, JULGAMENTO, PERIODOS } from './dados.js';
-import { filtraPorPeriodo, agregaPorHoraLocal, contaPor, recorrencia, paresRecorrentes,
-         resumo, quandoDe } from './metricas.js';
-
-const sevTag = n => `<span class="sev n${n}">${n} · ${SEVL[n]}</span>`;
-const tipoDe = o => o.tipo === OUTRO && o.tipoOutro ? o.tipoOutro : o.tipo;
-const localDe = o => o.local === OUTRO && o.localOutro ? o.localOutro : (o.local || 'Não informado');
-const quandoTexto = o => o.quandoISO ? quandoLegivel(o.quandoISO) : (o.quando || '—');
-
-function statusPill(o){
-  if(o.status === 'concluido')      return '<span class="pill done">&check; Concluído</span>';
-  if(o.status === 'acompanhamento') return '<span class="pill follow">Em acompanhamento</span>';
-  if(o.status === 'complemento')    return '<span class="pill wait">Requer complemento</span>';
-  const n = (o.chain || []).find(c => c.st === 'now');
-  return `<span class="pill wait">Aguarda ciência · ${esc(n ? n.nivel.split(' (')[0] : '—')}</span>`;
-}
-
-function itemHTML(o){
-  const nomes = (o.envolvidos || []).map(e => aluno(e.kid).nome).join(' · ');
-  return `<button class="item n${o.sev}" onclick="app.abrirOc('${esc(o.id)}')">
-    <span class="stripe"></span>
-    <div class="row" style="gap:8px;margin-bottom:5px"><h4 class="grow">${esc(tipoDe(o))}</h4>${sevTag(o.sev)}</div>
-    <div class="fs12 muted" style="margin-bottom:7px">${esc(nomes)} · ${esc(localDe(o))} · ${esc(quandoTexto(o))}</div>
-    <div class="row" style="gap:6px;flex-wrap:wrap">${statusPill(o)}
-      ${o.duas ? '<span class="pill">2 turmas</span>' : ''}
-      ${o.demo ? '<span class="pill demo">demonstração</span>' : ''}</div>
-  </button>`;
-}
-
-app.abrirOc = id => { S.detalhe = id; ir('detalhe'); };
-
-/* Primeiro acesso da gestão caía numa tela vazia sem rumo. */
-function primeirosPassos(u){
-  if(u.papel !== 'gestao') return '';
-  const passos = [
-    { ok: S.turmas.length > 0,  txt:'Cadastre as turmas',           tela:'alunos' },
-    { ok: S.alunos.length > 0,  txt:'Cadastre os alunos',           tela:'alunos' },
-    { ok: S.contas.filter(c => c.status === 'ativo').length > 1, txt:'Compartilhe o link com a equipe', tela:'usuarios' }
-  ];
-  if(passos.every(p => p.ok)) return '';
-  return `<div class="card flat stack s8">
-    <p class="sec-label" style="margin:0">Para começar</p>
-    ${passos.map(p => `<button class="row" style="gap:9px;width:100%;text-align:left" onclick="app.ir('${p.tela}')">
-      <span class="bx-passo ${p.ok ? 'ok' : ''}">${p.ok ? '&check;' : ''}</span>
-      <span class="fs13 grow" style="${p.ok ? 'opacity:.55;text-decoration:line-through' : ''}">${p.txt}</span>
-      ${p.ok ? '' : '<span class="fs11 muted">abrir</span>'}
-    </button>`).join('')}
-  </div>`;
-}
-
-const vazio = (titulo, texto) =>
-  `<div class="empty"><div class="big">${esc(titulo)}</div><p class="fs12" style="margin:0">${esc(texto)}</p></div>`;
-
-/* ---------------------------------------------------------------- início */
-registrarTela('home', () => {
-  const u = S.conta, fila = filaDe(u), meus = meusRegistros(u).slice(0, 3);
-  let out = '<div class="stack s18">';
-  if(u.trocarSenha) out += `<div class="notice info"><span class="ic">◆</span><div>Sua senha é temporária. <b onclick="app.ir('trocarSenha')" style="text-decoration:underline;cursor:pointer">Defina uma nova</b>.</div></div>`;
-
-  out += primeirosPassos(u);
-
-  /* Rascunho interrompido: o preenchimento é salvo sozinho, então dá para retomar. */
-  const r = rascunhoGuardado();
-  if(r) out += `<button class="rascunho" onclick="app.retomarRascunho()">
-    <span class="grow"><b>Continuar registro</b>
-      <span class="fs11">${esc(r.rascunho.tipo || r.rascunho.categoria || 'sem tipo ainda')} · começado ${esc(quandoLegivel(r.em))}</span></span>
-    <span class="acao-txt" role="button" tabindex="0"
-      onclick="event.stopPropagation();app.descartarRascunho()">Descartar</span>
-  </button>`;
-
-  out += `<button class="btn" style="padding:16px" onclick="app.ir('novo')">+ &nbsp;Registrar ocorrência</button>`;
-  if(fila.length) out += `<div><p class="sec-label">Aguardando sua ciência</p>
-      <div class="stack s8">${fila.map(o => itemHTML(o)).join('')}</div></div>`;
-  out += `<div><p class="sec-label">${u.papel === 'gestao' ? 'Últimos registros' : 'Meus registros'}</p>
-    <div class="stack s8">${meus.length ? meus.map(o => itemHTML(o)).join('')
-      : vazio('Nenhum registro ainda', 'O que você registrar aparece aqui, com o estado da ciência.')}</div>
-    ${meus.length ? `<button class="btn ghost sm" style="width:100%;margin-top:9px" onclick="app.ir('lista')">Ver todos</button>` : ''}
-  </div>`;
-  return out + rodape() + '</div>';
-});
-
-/* ---------------------------------------------------------------- escolha do modo */
-registrarTela('novo', () => `<div class="stack">
-  <button class="item" style="padding:16px" onclick="app.iniciar('rapido')">
-    <div class="row" style="margin-bottom:5px"><h4 class="grow" style="font-size:15px">Registro rápido</h4><span class="pill">~40s</span></div>
-    <p class="fs12 muted" style="margin:0">Categoria, criança, gravidade e uma linha.</p>
-  </button>
-  <button class="item" style="padding:16px" onclick="app.iniciar('completo')">
-    <div class="row" style="margin-bottom:5px"><h4 class="grow" style="font-size:15px">Registro completo</h4><span class="pill">5 passos</span></div>
-    <p class="fs12 muted" style="margin:0">Envolvidos, horário, local, providências e foto.</p>
-  </button>
-</div>`);
-
-app.iniciar = modo => {
-  /* Sem isto, começar um registro logo depois de uma correção sobrescreveria o
-     registro corrigido: o envio ainda acharia que está editando. */
-  S.editando = null; S.tentouEnviar = false;
-  S.modoRegistro = modo; S.passo = 1; S.buscaAluno = ''; S.filtroTurma = '';
-  S.rascunho = { categoria:'', tipo:'', tipoOutro:'', envolvidos:[],
-                 quandoOpcao:'Agora', quandoISO:new Date().toISOString(),
-                 local:'', localOutro:'', sev:0, presenciou:true,
-                 informanteNome:'', informanteCanal:'', desc:'', prov:[], foto:false,
-                 cond:{}, lesao:{} };
-  ir(modo === 'rapido' ? 'rapido' : 'wizard');
-};
+         PAPEIS_ENVOLVIDO, CANAIS_INFORME, SEVL, JULGAMENTO } from './vocabulario.js';
+import { sevTag, vazio } from './telas-comum.js';
 
 /* ---------------------------------------------------------------- o que falta */
-/* Cada falta diz também QUAL campo ficou em branco, para o campo poder se marcar.
-   Antes o aviso vinha só no topo e a pessoa tinha de caçar na tela qual era. */
-function faltas(d){
-  const f = [];
-  if(!d.categoria) f.push({ passo:1, campo:'categoria', texto:'Escolher a categoria' });
-  else if(!d.tipo) f.push({ passo:1, campo:'tipo', texto:'Escolher o tipo' });
-  if(d.tipo === OUTRO && !String(d.tipoOutro).trim()) f.push({ passo:1, campo:'tipoOutro', texto:'Descrever o tipo em "Outro"' });
-  if(!d.sev) f.push({ passo:1, campo:'gravidade', texto:'Escolher a gravidade' });
-  if(!d.envolvidos.length) f.push({ passo:2, campo:'criancas', texto:'Selecionar ao menos uma criança' });
-  else if(d.envolvidos.some(e => !e.papel)) f.push({ passo:2, campo:'papel', texto:'Marcar o papel de cada criança' });
-  if(String(d.desc).trim().length <= 8) f.push({ passo:3, campo:'descricao', texto:'Escrever a descrição do ocorrido' });
-  if(!d.presenciou && !String(d.informanteNome).trim()) f.push({ passo:3, campo:'informante', texto:'Informar quem relatou' });
-  return f;
-}
+const faltas = oQueFalta;
 
 /** Texto da falta daquele campo, ou vazio.
 
@@ -590,47 +477,24 @@ function missDaTurma(turma){
 }
 
 function destinoCiencia(){
-  const u = S.conta, d = S.rascunho, out = [];
+  const u = S.conta, d = S.rascunho;
   const turmas = [...new Set(d.envolvidos.map(e => e.turma || aluno(e.kid).turma).filter(Boolean))];
-
-  if(u.papel === 'gestao'){
-    out.push({ q:'Encerrado por você', p:'A gestão registra e conclui no mesmo ato' });
-    return out;
-  }
-  /* Ciência paralela: uma Miss por turma envolvida, exceto a própria autora. */
-  turmas.forEach(t => {
-    if(u.papel === 'miss' && u.turma === t) return;
-    const m = missDaTurma(t);
-    out.push(m
-      ? { q: `${m.nome} (Turma ${t})`, p:'Confirma a gravidade e acrescenta o contexto' }
-      : { q: `Gestão (Turma ${t} sem Miss ativa)`, p:'Nenhuma Miss cadastrada para esta turma' });
-  });
-
-  const recentes = d.envolvidos.some(e => S.ocs.some(o => (o.envolvidos || []).some(x => x.kid === e.kid)));
-  const gatilho = d.sev > 1 || d.foto || recentes;
-  if(gatilho || !CONFIG.REGRAS.nivel1EncerraNaMiss)
-    out.push({ q:'Gestão', p: d.sev > 1 ? 'Gravidade ' + d.sev : 'Gatilho: foto anexada ou registro recente' });
-  else
-    out.push({ q:'Encerra na Miss', p:'Nível 1 sem gatilho · entra no resumo diário da gestão' });
-
-  return out;
+  const temAnterior = d.envolvidos.some(e =>
+    S.ocs.some(o => (o.envolvidos || []).some(x => x.kid === e.kid)));
+  /* Quem decide é regras.mjs; aqui só se junta o que ela precisa saber. O servidor
+     refaz a mesma conta com os mesmos dados. */
+  return montarDestinos({
+    papelAutor:u.papel, turmaAutor:u.turma, turmas,
+    missDaTurma, temAnterior, sev:d.sev, temFoto:!!d.foto
+  }).map(x => ({ q:x.nivel, p:x.nota, encerra:x.encerra }));
 }
 
-/** Quem corrige: a autora enquanto ninguém deu ciência, e a gestão sempre. É o mesmo
-    conjunto que a guarda do servidor já autoriza em salvarOcorrencia. */
-function podeCorrigir(o){
-  const u = S.conta;
-  if(!u || !o) return false;
-  if(u.papel === 'gestao') return true;
-  if(o.autorLogin !== u.login) return false;
-  return !(o.chain || []).some(c => c.st === 'ok');
-}
 
 /** Reabre o formulário com o registro preenchido. O registro guarda cond e lesao
     achatados dentro de cada envolvido; o formulário os quer como mapas por criança. */
 app.corrigirRegistro = id => {
   const o = S.ocs.find(x => x.id === id);
-  if(!o || !podeCorrigir(o)) return;
+  if(!o || !podeCorrigir(S.conta, o)) return;
   const cond = {}, lesao = {};
   for(const e of (o.envolvidos || [])){
     if(e.cond && e.cond !== '—') cond[e.kid] = e.cond;
@@ -653,13 +517,9 @@ app.corrigirRegistro = id => {
   ir('wizard');
 };
 
-/** A cadeia de ciência que o conteúdo atual do formulário pede. */
+/** A cadeia que o conteúdo atual do formulário pede. */
 function cadeiaNova(){
-  const c = destinoCiencia()
-    .filter(x => !x.q.startsWith('Encerra'))
-    .map((x, i) => ({ nivel: x.q.startsWith('Encerrado') ? 'Gestão' : x.q,
-                      st: i === 0 ? 'now' : 'wait' }));
-  return c.length ? c : [{ nivel:'Gestão', st:'now' }];
+  return paraCadeia(destinoCiencia().map(x => ({ nivel:x.q, encerra:x.encerra })));
 }
 
 app.enviar = async () => {
@@ -738,266 +598,3 @@ app.enviar = async () => {
       : `Registro #${id} enviado para ciência`
   );
 };
-
-/* ---------------------------------------------------------------- listas */
-/* Só o resultado: a digitação reescreve esta parte, nunca o campo de busca. */
-function resultadoLista(){
-  const q = semAcento(String(S.buscaLista || '')).toLowerCase();
-  let v = visiveis(S.conta);
-  if(q) v = v.filter(o =>
-    (o.envolvidos || []).some(e => semAcento(aluno(e.kid).nome).toLowerCase().includes(q) ||
-                                    semAcento(aluno(e.kid).turma || '').toLowerCase().includes(q)) ||
-    semAcento(tipoDe(o)).toLowerCase().includes(q));
-  return v.length ? v.map(o => itemHTML(o)).join('')
-    : vazio('Nenhum registro', q ? 'Nada corresponde a essa busca.'
-        : 'Assim que houver registros visíveis para você, eles aparecem aqui.');
-}
-
-registrarTela('lista', () => {
-  return `<div class="stack s18">
-    <div class="busca">
-      <span class="ic">${svgIc(ICON.busca)}</span>
-      <input class="input" id="b-lista" placeholder="Buscar por aluno, turma ou tipo" value="${esc(S.buscaLista || '')}"
-             oninput="app.buscarLista(this.value)">
-    </div>
-    <div class="stack s8" id="lista-registros">${resultadoLista()}</div>
-    ${rodape()}
-  </div>`;
-});
-
-app.buscarLista = v => {
-  S.buscaLista = v;
-  const alvo = document.getElementById('lista-registros');
-  if(alvo) alvo.innerHTML = resultadoLista();
-};
-
-registrarTela('ciencia', () => {
-  const fila = filaDe(S.conta).slice().sort((a, b) => b.sev - a.sev);
-  if(!fila.length) return `<div class="stack s18">
-    <div class="notice calm"><span class="ic">&check;</span><div>Nada aguardando a sua ciência.</div></div>${rodape()}</div>`;
-  return `<div class="stack s18">
-    <p class="fs12 muted" style="margin:0">Ordenado por gravidade.</p>
-    <div class="stack s8">${fila.map(o => itemHTML(o)).join('')}</div>
-    ${rodape()}
-  </div>`;
-});
-
-/* ---------------------------------------------------------------- detalhe */
-function fotoBloco(o){
-  const gestao = S.conta.papel === 'gestao';
-  if(o.fotoPurgada) return `<div class="photo" style="border-style:solid">Foto apagada em ${esc(o.fotoPurgada)}</div>`;
-  if(o.preservado) return `<div class="photo">1 foto · <b>preservada por decisão da gestão</b><br><span class="fs11">Fora da exclusão automática · acesso em log</span></div>`
-    + (gestao ? `<button class="btn ghost sm" style="width:100%;margin-top:8px" onclick="app.preservar('${esc(o.id)}',false)">Voltar à retenção de ${CONFIG.REGRAS.retencaoFotoDias} dias</button>` : '');
-  const url = o.fotoId ? Store.urlFoto(o.fotoId) : null;
-  return (url
-      ? `<div class="fotobox"><img src="${esc(url)}" alt="Foto da lesão" loading="lazy"></div>`
-      : `<div class="photo">1 foto registrada</div>`)
-    + (gestao ? `<button class="btn ghost sm" style="width:100%;margin-top:8px" onclick="app.preservar('${esc(o.id)}',true)">Preservar anexo (exceção)</button>` : '');
-}
-
-registrarTela('detalhe', () => {
-  const o = S.ocs.find(x => x.id === S.detalhe), u = S.conta;
-  if(!o) return vazio('Registro não encontrado', 'Ele pode ter sido removido.');
-  const souDestino = filaDe(u).some(x => x.id === o.id);
-
-  return `<div class="stack s18">
-    <div>
-      <div class="row" style="gap:8px;margin-bottom:7px;flex-wrap:wrap">${sevTag(o.sev)}${statusPill(o)}${o.duas ? '<span class="pill">2 turmas</span>' : ''}${o.demo ? '<span class="pill demo">demonstração</span>' : ''}</div>
-      <h1 style="font-size:19px">${esc(tipoDe(o))}</h1>
-      <p class="fs12 muted" style="margin:4px 0 0">#${esc(o.id)} · ${esc(o.categoria || '—')} · ${esc(localDe(o))} · ${esc(quandoTexto(o))}</p>
-      <p class="fs12 muted" style="margin:2px 0 0">Registrado por ${esc(o.autor)}${o.presenciou
-        ? ' · presenciou'
-        : ' · informada por ' + esc((o.informante && o.informante.nome) || 'terceiros') + ((o.informante && o.informante.canal) ? ' (' + esc(o.informante.canal) + ')' : '')}</p>
-    </div>
-
-    <div><p class="sec-label">Crianças envolvidas</p><div class="stack s8">
-      ${(o.envolvidos || []).map(e => `<div class="card flat">
-        <div class="row" style="margin-bottom:6px"><span class="avatar sm">${esc(iniciais(aluno(e.kid).nome))}</span>
-          <b class="fs13 grow">${esc(aluno(e.kid).nome)}</b><span class="pill">${esc(e.papel || '—')}</span></div>
-        <div class="fs12 muted">Turma ${esc(e.turma || aluno(e.kid).turma || '—')} · ${esc(e.cond)}${e.lesao ? ' · marca em ' + esc(e.lesao) : ''}</div>
-      </div>`).join('')}</div></div>
-
-    <div><p class="sec-label">Descrição</p><p class="fs13" style="margin:0">${esc(o.desc)}</p></div>
-
-    ${(o.prov || []).length ? `<div><p class="sec-label">Providências</p><div class="chips">
-      ${o.prov.map(p => `<span class="pill">${esc(p)}</span>`).join('')}</div></div>` : ''}
-
-    ${o.foto ? `<div><p class="sec-label">Anexo</p>${fotoBloco(o)}</div>` : ''}
-
-    <div><p class="sec-label">Cadeia de ciência</p><div class="chain">
-      ${(o.chain || []).map((c, i) => `<div class="node ${c.st}">
-        <div class="gut"><div class="dot ${c.st === 'ok' ? 'ok' : c.st === 'now' ? 'now' : ''}">${c.st === 'ok' ? '&check;' : i+1}</div>${i < o.chain.length-1 ? `<div class="line ${c.st === 'ok' ? 'done' : ''}"></div>` : ''}</div>
-        <div class="body"><b class="fs13">${esc(c.nivel)}</b>
-          <div class="fs11 muted">${c.st === 'ok'
-            ? 'Ciência em ' + esc(c.quandoISO ? quandoLegivel(c.quandoISO) : c.quando)
-            : c.st === 'now' ? 'Aguardando' : 'Na fila'}</div>
-          ${c.parecer ? `<p class="fs12" style="margin:6px 0 0;padding:8px 10px;background:var(--surface-2);border-radius:9px">${esc(c.parecer)}</p>` : ''}
-        </div></div>`).join('')}</div></div>
-
-    ${o.acomp ? `<div class="notice info"><span class="ic">◆</span><div><b>Acompanhamento:</b> ${esc(o.acomp)}</div></div>` : ''}
-
-    <button class="btn soft" onclick="app.abrirFicha('${esc(o.id)}')">
-      ${svgIc(ICON.exportar).replace('<svg','<svg width="17" height="17"')} Gerar relatório</button>
-
-    ${podeCorrigir(o) ? `<button class="btn ghost" onclick="app.corrigirRegistro('${esc(o.id)}')">Corrigir registro</button>`
-      : (o.autorLogin === u.login
-        ? `<p class="fs11 muted center" style="margin:0">Registro travado pela ciência.</p>` : '')}
-
-    ${souDestino ? `<div class="card lift stack s8" style="border-color:var(--accent-text)">
-      <p class="sec-label" style="margin:0">Sua ciência</p>
-      <div><p class="fs12 muted" style="margin:0 0 6px">Confirme ou corrija a gravidade</p>
-        <div class="sevpick">${[1,2,3,4].map(n => `<button data-n="${n}" aria-pressed="${o.sev === n}" onclick="app.mudarSev('${esc(o.id)}',${n})"><b>${n}</b><small>${SEVL[n]}</small></button>`).join('')}</div></div>
-      <div class="field"><label for="d-par">Parecer ou orientação (opcional)</label>
-        <textarea class="input" id="d-par" style="min-height:66px" placeholder="Volta visível para quem registrou." spellcheck="true" autocorrect="on" autocapitalize="sentences"></textarea></div>
-      <button class="btn" onclick="app.darCiencia('${esc(o.id)}')">&check; Dar ciência</button>
-      <button class="btn ghost" onclick="app.pedirComplemento('${esc(o.id)}')">Pedir complemento</button>
-    </div>` : ''}
-
-    ${u.papel === 'gestao' && !souDestino && o.status !== 'concluido' ? `<div class="card stack s8">
-      <button class="btn soft" onclick="app.marcarComunicacao('${esc(o.id)}')">Registrar comunicação com a família</button>
-    </div>` : ''}
-
-    ${rodape()}
-  </div>`;
-});
-
-/* O registro já está alterado em memória: basta gravá-lo. Buscar tudo de novo aqui
-   custava mais de 12 segundos por causa das idas ao Apps Script. */
-function salvar(o, msg, voltarPara){
-  return otimista(
-    () => { if(voltarPara){ S.detalhe = null; ir(voltarPara, { guardar:false }); } },
-    () => Store.salvarOcorrencia(o),
-    msg
-  );
-}
-
-app.mudarSev = (id, n) => {
-  const o = S.ocs.find(x => x.id === id); if(!o) return;
-  o.sev = n; salvar(o, 'Gravidade ajustada para nível ' + n);
-};
-
-app.darCiencia = id => {
-  const o = S.ocs.find(x => x.id === id), u = S.conta; if(!o) return;
-  const par = (document.getElementById('d-par') || {}).value || '';
-  const i = o.chain.findIndex(c => c.st === 'now'); if(i < 0) return;
-  o.chain[i].st = 'ok';
-  /* Guarda o instante, não o texto: "Hoje, 22:47" gravado em texto continuava dizendo
-     "Hoje" meses depois, na tela e no papel. */
-  o.chain[i].quandoISO = new Date().toISOString();
-  o.chain[i].quando = quandoLegivel(o.chain[i].quandoISO);
-  if(par.trim()) o.chain[i].parecer = par.trim();
-  const prox = o.chain.findIndex(c => c.st === 'wait');
-  if(prox >= 0){ o.chain[prox].st = 'now'; o.status = 'aguarda_miss'; }
-  else {
-    o.status = u.papel === 'gestao' ? 'acompanhamento' : 'concluido';
-    if(u.papel === 'gestao') o.acomp = 'Definir encaminhamento · ' + u.curto;
-  }
-  salvar(o, prox >= 0 ? 'Ciência registrada. Segue para ' + o.chain[prox].nivel.split(' (')[0]
-    : 'Ciência registrada. ' + (u.papel === 'gestao' ? 'Registro em acompanhamento' : 'Registro concluído'), 'ciencia');
-};
-
-app.pedirComplemento = id => {
-  const o = S.ocs.find(x => x.id === id); if(!o) return;
-  o.status = 'complemento';
-  salvar(o, 'Devolvido a ' + String(o.autor).split(' ')[0] + ' · edição reaberta', 'ciencia');
-};
-
-app.preservar = (id, v) => {
-  const o = S.ocs.find(x => x.id === id); if(!o) return;
-  o.preservado = v;
-  salvar(o, v ? 'Anexo preservado · fora da exclusão automática' : 'Anexo volta à retenção padrão');
-};
-
-app.marcarComunicacao = id => {
-  const o = S.ocs.find(x => x.id === id); if(!o) return;
-  o.acomp = 'Família comunicada em ' + quandoLegivel(new Date().toISOString());
-  salvar(o, 'Comunicação com a família registrada');
-};
-
-/* ---------------------------------------------------------------- painel */
-app.periodo = p => { S.periodo = p; render(); };
-
-registrarTela('painel', () => {
-  const ocs = filtraPorPeriodo(S.ocs, S.periodo);
-  const r = resumo(ocs);
-  const grade = agregaPorHoraLocal(ocs);
-  const tipos = contaPor(ocs, o => tipoDe(o), 6);
-  const maxTipo = tipos.length ? tipos[0][1] : 1;
-  const cats = contaPor(ocs, 'categoria', 5);
-  const maxCat = cats.length ? cats[0][1] : 1;
-  const rec = recorrencia(ocs).slice(0, 4);
-  const pares = paresRecorrentes(ocs).slice(0, 3);
-  const nomePeriodo = (PERIODOS.find(p => p.id === S.periodo) || {}).nome || '';
-
-  return `<div class="stack s18">
-    <div class="chips" role="group" aria-label="Período">
-      ${PERIODOS.map(p => `<button class="chip sm" aria-pressed="${S.periodo === p.id}" onclick="app.periodo('${p.id}')">${esc(p.nome)}</button>`).join('')}
-    </div>
-
-    <div class="tiles">
-      <div class="tile"><b>${r.total}</b><small>registros · ${esc(nomePeriodo.toLowerCase())}</small></div>
-      <div class="tile${r.aguardando ? ' mark' : ''}"><b>${r.aguardando}</b><small>aguardando ciência</small></div>
-      <div class="tile"><b>${r.graves}</b><small>níveis 3 e 4</small></div>
-      <div class="tile${r.acompanhamento ? ' mark3' : ''}"><b>${r.acompanhamento}</b><small>em acompanhamento</small></div>
-    </div>
-
-    ${!ocs.length ? vazio('Nenhum registro no período', 'Escolha um período maior, ou carregue os dados de demonstração na aba Alunos.') : `
-    <div class="card">
-      <p class="sec-label">Quando e onde acontece</p>
-      ${grade.linhas.length ? `
-      <div class="heat" id="heat" style="grid-template-columns:76px repeat(${grade.horas.length},1fr)">
-        <div></div>${grade.horas.map(h => `<div class="hh">${h}h</div>`).join('')}
-        ${grade.linhas.map(l => `<div class="rl" title="${esc(l.local)}">${esc(l.local)}</div>` +
-          l.celulas.map(n => `<div class="cell" data-n="${n}" data-max="${grade.max}">${n || ''}</div>`).join('')).join('')}
-      </div>
-      <div class="legend" style="margin-top:10px"><span><i style="background:var(--surface-2)"></i>0</span>
-        <span><i style="background:color-mix(in srgb,var(--teal) 44%,var(--surface))"></i>poucos</span>
-        <span><i style="background:var(--teal)"></i>${grade.max}</span></div>
-      `
-      : '<p class="fs12 muted" style="margin:0">Sem horário registrado no período.</p>'}
-    </div>
-
-    <div class="card">
-      <p class="sec-label">Por categoria</p>
-      <div class="bars">${cats.map(([t, n]) => `
-        <div><div class="bar-row"><span class="lab">${esc(t)}</span><span class="bar-n">${n}</span>
-          <div class="bar-track"><div class="bar-fill" style="width:${Math.round(n/maxCat*100)}%"></div></div></div></div>`).join('')}</div>
-    </div>
-
-    <div class="card">
-      <p class="sec-label">Tipos mais frequentes</p>
-      <div class="bars">${tipos.map(([t, n]) => `
-        <div><div class="bar-row"><span class="lab">${esc(t)}</span><span class="bar-n">${n}</span>
-          <div class="bar-track"><div class="bar-fill" style="width:${Math.round(n/maxTipo*100)}%"></div></div></div></div>`).join('')}</div>
-    </div>
-
-    ${rec.length ? `<div class="card">
-      <p class="sec-label">Recorrência no período</p>
-      <div class="stack s8">
-        ${rec.map(x => `<div class="card flat" style="padding:11px 12px">
-          <div class="row"><b class="fs13 grow">${esc(aluno(x.kid).nome)}</b><span class="pill${x.total >= 3 ? ' wait' : ''}">${x.total} registros</span></div>
-          <div class="fs11 muted" style="margin-top:3px">Mais frequente como: ${esc(x.principal[0])} (${x.principal[1]}×) · Turma ${esc(aluno(x.kid).turma || '—')}</div>
-        </div>`).join('')}
-        ${pares.map(p => `<div class="card flat" style="padding:11px 12px">
-          <div class="row"><b class="fs13 grow">Par recorrente</b><span class="pill wait">${p.total} episódios</span></div>
-          <div class="fs11 muted" style="margin-top:3px">${esc(aluno(p.a).nome)} e ${esc(aluno(p.b).nome)}</div>
-        </div>`).join('')}
-      </div>
-    </div>` : ''}
-
-`}
-    ${rodape()}
-  </div>`;
-});
-
-posRender.push(() => {
-  document.querySelectorAll('#heat .cell').forEach(c => {
-    const n = +c.dataset.n, max = +c.dataset.max || 1;
-    const pct = n === 0 ? 0 : Math.round(24 + (n / max) * 70);
-    c.style.background = n === 0 ? 'var(--surface-2)'
-      : `color-mix(in srgb, var(--teal) ${pct}%, var(--surface))`;
-    c.style.color = pct >= 70 ? 'var(--accent-ink)' : 'var(--fg)';
-  });
-});
-
-export { tipoDe, localDe, quandoTexto, sevTag, itemHTML };

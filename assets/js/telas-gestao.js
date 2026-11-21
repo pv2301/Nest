@@ -7,7 +7,7 @@ import { Store } from './store.js';
 import { escolha } from './escolha.js';
 import { esc, ICON, svgIc, iniciais, quandoLegivel, senhaTemporaria, semAcento,
          tituloNome } from './util.js';
-import { PAPEIS_CONTA, FUNCOES } from './dados.js';
+import { PAPEIS_CONTA, FUNCOES } from './vocabulario.js';
 
 /* ---------------------------------------------------------------- gestão (índice)
    Reúne o que antes ocupava até cinco abas na barra de baixo. Cada linha é um alvo

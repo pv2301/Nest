@@ -9,7 +9,7 @@ import {
   validaLogin, validaSenha, requisitosSenha, normalizaLogin, sugereLogin, senhaTemporaria,
   criptoDisponivel, tituloNome
 } from './util.js';
-import { PAPEIS_CONTA } from './dados.js';
+import { PAPEIS_CONTA } from './vocabulario.js';
 import { escolha } from './escolha.js';
 import { CONFIG } from '../../config.js';
 

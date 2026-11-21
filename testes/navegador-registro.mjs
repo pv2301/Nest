@@ -155,8 +155,12 @@ async function entrarComo(p, login, senha){
     'abas: ' + (await p.locator('.tabbar').innerText()).replace(/\n/g, ' · '));
  await p.locator('.tabbar button:has-text("Gestão")').click(); await p.waitForTimeout(900);
  const hub = await p.locator('#view').innerText();
- ok('a tela reúne painel, alunos e usuários',
-    /Painel/.test(hub) && /Alunos e turmas/.test(hub) && /Usuários/.test(hub), hub.slice(0, 200));
+ /* Painel e Calendário eram duas entradas; hoje são guias de Visão geral, e o índice
+    tem três linhas em vez de quatro. */
+ ok('a tela reúne visão geral, alunos e usuários',
+    /Visão geral/.test(hub) && /Alunos e turmas/.test(hub) && /Usuários/.test(hub), hub.slice(0, 200));
+ ok('nenhuma entrada repete o mesmo conjunto de dados',
+    (await p.locator('.urow').count()) === 3, 'entradas: ' + (await p.locator('.urow').count()));
  ok('cada entrada diz o seu estado', /turmas/.test(hub) && /conta/.test(hub));
  await p.locator('.urow:has-text("Alunos e turmas")').click(); await p.waitForTimeout(1000);
  ok('a entrada abre a tela certa, com botão voltar',
