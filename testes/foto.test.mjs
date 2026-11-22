@@ -102,7 +102,9 @@ cookie = '';
 await chamarApi('entrar', { login:'carolina.mendes', chave:CHAVE_M });
 const cookieMiss = cookie;
 await chamarApi('salvarOcorrencia', { ocorrencia:{
-  id:'7001', tipo:'Mordida', sev:2, autorLogin:'carolina.mendes',
+  id:'7001', categoria:'Incidente', tipo:'Mordida', sev:2,
+  autorLogin:'carolina.mendes', presenciou:true,
+  desc:'Mordida no braço durante o brincar livre, sem rompimento da pele.',
   envolvidos:[{ kid:'c1', papel:'Sofreu', turma:'Verde' }],
   chain:[{ nivel:'Carolina Mendes (Turma Verde)', st:'ok' },{ nivel:'Gestão', st:'now' }] } });
 t('cenário montado', true);

@@ -59,8 +59,10 @@ await chamar('salvarTurma', { turma:{ id:'t9', nome:'Maternal Real' } });
 await chamar('salvarAluno', { aluno:{ id:'c1', nome:'Criança Real', turma:'Maternal Real' } });
 await chamar('criarConta', { nome:'Pessoa Real', login:'pessoa.real', chave:'b'.repeat(64), papel:'miss' });
 await chamar('atualizarConta', { login:'pessoa.real', patch:{ status:'ativo', aprovadoPor:'demonstração' } });
-await chamar('salvarOcorrencia', { ocorrencia:{ id:'5000', tipo:'Queda', sev:1,
-  autorLogin:'tallita.lima', envolvidos:[{ kid:'c1', papel:'Sofreu' }], chain:[] } });
+await chamar('salvarOcorrencia', { ocorrencia:{ id:'5000', categoria:'Acidente',
+  tipo:'Queda', sev:1, autorLogin:'tallita.lima', presenciou:true,
+  desc:'Caiu sentada na areia durante o brincar livre, sem marca visível.',
+  envolvidos:[{ kid:'c1', papel:'Sofreu' }], chain:[] } });
 
 let r = await chamar('sincronizar');
 t('aluno real com id de semente existe', r.dados.alunos.some(a => a.id === 'c1' && a.nome === 'Criança Real'));

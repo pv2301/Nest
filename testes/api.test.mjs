@@ -146,13 +146,35 @@ r = await chamar('salvarAluno', { aluno:{ id:'c1', nome:'Nome Trocado' } });
 t('Miss NÃO edita aluno já cadastrado', !r.ok && r.codigo === 'permissao');
 
 console.log('\n=== Ocorrências e sigilo ===');
-const ocMiss = { id:'9001', tipo:'Mordida', sev:2, autorLogin:'carolina.mendes',
+/* Registros completos de propósito: o servidor confere o que recebe com a mesma
+   oQueFalta da tela, então um dado de teste esquelético não representa nada que o
+   app consiga produzir. */
+const ocMiss = { id:'9001', categoria:'Incidente', tipo:'Mordida', sev:2,
+  autorLogin:'carolina.mendes', presenciou:true,
+  desc:'Durante o brincar livre, houve uma mordida no braço, sem rompimento da pele.',
   envolvidos:[{ kid:'c1', papel:'Sofreu', turma:'Verde' }], chain:[{ nivel:'Gestão', st:'now' }] };
 r = await chamar('salvarOcorrencia', { ocorrencia: ocMiss });
 t('Miss grava ocorrência', r.ok && r.dados.id === '9001');
 
-const ocOutra = { id:'9002', tipo:'Queda', sev:1, autorLogin:'tallita.lima',
-  envolvidos:[], chain:[{ nivel:'Gestão', st:'ok' }] };
+/* O servidor exigia só um id: um registro sem categoria, sem criança e sem descrição
+   era gravado, e só a tela impedia. Quem não passa pela tela — um cliente velho em
+   cache, uma chamada direta — gravava lixo no lugar onde ficam registros de criança. */
+r = await chamar('salvarOcorrencia', { novo:true, ocorrencia:{ id:'9099', sev:2 } });
+t('registro incompleto é recusado pelo servidor',
+  !r.ok && r.codigo === 'incompleto' && r.http === 422, JSON.stringify(r));
+t('e a recusa diz o que falta',
+  !r.ok && /categoria/i.test(r.erro) && /crian/i.test(r.erro) && /descri/i.test(r.erro), r.erro);
+r = await chamar('ocorrencias');
+t('o registro incompleto não ficou no banco',
+  r.ok && !r.dados.some(o => o.id === '9099'));
+
+const ocOutra = { id:'9002', categoria:'Acidente', tipo:'Queda', sev:1,
+  autorLogin:'tallita.lima', presenciou:true,
+  desc:'Tropeçou no degrau do escorregador e caiu sentada na areia, sem marca.',
+  /* c1, e não c9: c9 é o aluno que o teste de remoção precisa ver livre de
+     registros. */
+  envolvidos:[{ kid:'c1', papel:'Envolvida', turma:'Verde' }],
+  chain:[{ nivel:'Gestão', st:'ok' }] };
 cookieAtual = cookieGestao;
 await chamar('salvarOcorrencia', { ocorrencia: ocOutra });
 
@@ -238,7 +260,9 @@ await chamar('atualizarConta', { login:'elisa.prado', patch:{ status:'ativo', ap
 
 cookieAtual = '';
 await chamar('entrar', { login:'elisa.prado', chave:CHAVE_A });
-const ocFila = { id:'9003', tipo:'Empurrão', sev:2,
+const ocFila = { id:'9003', categoria:'Incidente', tipo:'Empurrão', sev:2,
+  presenciou:true,
+  desc:'As duas disputavam o mesmo brinquedo e houve um empurrão, sem queda.',
   envolvidos:[{ kid:'c1', papel:'Sofreu', turma:'Verde' },
               { kid:'c2', papel:'Causou', turma:'Azul' }],
   /* Cadeia mentirosa de propósito: se o servidor a aceitasse, a autora escolheria

@@ -86,6 +86,35 @@ const tela = p => p.evaluate(()=>{ const h=document.querySelector('.appbar h2');
    .filter(e => /Mordida/.test(e.innerText)).length);
  ok('um registro novo, não dois', mordidas >= 1, `${mordidas} cartões de Mordida`);
 
+ console.log('\n=== A sessão vence no meio do formulário ===');
+ await preencher(p);
+ await p.route('**/*', r => {
+   if(!(r.request().postData()||'').includes('salvarOcorrencia')) return r.continue();
+   return r.fulfill({ status:401, contentType:'application/json',
+     body: JSON.stringify({ ok:false, erro:'Sessão expirada. Entre novamente.', codigo:'sessao' }) });
+ });
+ await p.evaluate(()=>app.tentarEnviar()); await p.waitForTimeout(1800);
+ await p.unroute('**/*');
+
+ const txt = await p.locator('#view').innerText();
+ ok('leva ao login em vez de repetir a recusa', /entrar|senha/i.test(txt), txt.slice(0,160));
+ ok('avisa que o registro ficou guardado', /guardado neste aparelho/i.test(txt), txt.slice(0,260));
+ ok('e o rascunho está mesmo no aparelho',
+    await p.evaluate(()=>!!localStorage.getItem('reg.rascunho')));
+
+ /* Entrando de novo, o início tem de oferecer o registro de volta. */
+ await p.fill('#f-login','tallita.lima').catch(()=>{});
+ if(await p.locator('#f-login').count() === 0){
+   await p.locator('button:text-is("Entrar")').first().click(); await p.waitForTimeout(800);
+   await p.fill('#f-login','tallita.lima');
+ }
+ await p.fill('#f-senha','Gestora2026');
+ await p.click('button[type=submit]'); await p.waitForTimeout(2400);
+ const agora = p.locator('text=Agora não');
+ if(await agora.count()){ await agora.click(); await p.waitForTimeout(800); }
+ ok('depois de entrar, o início oferece continuar', (await p.locator('.rascunho').count()) === 1,
+    (await p.locator('#view').innerText()).slice(0,200));
+
  console.log('\n=== Números de registro não se repetem ===');
  const ids = await p.evaluate(()=>[...document.querySelectorAll('.item')]
    .map(e => (e.innerText.match(/#\S+/)||[''])[0]).filter(Boolean));

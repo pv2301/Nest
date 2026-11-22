@@ -325,6 +325,19 @@ async function salvarOcorrencia(eu, d){
     throw new ErroApi('Já existe um registro com este número. Tente enviar de novo.',
       'id_ocupado', 409);
 
+  /* O servidor exigia só que existisse um id: um registro sem categoria, sem criança
+     ou sem descrição era gravado do mesmo jeito, e só a tela impedia. A mesma
+     oQueFalta que o formulário usa roda aqui — uma regra, dois lados, como quemVe e
+     a cadeia de ciência.
+
+     A tela guarda o informante dentro de um objeto; a regra o espera solto. É a
+     única diferença de forma entre o rascunho e o registro gravado. */
+  const { oQueFalta } = await regras();
+  const falta = oQueFalta({ ...oc, informanteNome: (oc.informante || {}).nome });
+  if(falta.length)
+    throw new ErroApi('Registro incompleto: ' + falta.map(f => f.texto).join('; ') + '.',
+      'incompleto', 422);
+
   if(existe){
     /* Quem pode escrever é quem pode ver: a autora corrige, e quem está na cadeia
        registra a própria ciência. Antes isto usava podeVer de foto.js — a regra do

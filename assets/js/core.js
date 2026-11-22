@@ -182,6 +182,23 @@ export async function otimista(aplicar, gravar, msgOk){
     S.ocs = antes.ocs; S.contas = antes.contas; S.alunos = antes.alunos; S.turmas = antes.turmas;
     S.salvando = false;
 
+    /* Sessão vencida é outro caso: continuar no formulário só produziria a mesma
+       recusa a cada toque. Guarda o que foi escrito no aparelho, leva ao login, e o
+       início oferece "Continuar registro" assim que a pessoa entrar de novo. */
+    if(e.codigo === 'sessao'){
+      if(forma.rascunho){
+        Store.guardarRascunho({ rascunho: { ...forma.rascunho, fotoArquivo:undefined,
+          fotoPreview:undefined, foto:false },
+          passo: forma.passo, modo: forma.modo,
+          login: S.conta ? S.conta.login : '', em: new Date().toISOString() });
+      }
+      sairDaConta();
+      S.formErro = forma.rascunho
+        ? 'A sessão expirou antes de enviar. O registro está guardado neste aparelho: entre de novo e continue de onde parou.'
+        : 'A sessão expirou. Entre novamente.';
+      return render();
+    }
+
     /* Só quando havia um formulário em curso: as outras escritas otimistas (ciência,
        cadastro, turma) não têm rascunho e não devem ser levadas de volta a lugar
        nenhum. */
