@@ -159,8 +159,13 @@ async function entrarComo(p, login, senha){
     tem três linhas em vez de quatro. */
  ok('a tela reúne visão geral, alunos e usuários',
     /Visão geral/.test(hub) && /Alunos e turmas/.test(hub) && /Usuários/.test(hub), hub.slice(0, 200));
+ /* O que importa não é o número de entradas, que cresce, mas que Painel e
+    Calendário não voltem a ser duas portas para os mesmos dados. */
  ok('nenhuma entrada repete o mesmo conjunto de dados',
-    (await p.locator('.urow').count()) === 3, 'entradas: ' + (await p.locator('.urow').count()));
+    !/^Painel$/m.test(hub) && !/^Calendário$/m.test(hub) &&
+    (hub.match(/Visão geral/g) || []).length === 1, hub);
+ ok('a auditoria está na Gestão', /Auditoria/.test(hub), hub);
+ ok('e os registros removidos também', /Registros removidos/.test(hub), hub);
  ok('cada entrada diz o seu estado', /turmas/.test(hub) && /conta/.test(hub));
  await p.locator('.urow:has-text("Alunos e turmas")').click(); await p.waitForTimeout(1000);
  ok('a entrada abre a tela certa, com botão voltar',

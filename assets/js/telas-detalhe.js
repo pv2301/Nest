@@ -8,6 +8,7 @@ import { esc, quandoLegivel, iniciais, ICON, svgIc } from './util.js';
 import { CONFIG } from '../../config.js';
 import { SEVL } from './vocabulario.js';
 import { localDe, quandoTexto, sevTag, statusPill, tipoDe, vazio } from './telas-comum.js';
+import { dialogoRemocao } from './telas-auditoria.js';
 
 /* ---------------------------------------------------------------- detalhe */
 function fotoBloco(o){
@@ -83,6 +84,10 @@ registrarTela('detalhe', () => {
     ${u.papel === 'gestao' && !souDestino && o.status !== 'concluido' ? `<div class="card stack s8">
       <button class="btn soft" onclick="app.marcarComunicacao('${esc(o.id)}')">Registrar comunicação com a família</button>
     </div>` : ''}
+
+    ${u.papel === 'gestao' ? (S.remocao && S.remocao.id === o.id
+      ? dialogoRemocao()
+      : `<button class="btn ghost" onclick="app.pedirRemocao('${esc(o.id)}')">Remover este registro</button>`) : ''}
 
     ${rodape()}
   </div>`;

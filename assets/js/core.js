@@ -3,7 +3,7 @@
 
 import { CONFIG } from '../../config.js';
 import { Store, perfil, temFuncao } from './store.js';
-import { esc, SEAL, ICON, svgIc, confRodape } from './util.js';
+import { esc, SEAL, ICON, svgIc, confRodape, iniciais } from './util.js';
 import { quemVe, aguardaCiencia } from './regras.mjs';
 
 export { temFuncao };
@@ -261,6 +261,10 @@ export function entradasGestao(c = S.conta){
     const n = pendentes().length;
     e.push({ tela:'usuarios', ic:ICON.usuarios, nome:'Usuários', n,
              sub: n ? `${n} ${n === 1 ? 'conta aguardando' : 'contas aguardando'}` : `${S.contas.length} com acesso` });
+    e.push({ tela:'auditoria', ic:ICON.lista, nome:'Auditoria',
+             sub:'Tudo o que aconteceu, por quem e quando' });
+    e.push({ tela:'removidos', ic:ICON.exportar, nome:'Registros removidos',
+             sub:'Saíram de vista, continuam guardados' });
   }
   /* Quadro horário e Relações continuam no código, com as funções que as concedem,
      mas saem do índice até existirem de verdade: eram duas portas que não levavam a
@@ -271,8 +275,33 @@ export function entradasGestao(c = S.conta){
 export const pendentes = () => S.contas.filter(c => c.status === 'pendente');
 
 /** Aluno por id. Substitui a antiga constante KIDS: agora vem do cadastro da gestão. */
+/* Nomes que sobreviveram ao cadastro.
+
+   Quando a gestão remove um aluno, o servidor copia o nome dele para dentro de cada
+   registro em que ele aparece, justamente para os registros antigos continuarem
+   legíveis. Aqui esse nome é recolhido uma vez por lista de ocorrências, e não a
+   cada chamada: aluno() é chamado dentro de laços, em toda lista e em todo
+   relatório. */
+let _ocsLidas = null, _arquivados = {};
+function nomesArquivados(){
+  if(_ocsLidas === S.ocs) return _arquivados;
+  _ocsLidas = S.ocs;
+  _arquivados = {};
+  for(const o of S.ocs || [])
+    for(const e of (o.envolvidos || []))
+      if(e && e.nomeArquivado && !_arquivados[e.kid]) _arquivados[e.kid] = e.nomeArquivado;
+  return _arquivados;
+}
+
 export function aluno(id){
-  return S.alunos.find(a => a.id === id) || { id, nome:'(aluno removido)', turma:'', ini:'??' };
+  const a = S.alunos.find(x => x.id === id);
+  if(a) return a;
+  /* Sem cadastro, o nome preservado no registro. Só quando nem isso existe é que a
+     tela admite não saber de quem se trata. */
+  const nome = nomesArquivados()[id];
+  return nome
+    ? { id, nome, turma:'', ini: iniciais(nome), removido:true }
+    : { id, nome:'(aluno removido)', turma:'', ini:'??', removido:true };
 }
 export const nomesTurmas = () => S.turmas.map(t => t.nome);
 
@@ -303,12 +332,12 @@ function barraSuperior(){
     detalhe:'Ocorrência ' + (S.detalhe || ''), usuario:'Usuário',
     conta:'Minha conta', alunos:'Alunos e turmas', aluno:'Aluno', ficha:'Gerar relatório',
     ajuda:'Como funciona', gestao:'Gestão', calendario:'Calendário',
-    visao:'Visão geral',
+    visao:'Visão geral', auditoria:'Auditoria', removidos:'Registros removidos',
     turma:'Turma' + (S.turmaSel && S.turmaSel.nome ? ' ' + S.turmaSel.nome : '')
   };
   const comVoltar = ['detalhe','novo','rapido','wizard','usuario','conta','aluno','ficha','ajuda',
     'painel','alunos','usuarios','horario','relacoes','turma','calendario',
-    'visao'].includes(S.tela);
+    'visao','auditoria','removidos'].includes(S.tela);
   const esquerda = comVoltar
     ? `<button class="back" onclick="app.voltar()" aria-label="Voltar">&lsaquo;</button>`
     : `<button class="avatar" onclick="app.ir('conta')" title="${esc(c.nome)}">${esc(c.ini)}</button>`;

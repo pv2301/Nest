@@ -283,7 +283,51 @@ export const Store = {
 
   async removerAluno(id){
     if(temApi()) return await api('removerAluno', { id });
-    LS.gravar(K.alunos, LS.ler(K.alunos, []).filter(a => a.id !== id));
+    /* Mesma regra do servidor no modo local: o nome vai para dentro dos registros
+       antes de o cadastro sair, senão eles passariam a apontar para ninguém. */
+    const a = LS.ler(K.alunos, []).find(x => x.id === id);
+    if(a){
+      const ocs = LS.ler(K.ocs, []);
+      let mudou = false;
+      for(const o of ocs)
+        for(const e of (o.envolvidos || []))
+          if(e.kid === id){ e.nomeArquivado = a.nome; mudou = true; }
+      if(mudou) LS.gravar(K.ocs, ocs);
+    }
+    LS.gravar(K.alunos, LS.ler(K.alunos, []).filter(x => x.id !== id));
+  },
+
+  /* ---------- registros removidos ----------
+     Removido aqui quer dizer fora de vista, não fora do banco: o motivo, quem e
+     quando ficam no próprio registro, e a gestão pode restaurar. */
+  async removerOcorrencia(id, motivo){
+    if(temApi()) return await api('removerOcorrencia', { id, motivo });
+    const ocs = LS.ler(K.ocs, []);
+    const o = ocs.find(x => x.id === id);
+    if(!o) throw new ErroStore('Registro não encontrado.', 'inexistente');
+    o.removido = { motivo, porQuem:'(este aparelho)', quando:new Date().toISOString() };
+    LS.gravar(K.ocs, ocs);
+    return o;
+  },
+
+  async restaurarOcorrencia(id){
+    if(temApi()) return await api('restaurarOcorrencia', { id });
+    const ocs = LS.ler(K.ocs, []);
+    const o = ocs.find(x => x.id === id);
+    if(o) delete o.removido;
+    LS.gravar(K.ocs, ocs);
+    return o;
+  },
+
+  async ocorrenciasRemovidas(){
+    if(temApi()) return await api('ocorrenciasRemovidas');
+    return LS.ler(K.ocs, []).filter(o => o && o.removido);
+  },
+
+  /* Só leitura, e só para a gestão. Não existe par de escrita de propósito. */
+  async auditoria(filtro){
+    if(temApi()) return await api('auditoria', filtro || {});
+    return { linhas: [], acoes: [], pessoas: [] };
   },
 
   async removerTurma(id){
@@ -294,7 +338,7 @@ export const Store = {
   /* ---------- ocorrências ---------- */
   async ocorrencias(){
     if(temApi()) return await api('ocorrencias');
-    return LS.ler(K.ocs, []);
+    return LS.ler(K.ocs, []).filter(o => o && !o.removido);
   },
 
   /* `novo` diz a intenção: é um registro nascendo, não uma edição. Sem isso os dois

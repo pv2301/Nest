@@ -314,10 +314,22 @@ r = await chamar('removerAluno', { id:'c9' });
 t('Miss não remove aluno', !r.ok && r.codigo === 'permissao' && r.http === 403);
 
 cookieAtual = cookieGestao;
+/* Antes isto era recusado: os registros guardam só o id da criança e passariam a
+   apontar para ninguém. Agora o nome é copiado para dentro de cada registro antes de
+   o cadastro sair, e é isso que esta parte prova — remover o cadastro não pode levar
+   junto a legibilidade do que já aconteceu. */
 r = await chamar('removerAluno', { id:'c1' });
-t('aluno que aparece em registro NÃO é removido', !r.ok && r.codigo === 'em_uso', JSON.stringify(r));
+t('aluno que aparece em registro agora é removido', r.ok === true, JSON.stringify(r));
 r = await chamar('alunos');
-t('e continua no cadastro', r.ok && r.dados.some(a => a.id === 'c1'));
+t('e sai mesmo do cadastro', r.ok && !r.dados.some(a => a.id === 'c1'));
+
+r = await chamar('ocorrencias');
+const antigos = (r.dados || []).filter(o => (o.envolvidos || []).some(e => e.kid === 'c1'));
+t('os registros em que ele aparecia continuam lá', antigos.length > 0, String(antigos.length));
+t('e guardam o nome que ele tinha',
+  antigos.every(o => o.envolvidos.filter(e => e.kid === 'c1')
+    .every(e => typeof e.nomeArquivado === 'string' && e.nomeArquivado.length > 0)),
+  JSON.stringify(antigos.map(o => o.envolvidos.map(e => e.nomeArquivado))));
 
 r = await chamar('removerAluno', { id:'c9' });
 t('aluno sem registro é removido', r.ok && !r.dados.some(a => a.id === 'c9'),

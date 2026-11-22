@@ -10,6 +10,7 @@ import './telas-auth.js';
 import './telas-inicio.js';
 import './telas-formulario.js';
 import './telas-detalhe.js';
+import './telas-auditoria.js';
 import './telas-gestao.js';
 import './telas-relatorio.js';
 import './telas-visao.js';

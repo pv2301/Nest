@@ -37,7 +37,9 @@ const turmaPublica = t => ({
 async function ocorrenciasDe(eu){
   const { quemVe } = await regras();
   const linhas = await todas('SELECT dados FROM ocorrencias ORDER BY criado_em DESC');
-  return linhas.map(l => l.dados).filter(o => quemVe(eu, o));
+  /* Removido não sai daqui: filtrar só na tela deixaria o registro chegar ao
+     navegador de quem não deve mais vê-lo. */
+  return linhas.map(l => l.dados).filter(o => o && !o.removido && quemVe(eu, o));
 }
 
 async function diretorio(){
@@ -171,6 +173,9 @@ async function atualizarConta(eu, d){
 
   const campos = [], vals = [];
   const por = (col, v) => { campos.push(`${col} = $${campos.length + 1}`); vals.push(v); };
+  /* O nome faltava: a gestão podia corrigir turma, papel e funções, mas não um nome
+     digitado errado no cadastro. */
+  if(p.nome && String(p.nome).trim()) por('nome', String(p.nome).trim());
   if(p.papel) por('papel', p.papel === 'gestao' ? 'gestao' : 'miss');
   if('turma' in p) por('turma', p.turma || null);
   if(p.funcoes) por('funcoes', listaFuncoes(p.funcoes));
@@ -268,13 +273,97 @@ async function removerAluno(eu, d){
      A varredura é em JavaScript, e não por consulta ao JSON, porque a forma do texto
      muda entre json e jsonb e o banco em memória dos testes não cobre os mesmos
      operadores. O volume de uma escola cabe folgado na memória. */
-  const linhas = await todas('SELECT dados FROM ocorrencias');
-  const emUso = linhas.some(l => ((l.dados || {}).envolvidos || []).some(e => e.kid === d.id));
-  if(emUso) throw new ErroApi('Este aluno aparece em registros. Arquive em vez de remover.', 'em_uso');
+  /* Antes isto recusava quem aparecia em registros, porque eles guardam só o id da
+     criança e passariam a apontar para ninguém. Agora o nome é copiado para dentro
+     de cada registro antes de o cadastro sair: os registros antigos continuam
+     legíveis, que é o que a escola precisa guardar. O que se perde é a ligação com a
+     ficha — que deixou de existir de propósito.
+
+     Arquivar continua existindo, e continua sendo o caminho para quem só quer tirar
+     da lista sem abrir mão do cadastro.
+
+     A varredura é em JavaScript, e não por consulta ao JSON, porque a forma do texto
+     muda entre json e jsonb e o banco em memória dos testes não cobre os mesmos
+     operadores. O volume de uma escola cabe folgado na memória. */
+  const linhas = await todas('SELECT id, dados FROM ocorrencias');
+  let tocados = 0;
+  for(const l of linhas){
+    const oc = l.dados || {};
+    const envolvidos = oc.envolvidos || [];
+    if(!envolvidos.some(e => e.kid === d.id)) continue;
+    for(const e of envolvidos) if(e.kid === d.id) e.nomeArquivado = a.nome;
+    await consultar('UPDATE ocorrencias SET dados=$1 WHERE id=$2', [oc, l.id]);
+    tocados++;
+  }
 
   await consultar('DELETE FROM alunos WHERE id=$1', [d.id]);
-  await registrar(eu.login, 'remove_aluno', a.nome);
+  await registrar(eu.login, 'remove_aluno',
+    a.nome + (tocados ? ` — nome preservado em ${tocados} registro(s)` : ''));
   return (await todas('SELECT * FROM alunos ORDER BY nome')).map(alunoPublico);
+}
+
+/* ---------- auditoria ----------
+   A tabela `log` já era escrita em dezenove pontos — entrada, cadastro, troca de
+   senha, criar e editar aluno, salvar e remover turma, criar e editar ocorrência,
+   anexar, ver e remover foto, carregar e limpar demonstração — e ninguém nunca a
+   lia. Esta ação é só a porta de leitura.
+
+   NÃO EXISTE AQUI, E NÃO DEVE PASSAR A EXISTIR, NENHUMA AÇÃO QUE ESCREVA OU APAGUE
+   ESTA TABELA. Quem escreve é o registrar() de cada ação, como efeito dela. A
+   limpeza diária apaga sessões e fotos vencidas e não toca no log de propósito: uma
+   auditoria que o auditado pode editar não é auditoria. */
+
+const ACOES_ROTULO = {
+  entrada:'Entrou', cadastro:'Criou a própria conta', configuracao_inicial:'Configuração inicial',
+  entrada_negada:'Tentativa de entrada recusada', troca_senha:'Trocou a senha',
+  redefine_senha:'Redefiniu a senha de alguém', atualiza_conta:'Alterou uma conta',
+  cria_aluno:'Cadastrou aluno', edita_aluno:'Editou aluno', remove_aluno:'Removeu aluno',
+  salva_turma:'Salvou turma', remove_turma:'Removeu turma',
+  cria_ocorrencia:'Criou registro', edita_ocorrencia:'Editou registro',
+  remove_ocorrencia:'Removeu registro', restaura_ocorrencia:'Restaurou registro',
+  anexa_foto:'Anexou foto', ve_foto:'Abriu uma foto', remove_foto:'Removeu foto',
+  retencao_foto:'Foto apagada pela retenção', limpeza_diaria:'Limpeza diária',
+  demo_carregada:'Carregou a demonstração', demo_limpa:'Limpou a demonstração'
+};
+
+async function auditoria(eu, d){
+  const limite = Math.min(Math.max(Number((d || {}).limite) || 60, 1), 200);
+  const antesDe = Number((d || {}).antesDe) || 0;
+  const quem = String((d || {}).quem || '').trim();
+  const acao = String((d || {}).acao || '').trim();
+
+  const onde = [], vals = [];
+  const cond = (coluna, v) => { vals.push(v); onde.push(coluna + ' $' + vals.length); };
+  if(antesDe) cond('id <', antesDe);
+  if(quem)    cond('login =', quem);
+  if(acao)    cond('acao =', acao);
+  vals.push(limite);
+
+  const linhas = await todas(
+    'SELECT id, quando, login, acao, detalhe FROM log ' +
+    (onde.length ? 'WHERE ' + onde.join(' AND ') + ' ' : '') +
+    'ORDER BY id DESC LIMIT $' + vals.length, vals);
+
+  /* O nome de quem agiu, para a tela não mostrar só o login. */
+  const nomes = Object.fromEntries(
+    (await todas('SELECT login, nome FROM contas')).map(c => [c.login, c.nome]));
+
+  return {
+    linhas: linhas.map(l => ({
+      id: l.id,
+      quando: new Date(l.quando).toISOString(),
+      login: l.login || '',
+      nome: l.login ? (nomes[l.login] || l.login) : 'sistema',
+      acao: l.acao,
+      rotulo: ACOES_ROTULO[l.acao] || l.acao,
+      detalhe: l.detalhe || ''
+    })),
+    /* Para a tela montar os filtros sem inventar opções que nunca ocorreram. */
+    acoes: (await todas('SELECT DISTINCT acao FROM log ORDER BY acao'))
+      .map(r => ({ id:r.acao, nome: ACOES_ROTULO[r.acao] || r.acao })),
+    pessoas: (await todas('SELECT DISTINCT login FROM log WHERE login IS NOT NULL ORDER BY login'))
+      .map(r => ({ id:r.login, nome: nomes[r.login] || r.login }))
+  };
 }
 
 /* ---------- ocorrências ---------- */
@@ -373,6 +462,51 @@ async function salvarOcorrencia(eu, d){
   return oc;
 }
 
+/** Tira o registro de vista sem tirá-lo do banco.
+
+    A gestão pediu isto para o caso do duplicado. Apagar de verdade seria outra
+    coisa: um registro de incidente com criança que some é dado que a escola pode
+    precisar e não terá mais, e muitos já têm ciência dada — são documentos
+    assinados. Então o registro ganha a marca, some das listas, e continua inteiro
+    onde está.
+
+    O motivo é obrigatório: remover sem dizer por quê é justamente o que a auditoria
+    existe para impedir. */
+async function removerOcorrencia(eu, d){
+  const motivo = String((d || {}).motivo || '').trim();
+  if(motivo.length < 5)
+    throw new ErroApi('Diga o motivo da remoção.', 'sem_motivo', 422);
+
+  const linha = await uma('SELECT dados FROM ocorrencias WHERE id=$1', [d.id]);
+  if(!linha) throw new ErroApi('Registro não encontrado.', 'inexistente', 404);
+
+  const oc = linha.dados || {};
+  if(oc.removido) throw new ErroApi('Este registro já está removido.', 'ja_removido', 409);
+
+  oc.removido = { motivo, porQuem: eu.nome, login: eu.login,
+                  quando: new Date().toISOString() };
+  await consultar('UPDATE ocorrencias SET dados=$1 WHERE id=$2', [oc, d.id]);
+  await registrar(eu.login, 'remove_ocorrencia', d.id + ' — ' + motivo);
+  return oc;
+}
+
+async function restaurarOcorrencia(eu, d){
+  const linha = await uma('SELECT dados FROM ocorrencias WHERE id=$1', [d.id]);
+  if(!linha) throw new ErroApi('Registro não encontrado.', 'inexistente', 404);
+  const oc = linha.dados || {};
+  if(!oc.removido) throw new ErroApi('Este registro não está removido.', 'nao_removido', 409);
+  delete oc.removido;
+  await consultar('UPDATE ocorrencias SET dados=$1 WHERE id=$2', [oc, d.id]);
+  await registrar(eu.login, 'restaura_ocorrencia', String(d.id));
+  return oc;
+}
+
+/** Os removidos, só para a gestão ver e poder restaurar. */
+async function ocorrenciasRemovidas(eu){
+  const linhas = await todas('SELECT dados FROM ocorrencias');
+  return linhas.map(l => l.dados).filter(o => o && o.removido);
+}
+
 /* ---------- demonstração ----------
    Antes esta ação só escrevia no log e não semeava nada: a gestão clicava e nada
    acontecia. Agora os dados vêm do próprio pedido, que o front já tem. */
@@ -456,6 +590,10 @@ async function despachar(acao, dados, req, res){
     case 'salvarOcorrencia': return salvarOcorrencia(await A.exigeSessao(req), dados);
     case 'salvarAluno':      return salvarAluno(await A.exigeSessao(req), dados);
     case 'removerAluno':     return removerAluno(await A.exigeGestao(req), dados);
+    case 'removerOcorrencia':   return removerOcorrencia(await A.exigeGestao(req), dados);
+    case 'restaurarOcorrencia': return restaurarOcorrencia(await A.exigeGestao(req), dados);
+    case 'ocorrenciasRemovidas':return ocorrenciasRemovidas(await A.exigeGestao(req));
+    case 'auditoria':           return auditoria(await A.exigeGestao(req), dados);
     case 'contas':           return (await A.exigeGestao(req)) &&
                                     (await todas('SELECT * FROM contas ORDER BY nome')).map(A.contaPublica);
     case 'atualizarConta':   return atualizarConta(await A.exigeGestao(req), dados);
