@@ -308,6 +308,44 @@ r = await chamar('salvarOcorrencia', { ocorrencia: { ...ocFila, desc:'agora pode
   chain:[ { ...cadeia[0], st:'ok' }, { ...cadeia[1], st:'now' }, cadeia[2] ] } });
 t('e passa a poder escrever nele', r.ok === true, JSON.stringify(r));
 
+console.log('\n=== Maiúscula de nome, no servidor ===');
+/* A tela já normaliza; o servidor também, porque quem não passa pela tela — um
+   cliente velho em cache, uma chamada direta — gravava o nome como viesse. */
+cookieAtual = cookieGestao;
+await chamar('salvarAluno', { aluno:{ id:'c20', nome:'  maria   da SILVA  ', turma:'Verde' } });
+r = await chamar('alunos');
+const c20 = (r.dados || []).find(a => a.id === 'c20');
+t('nome de aluno sai normalizado do servidor',
+  !!c20 && c20.nome === 'Maria da Silva', JSON.stringify(c20 && c20.nome));
+
+r = await chamar('salvarTurma', { turma:{ id:'t20', nome:'pré ii' } });
+t('nome de turma também', r.ok === true, JSON.stringify(r));
+r = await chamar('sincronizar');
+const t20 = (r.dados.turmas || []).find(x => x.id === 't20');
+t('e algarismo romano fica de pé', t20 && t20.nome === 'Pré II', JSON.stringify(t20));
+
+await chamar('criarConta', { nome:'joão pedro DE souza', login:'joao.pedro',
+  chave:'f'.repeat(64), papel:'miss', turma:'Verde' });
+r = await chamar('contas');
+const jp = (r.dados || []).find(c => c.login === 'joao.pedro');
+t('nome de conta também', jp && jp.nome === 'João Pedro de Souza', JSON.stringify(jp && jp.nome));
+
+console.log('\n=== A passagem sobre o que já estava gravado ===');
+/* Grava direto no banco, por fora da API, como se fosse dado antigo de antes de a
+   normalização existir. */
+await _db.consultar(`UPDATE alunos SET nome = 'joana   rocha dos SANTOS' WHERE id = 'c20'`);
+await _db.consultar(`DELETE FROM config WHERE chave = 'nomesNormalizados'`);
+
+const passagem = await _db.normalizarNomes();
+t('a passagem corrigiu e disse quantos', passagem.mudou >= 1, JSON.stringify(passagem));
+r = await chamar('alunos');
+t('o nome antigo ficou certo',
+  (r.dados || []).some(a => a.id === 'c20' && a.nome === 'Joana Rocha dos Santos'),
+  JSON.stringify((r.dados || []).find(a => a.id === 'c20')));
+
+const segunda = await _db.normalizarNomes();
+t('rodar de novo não faz nada', segunda.pulou === true, JSON.stringify(segunda));
+
 console.log('\n=== Remover aluno do cadastro ===');
 cookieAtual = cookieMiss;
 r = await chamar('removerAluno', { id:'c9' });

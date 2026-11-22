@@ -336,6 +336,14 @@ textarea.input{min-height:96px;resize:vertical;line-height:1.55;font-size:14.5px
 .ch{color:var(--muted);font-size:20px;line-height:1;flex:none}
 .cnt{font-size:10px;background:var(--g4-mark);color:#fff;border-radius:99px;padding:1px 7px;font-weight:700;flex:none}
 
+/* ---------- prévia sem identificar ---------- */
+/* Fundo diferente e tarja na borda: tem de ficar claro que isto é como o texto vai
+   sair, e não um segundo campo para escrever. Não vai ao papel. */
+.previa{background:var(--surface-2);border-left:3px solid var(--accent);
+  border-radius:var(--r-sm);padding:11px 13px;font-size:13px;line-height:1.55}
+.previa p:last-child{white-space:pre-wrap}
+@media print{ .previa{display:none} }
+
 /* ---------- auditoria ---------- */
 /* Lista densa de propósito: o valor dela é poder correr o olho por muitas linhas.
    A hora fica numa coluna fixa para as linhas se alinharem. */

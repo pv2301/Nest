@@ -7,8 +7,10 @@ import { Store } from './store.js';
 import {
   esc, RINGBG, SEAL, ICON, svgIc,
   validaLogin, validaSenha, requisitosSenha, normalizaLogin, sugereLogin, senhaTemporaria,
-  criptoDisponivel, tituloNome
+  criptoDisponivel
 } from './util.js';
+import { tituloNome } from './nomes.mjs';
+import { RETENCAO_FOTO_DIAS } from './regras.mjs';
 import { PAPEIS_CONTA, FUNCOES } from './vocabulario.js';
 import { escolha } from './escolha.js';
 import { CONFIG } from '../../config.js';
@@ -481,7 +483,7 @@ registrarTela('ajuda', () => `
         <dt>Quem vê</dt><dd>Cada Miss vê os registros que criou e os das crianças da sua turma. A gestão vê todos.</dd>
         <dt>Ciência</dt><dd>O registro segue para a Miss de cada turma envolvida e depois para a gestão.</dd>
         <dt>Rascunho</dt><dd>Salvo sozinho enquanto você preenche.</dd>
-        <dt>Fotos</dt><dd>Apagadas em ${CONFIG.REGRAS.retencaoFotoDias} dias. Visíveis à cadeia de ciência e à gestão; todo acesso fica em log.</dd>
+        <dt>Fotos</dt><dd>Apagadas em ${RETENCAO_FOTO_DIAS} dias. Visíveis à cadeia de ciência e à gestão; todo acesso fica em log.</dd>
         <dt>Contas</dt><dd>A gestão aprova cada conta nova e define função e turma.</dd>
         <dt>Relatório</dt><dd>Três versões: sem identificar (padrão), para a família e de uso interno.</dd>
       </dl>

@@ -4,7 +4,8 @@
    - a imagem nunca é um link direto; sai por aqui, depois de conferir a sessão e se
      a pessoa está na cadeia de ciência daquele registro ou é gestão;
    - toda visualização vai para o log;
-   - some sozinha 90 dias depois, salvo quando a gestão marcou preservar.
+   - some sozinha depois do prazo de retenção (config.js), salvo quando a gestão
+     marcou preservar.
 
    Ressalva: no plano atual do Vercel o arquivo tem URL pública, ainda que impossível
    de adivinhar. Servir por aqui impede listagem e acesso sem sessão, mas quem obtiver
@@ -16,7 +17,15 @@ const { uma, consultar, todas, registrar } = require('./_db');
 const A = require('./_auth');
 const { ErroApi } = A;
 
-const DIAS_RETENCAO = 90;
+/* O prazo vem de regras.mjs, que é o único lugar onde ele existe. Antes havia um
+   número aqui e outro em config.js, e os dois podiam divergir sem ninguém notar: a
+   tela prometeria um prazo e o servidor cumpriria outro.
+
+   regras.mjs é .mjs justamente para este arquivo, que é CommonJS, conseguir
+   carregá-lo por import dinâmico. */
+let _regras = null;
+const diasRetencao = async () =>
+  ((_regras = _regras || import('../assets/js/regras.mjs')), (await _regras).RETENCAO_FOTO_DIAS);
 const TAMANHO_MAX = 6 * 1024 * 1024;
 const TIPOS = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
@@ -74,13 +83,14 @@ async function enviar(req, res){
     token: process.env.BLOB_READ_WRITE_TOKEN
   });
 
-  const expira = new Date(Date.now() + DIAS_RETENCAO * 864e5);
+  const dias = await diasRetencao();
+  const expira = new Date(Date.now() + dias * 864e5);
   await consultar(
     `INSERT INTO anexos (id, ocorrencia_id, caminho, url, expira_em) VALUES ($1,$2,$3,$4,$5)`,
     [id, ocorrenciaId, salvo.pathname || caminho, salvo.url, expira]);
 
   await registrar(eu.login, 'anexa_foto', ocorrenciaId);
-  return { id, expiraEm: expira.toISOString(), dias: DIAS_RETENCAO };
+  return { id, expiraEm: expira.toISOString(), dias };
 }
 
 async function servir(req, res){
@@ -152,4 +162,4 @@ module.exports = async function handler(req, res){
 module.exports.expurgar = expurgar;
 module.exports.podeVer = podeVer;
 module.exports.usarBlob = usarBlob;
-module.exports.DIAS_RETENCAO = DIAS_RETENCAO;
+module.exports.diasRetencao = diasRetencao;

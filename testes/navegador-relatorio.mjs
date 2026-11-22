@@ -76,8 +76,21 @@ const prim = n => n.split(' ')[0];
     !t.includes(prim(n1)) && !t.includes(prim(n2)), t.slice(0,400));
  ok('a NARRATIVA também não nomeia — era aqui que vazava', !t.includes(prim(n1)) && !t.includes(prim(n2)));
  ok('a criança citada de passagem também sumiu', !t.includes(prim(n3)), 'ainda cita '+n3);
- ok('aparecem Criança A, B e C', /Criança A/.test(t) && /Criança B/.test(t) && /Criança C/.test(t), t.slice(0,500));
+ /* Na tabela o rótulo abre maiúsculo; na narrativa ele entra com artigo e vira
+    "a criança A". Por isso a comparação ignora a caixa. */
+ ok('aparecem Criança A, B e C',
+    /criança A/i.test(t) && /criança B/i.test(t) && /criança C/i.test(t), t.slice(0,500));
+ ok('na narrativa o rótulo vem com artigo, não solto',
+    /\ba criança [ABC]\b/.test(t) || /^A criança [ABC]\b/m.test(t), t.slice(0,500));
  ok('a turma não aparece', !/Turma /.test(t));
+
+ console.log('\n=== A prévia mostra o texto antes de gerar o PDF ===');
+ const prev = await p.locator('.previa').innerText().catch(()=>'');
+ ok('a prévia aparece no uso interno', /como vai sair/i.test(prev), prev.slice(0,120));
+ ok('e já traz o artigo junto do rótulo', /\ba criança [AB]\b|^A criança [AB]\b/mi.test(prev), prev.slice(0,220));
+ ok('a prévia não vai ao papel',
+    await p.evaluate(()=>{ const e=document.querySelector('.previa');
+      return !!e && getComputedStyle(e).display !== 'none'; }));
 
  console.log('\n=== Legenda: na tela, nunca no papel ===');
  const leg = await p.locator('#view').innerText();

@@ -101,6 +101,22 @@ const anonimizar = (texto, mapa) => trocarNomes(texto, (mapa || []).filter(p => 
 /** Texto como vai ao papel. */
 const comoSai = (txt, mapa) => S.ficha.semIdentificar ? anonimizar(txt, mapa) : txt;
 
+/** Como o texto vai sair, mostrado antes de gerar o PDF.
+
+    O campo onde se escreve continua com os nomes reais, porque é ele que fica
+    guardado: trocar o conteúdo dele apagaria os nomes para sempre e a versão
+    identificada do relatório deixaria de existir. Então a troca aparece aqui ao
+    lado, marcada como prévia, sem precisar rolar até o documento inteiro. */
+function previaSemNomes(txt, mapa){
+  if(!S.ficha.semIdentificar) return '';
+  const saida = anonimizar(txt, mapa);
+  if(!String(txt || '').trim()) return '';
+  return `<div class="previa">
+    <p class="sec-label" style="margin:0 0 6px">Como vai sair, sem identificar</p>
+    <p style="margin:0">${esc(saida)}</p>
+  </div>`;
+}
+
 /** Nome de uma criança no documento. */
 function nomeNaFicha(kid, mapa){
   if(!S.ficha.semIdentificar) return aluno(kid).nome;
@@ -132,8 +148,12 @@ app.checarFamilia = () => {
   const o = S.ocs.find(x => x.id === S.ficha.id);
   const campo = document.getElementById('f-familia');
   const alvo = document.getElementById('f-vaza');
-  /* Atualiza só o aviso: re-renderizar apagaria o que está sendo digitado. */
-  if(o && campo && alvo) alvo.innerHTML = avisoVazamento(o, campo.value);
+  /* Atualiza só o aviso e a prévia: re-renderizar apagaria o que está sendo
+     digitado — foi o que quebrou a busca de alunos no celular. */
+  if(!o || !campo) return;
+  if(alvo) alvo.innerHTML = avisoVazamento(o, campo.value);
+  const previa = document.getElementById('f-previa');
+  if(previa) previa.innerHTML = previaSemNomes(campo.value, mapaDeNomes(o));
 };
 
 /** Quem é quem. Fica na tela e só na tela: impressa, devolveria tudo o que a
@@ -351,7 +371,12 @@ registrarTela('ficha', () => {
           spellcheck="true" autocorrect="on" autocapitalize="sentences"
           oninput="app.checarFamilia()">${esc(textoFamilia(o))}</textarea>
         <div id="f-vaza" style="margin-top:8px">${avisoVazamento(o, textoFamilia(o))}</div>
-      </div>` : ''}
+        <div id="f-previa">${previaSemNomes(textoFamilia(o), mapa)}</div>
+      </div>` : `<div class="field">
+        <label>O que aconteceu</label>
+        <p class="fs13" style="margin:0 0 8px;white-space:pre-wrap">${esc(o.desc || '—')}</p>
+        ${previaSemNomes(o.desc, mapa)}
+      </div>`}
 
       ${temFoto ? `<button class="switch" aria-pressed="${f.incluirFoto}" onclick="app.fichaFoto()">
         <span class="grow"><span style="display:block;font-size:13px;font-weight:600">Incluir a foto</span></span>

@@ -123,6 +123,47 @@ const ESQUEMA = [
   `CREATE INDEX IF NOT EXISTS idx_log_quando ON log (quando DESC)`
 ];
 
+/* ---------- maiúscula nos nomes já gravados ----------
+
+   Quem cadastrou "maria da silva" antes de a normalização existir continua com
+   "maria da silva" até alguém reabrir e salvar. Esta passagem corrige o passado uma
+   vez só, marcada em `config` para não repetir.
+
+   Em JavaScript e não em SQL de propósito: o initcap do Postgres devolveria
+   "Maria Da Silva", que é justamente o que a regra exclui. */
+async function normalizarNomes(forcar = false){
+  const p = obterPool();
+  if(!forcar){
+    const ja = await p.query(`SELECT valor FROM config WHERE chave = 'nomesNormalizados'`);
+    if(ja.rows.length) return { pulou: true, mudou: 0 };
+  }
+
+  const { tituloNome } = await import('../assets/js/nomes.mjs');
+  let mudou = 0;
+
+  /* Turma aceita algarismo romano em minúscula; nome de pessoa não, porque "vivi"
+     viraria "VIVI". */
+  for(const [tabela, chave, romanos] of
+      [['alunos','id',false], ['turmas','id',true], ['contas','login',false]]){
+    const linhas = await p.query(`SELECT ${chave}, nome FROM ${tabela}`);
+    for(const l of linhas.rows){
+      const certo = tituloNome(l.nome, { romanos });
+      if(!certo || certo === l.nome) continue;
+      await p.query(`UPDATE ${tabela} SET nome = $1 WHERE ${chave} = $2`, [certo, l[chave]]);
+      mudou++;
+    }
+  }
+
+  await p.query(
+    `INSERT INTO config (chave, valor) VALUES ('nomesNormalizados', $1)
+     ON CONFLICT (chave) DO UPDATE SET valor = EXCLUDED.valor`,
+    [new Date().toISOString() + ' · ' + mudou]);
+
+  /* Numa linha de auditoria, para a mudança não acontecer em silêncio. */
+  if(mudou) await registrar(null, 'normaliza_nomes', `${mudou} nome(s) corrigido(s)`);
+  return { pulou: false, mudou };
+}
+
 async function migrar(){
   if(!fabricaPropria && !urlDoBanco()){
     const e = new Error('Banco de dados não configurado: nenhuma variável de ambiente com URL de Postgres foi encontrada. No Vercel, conecte o banco ao projeto e faça um novo deploy.');
@@ -132,6 +173,10 @@ async function migrar(){
   }
   const p = obterPool();
   for(const sql of ESQUEMA) await p.query(sql);
+  /* Depois do esquema, porque precisa da tabela config. Falhar aqui não pode
+     derrubar o servidor: o app funciona com os nomes como estão. */
+  try { await normalizarNomes(); }
+  catch(e){ console.error('normalização de nomes adiada:', e.message); }
 }
 
 /** Garante o esquema uma vez por instância. */
@@ -163,4 +208,5 @@ async function registrar(login, acao, detalhe){
   } catch { /* log nunca derruba a operação */ }
 }
 
-module.exports = { consultar, uma, todas, registrar, garantir, usarFabrica, obterPool };
+module.exports = { consultar, uma, todas, registrar, garantir, usarFabrica, obterPool,
+                   normalizarNomes };

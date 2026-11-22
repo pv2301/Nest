@@ -8,6 +8,8 @@
    do app toca em armazenamento — quando o backend mudar, muda só este arquivo. */
 
 import { CONFIG } from '../../config.js';
+import { tituloNome } from './nomes.mjs';
+import { RETENCAO_FOTO_DIAS } from './regras.mjs';
 import { derivarChave, resumoLocal, carimbo, iniciais, primeiroNome } from './util.js';
 import { DEMO_CONTAS, DEMO_OCORRENCIAS, SEMENTE_ALUNOS, SEMENTE_TURMAS } from './demonstracao.js';
 
@@ -140,7 +142,10 @@ export const Store = {
     return publica(conta);
   },
 
+  /* A normalização acontece aqui, e não só na tela: é a porta por onde passam os
+     dois modos, e no modo local não há servidor nenhum para arrumar depois. */
   async criarConta({ nome, login, senha, papel, turma }){
+    nome = tituloNome(nome);
     const chave = await derivarChave(senha, login);
     if(temApi()) return await api('criarConta', { nome, login, chave, papel, turma });
     const cs = contasLocais();
@@ -251,6 +256,7 @@ export const Store = {
   },
 
   async salvarAluno(aluno){
+    if(aluno && aluno.nome) aluno = { ...aluno, nome: tituloNome(aluno.nome) };
     if(temApi()) return await api('salvarAluno', { aluno });
     const as = LS.ler(K.alunos, []);
     const i = as.findIndex(a => a.id === aluno.id);
@@ -273,6 +279,7 @@ export const Store = {
   },
 
   async salvarTurma(turma){
+    if(turma && turma.nome) turma = { ...turma, nome: tituloNome(turma.nome, { romanos:true }) };
     if(temApi()) return await api('salvarTurma', { turma });
     const ts = LS.ler(K.turmas, []);
     const i = ts.findIndex(t => t.id === turma.id);
@@ -403,7 +410,7 @@ export const Store = {
      A imagem sobe direto e sai sempre pela API, que confere a sessão e o acesso
      àquele registro. No modo local não há onde guardar: fica só a marca. */
   async enviarFoto(ocorrenciaId, arquivo){
-    if(!temApi()) return { id:'local', dias:CONFIG.REGRAS.retencaoFotoDias };
+    if(!temApi()) return { id:'local', dias:RETENCAO_FOTO_DIAS };
     let r;
     try {
       r = await fetch(`${CONFIG.API_URL}/foto?ocorrencia=${encodeURIComponent(ocorrenciaId)}`, {

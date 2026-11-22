@@ -255,6 +255,47 @@ export function formasDoNome(nome){
 const regexNome = forma =>
   new RegExp(`(^|[^${LETRA}])(${padraoDoNome(forma)})(?![${LETRA}])`, 'g');
 
+/* ---------- artigo no lugar do nome ----------
+
+   Trocar "Otto" por "Criança A" seco deixa a frase capenga: "Otto fez e Raissa não
+   gostou" vira "Criança A fez e Criança B não gostou". Em português o rótulo pede
+   artigo — "A criança A fez e a criança B não gostou" —, e o artigo encontra a
+   preposição que vinha antes do nome.
+
+   Só estas três contraem. "a" de propósito fica de fora: em "entregou a Helena" a
+   crase caberia, mas em "a Helena chorou" não, e não há como distinguir as duas sem
+   entender a frase. Errar para o lado de não contrair deixa o texto simples; errar
+   para o outro deixa o texto errado. */
+const CONTRAI = { de:'da', em:'na', por:'pela' };
+
+/* Palavras que já cumprem o papel do artigo: aqui não se acrescenta outro, só se
+   troca o nome. "da Helena" vira "da criança A", e não "da a criança A". */
+const JA_DETERMINA = ['a','o','as','os','da','do','na','no','pela','pelo','à','um','uma'];
+
+const PRE = Object.keys(CONTRAI).concat(JA_DETERMINA)
+  .sort((x, y) => y.length - x.length).join('|');
+
+/** O nome com a palavra anterior, quando ela muda o que sai. */
+const regexNomeComPre = forma =>
+  new RegExp(`(^|[^${LETRA}])(?:(${PRE})([ \t]+))?(${padraoDoNome(forma)})(?![${LETRA}])`,
+    'gi');
+
+/** Começa frase? Depois de pontuação final, de quebra de linha, ou no início. */
+const abreFrase = antes => {
+  const t = String(antes).replace(/[\s]+$/u, '');
+  return t === '' || /[.!?:;…]$/.test(t);
+};
+
+/** "criança A" com o artigo e a contração que a frase pede. */
+function rotuloNaFrase(rotulo, anterior, inicio){
+  const base = String(rotulo).charAt(0).toLocaleLowerCase('pt-BR') + String(rotulo).slice(1);
+  const p = String(anterior || '').toLocaleLowerCase('pt-BR');
+  const saida = CONTRAI[p] ? CONTRAI[p] + ' ' + base
+    : p ? p + ' ' + base
+    : 'a ' + base;
+  return inicio ? saida.charAt(0).toLocaleUpperCase('pt-BR') + saida.slice(1) : saida;
+}
+
 /** Posição da primeira citação do nome no texto, ou -1 se não houver. */
 export function posicaoNome(texto, nome){
   let menor = -1;
@@ -271,36 +312,14 @@ export function trocarNomes(texto, pares){
   let fora = String(texto);
   for(const p of pares || []){
     for(const forma of formasDoNome(p.nome)){
-      fora = fora.replace(regexNome(forma), (_m, antes) => antes + p.rotulo);
+      fora = fora.replace(regexNomeComPre(forma),
+        (_m, antes, pre, _esp, _nome, desloc, todo) =>
+          antes + rotuloNaFrase(p.rotulo, pre,
+            abreFrase(String(todo).slice(0, desloc) + antes)));
     }
   }
   return fora;
 }
 
-/* ---------- maiúscula de nome próprio ----------
-   "maria da silva" digitada às pressas sai impressa num relatório que vai à família.
-   O teclado do celular ajuda com autocapitalize, mas o de computador não tem, então
-   a normalização acontece ao salvar.
-
-   Partículas ficam minúsculas quando não abrem o nome: "Maria da Silva", não
-   "Maria Da Silva". */
-const PARTICULAS = new Set(['de','da','do','das','dos','e','du','del','di','la','van','von']);
-
-export function tituloNome(valor){
-  const t = String(valor ?? '').trim().replace(/\s+/g, ' ');
-  if(!t) return '';
-  /* Baixa tudo primeiro: assim "MARIA SILVA" também se acerta. Depois sobe a inicial
-     de cada palavra, inclusive depois de apóstrofo e hífen — D'Ávila, Jean-Pierre. */
-  const subido = t.toLocaleLowerCase('pt-BR')
-    .replace(/(^|[\s'’-])(\p{L})/gu, (_, sep, ch) => sep + ch.toLocaleUpperCase('pt-BR'));
-  return subido.split(' ')
-    .map((w, i) => i > 0 && PARTICULAS.has(w.toLocaleLowerCase('pt-BR'))
-      ? w.toLocaleLowerCase('pt-BR') : w)
-    .join(' ');
-}
-
-/** Para frases, não nomes: sobe só a primeira letra. */
-export function primeiraMaiuscula(valor){
-  const t = String(valor ?? '').trim();
-  return t ? t.charAt(0).toLocaleUpperCase('pt-BR') + t.slice(1) : '';
-}
+/* A maiúscula de nome mora em nomes.mjs: a API precisa dela também, e um .js não é
+   importável como módulo ES de dentro do CommonJS. Mesma razão de regras.mjs. */

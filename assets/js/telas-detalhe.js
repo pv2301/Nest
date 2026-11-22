@@ -3,7 +3,7 @@
 
 import { S, app, registrarTela, ir, rodape, otimista, filaDe, aluno } from './core.js';
 import { Store } from './store.js';
-import { podeCorrigir } from './regras.mjs';
+import { podeCorrigir, RETENCAO_FOTO_DIAS } from './regras.mjs';
 import { esc, quandoLegivel, iniciais, ICON, svgIc } from './util.js';
 import { CONFIG } from '../../config.js';
 import { SEVL } from './vocabulario.js';
@@ -15,7 +15,7 @@ function fotoBloco(o){
   const gestao = S.conta.papel === 'gestao';
   if(o.fotoPurgada) return `<div class="photo" style="border-style:solid">Foto apagada em ${esc(o.fotoPurgada)}</div>`;
   if(o.preservado) return `<div class="photo">1 foto · <b>preservada por decisão da gestão</b><br><span class="fs11">Fora da exclusão automática · acesso em log</span></div>`
-    + (gestao ? `<button class="btn ghost sm" style="width:100%;margin-top:8px" onclick="app.preservar('${esc(o.id)}',false)">Voltar à retenção de ${CONFIG.REGRAS.retencaoFotoDias} dias</button>` : '');
+    + (gestao ? `<button class="btn ghost sm" style="width:100%;margin-top:8px" onclick="app.preservar('${esc(o.id)}',false)">Voltar à retenção de ${RETENCAO_FOTO_DIAS} dias</button>` : '');
   const url = o.fotoId ? Store.urlFoto(o.fotoId) : null;
   return (url
       ? `<div class="fotobox"><img src="${esc(url)}" alt="Foto da lesão" loading="lazy"></div>`

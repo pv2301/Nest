@@ -5,8 +5,8 @@ import { S, app, registrarTela, ir, toast, render, recarregar, rodape, pendentes
          entradasGestao } from './core.js';
 import { Store } from './store.js';
 import { escolha } from './escolha.js';
-import { esc, ICON, svgIc, iniciais, quandoLegivel, senhaTemporaria, semAcento,
-         tituloNome } from './util.js';
+import { esc, ICON, svgIc, iniciais, quandoLegivel, senhaTemporaria, semAcento } from './util.js';
+import { tituloNome } from './nomes.mjs';
 import { PAPEIS_CONTA, FUNCOES } from './vocabulario.js';
 
 /* ---------------------------------------------------------------- gestão (índice)
@@ -416,7 +416,7 @@ app.buscaAlunoGestao = v => {
 app.filtroTurmaGestao = t => { S.filtroTurma = S.filtroTurma === t ? '' : t; render(); };
 
 app.novaTurma = async () => {
-  const nome = tituloNome((document.getElementById('t-nova') || {}).value);
+  const nome = tituloNome((document.getElementById('t-nova') || {}).value, { romanos:true });
   if(!nome) return toast('Informe o nome da turma.');
   if(S.turmas.some(t => t.nome.toLowerCase() === nome.toLowerCase())) return toast('Essa turma já existe.');
   const t = { id:'t' + Date.now().toString(36), nome, faixa:'' };
@@ -487,7 +487,7 @@ registrarTela('turma', () => {
 
 app.renomearTurma = async () => {
   const t = S.turmaSel;
-  const nome = tituloNome((document.getElementById('tu-nome') || {}).value);
+  const nome = tituloNome((document.getElementById('tu-nome') || {}).value, { romanos:true });
   if(!nome) return toast('Informe o nome da turma.');
   if(nome === t.nome) return;
   if(S.turmas.some(x => x.id !== t.id && x.nome.toLowerCase() === nome.toLowerCase()))

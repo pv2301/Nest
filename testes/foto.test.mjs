@@ -1,8 +1,9 @@
-/* Testes do anexo: envio, leitura autorizada, recusa sem acesso e expurgo aos 90 dias.
+/* Testes do anexo: envio, leitura autorizada, recusa sem acesso e expurgo no prazo.
    O Vercel Blob é substituído por um armazenamento de mentira, para o teste rodar
    sem rede e sem token. */
 
 import { newDb } from 'pg-mem';
+import { RETENCAO_FOTO_DIAS as DIAS } from '../assets/js/regras.mjs';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
@@ -112,7 +113,10 @@ t('cenário montado', true);
 console.log('\n=== Envio ===');
 let r = await chamarFoto('POST', { ocorrencia:'7001' }, { corpo:IMAGEM, tipo:'image/jpeg' });
 t('autora envia a foto', r.ok === true && !!r.dados.id, JSON.stringify(r));
-t('retenção de 90 dias informada', r.dados && r.dados.dias === 90);
+/* O prazo não é escrito aqui: vem de config.js, que é o único lugar onde ele
+   existe. Assim mudar o prazo não deixa um teste mentindo. */
+t('o prazo informado é o da configuração',
+  r.dados && r.dados.dias === DIAS, `${r.dados && r.dados.dias} vs ${DIAS}`);
 const fotoId = r.dados && r.dados.id;
 
 r = await chamarFoto('POST', { ocorrencia:'7001' }, { corpo:IMAGEM, tipo:'application/pdf' });
@@ -138,14 +142,14 @@ cookie = cookieGestao;
 r = await chamarFoto('GET', { id: fotoId });
 t('gestão lê', r.http === 200 && Buffer.isBuffer(r.binario));
 
-console.log('\n=== Retenção de 90 dias ===');
+console.log(`\n=== Retenção de ${DIAS} dias ===`);
 let n = await foto.expurgar(new Date());
 t('nada expira hoje', n === 0);
 t('arquivo continua no armazenamento', arquivos.size === 1);
 
-const daquiA91Dias = new Date(Date.now() + 91 * 864e5);
-n = await foto.expurgar(daquiA91Dias);
-t('expira aos 90 dias', n === 1);
+const depoisDoPrazo = new Date(Date.now() + (DIAS + 1) * 864e5);
+n = await foto.expurgar(depoisDoPrazo);
+t(`expira aos ${DIAS} dias`, n === 1);
 t('arquivo foi apagado de verdade', arquivos.size === 0);
 
 r = await chamarFoto('GET', { id: fotoId });
@@ -156,7 +160,7 @@ console.log('\n=== Preservação pela gestão ===');
 r = await chamarFoto('POST', { ocorrencia:'7001' }, { corpo:IMAGEM, tipo:'image/jpeg' });
 const id2 = r.dados.id;
 await _db.consultar('UPDATE anexos SET preservado = true WHERE id = $1', [id2]);
-n = await foto.expurgar(daquiA91Dias);
+n = await foto.expurgar(depoisDoPrazo);
 t('anexo preservado sobrevive ao expurgo', n === 0 && arquivos.size === 1);
 
 console.log(falhas

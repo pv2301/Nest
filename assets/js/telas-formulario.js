@@ -8,8 +8,10 @@ import { S, app, registrarTela, ir, toast, render, rodape, otimista, aluno,
          nomesTurmas, avancarPasso, voltar } from './core.js';
 import { Store } from './store.js';
 import { escolha } from './escolha.js';
-import { montarDestinos, paraCadeia, oQueFalta, podeCorrigir } from './regras.mjs';
-import { esc, quandoLegivel, agoraHora, iniciais, tituloNome, novoId } from './util.js';
+import { montarDestinos, paraCadeia, oQueFalta, podeCorrigir,
+         RETENCAO_FOTO_DIAS } from './regras.mjs';
+import { esc, quandoLegivel, agoraHora, iniciais, novoId } from './util.js';
+import { tituloNome } from './nomes.mjs';
 import { CONFIG } from '../../config.js';
 import { CATS, OUTRO, EXEMPLOS, LOCAIS, PROVIDENCIAS, CONDICOES, REGIOES,
          PAPEIS_ENVOLVIDO, CANAIS_INFORME, SEVL, JULGAMENTO } from './vocabulario.js';
@@ -543,7 +545,7 @@ app.enviar = async () => {
       turma: e.turma || aluno(e.kid).turma || '',
       cond:d.cond[e.kid] || '—', lesao:d.lesao[e.kid] || '' })),
     desc:d.desc, prov:d.prov, foto:d.foto,
-    fotoDias: d.foto ? CONFIG.REGRAS.retencaoFotoDias : undefined,
+    fotoDias: d.foto ? RETENCAO_FOTO_DIAS : undefined,
     presenciou:d.presenciou,
     informante: d.presenciou ? null : { nome:tituloNome(d.informanteNome), canal:d.informanteCanal },
     duas: [...new Set(d.envolvidos.map(e => e.turma || aluno(e.kid).turma))].filter(Boolean).length > 1

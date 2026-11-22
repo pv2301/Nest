@@ -18,6 +18,14 @@
    Estava em config.js como se fosse ajuste; é regra, e precisa valer nos dois lados. */
 export const NIVEL1_ENCERRA_NA_MISS = true;
 
+/* Quantos dias a foto fica guardada antes de o sistema apagá-la sozinho.
+
+   Mora aqui, e não em config.js, pelo mesmo motivo da regra acima: config.js é
+   módulo ES e a API é CommonJS, que não o importa — então o servidor nunca leria o
+   número de lá e ficaria com uma cópia própria, livre para divergir. É regra de
+   tratamento de dado de criança, não identidade da escola. */
+export const RETENCAO_FOTO_DIAS = 180;
+
 /* ---------------------------------------------------------------- quem vê */
 
 /** O registro aguarda a ciência desta pessoa agora? */

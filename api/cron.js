@@ -1,6 +1,6 @@
 /* Tarefa diária, agendada no vercel.json.
    Faz a limpeza que ninguém lembraria de fazer à mão: sessões vencidas e fotos que
-   passaram dos 90 dias. */
+   passaram do prazo de retenção. */
 
 const { consultar, registrar } = require('./_db');
 const { expurgar } = require('./foto');

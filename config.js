@@ -40,6 +40,7 @@ export const CONFIG = {
      --------------------------------------------------------------------------- */
   REGRAS: {
     nivel1EncerraNaMiss: true,  // nível 1 sem gatilho se encerra na ciência da Miss
-    retencaoFotoDias: 90        // foto apagada 90 dias após o fato ou a conclusão
+    // O prazo de guarda da foto mudou-se para assets/js/regras.mjs: o servidor
+    // precisa lê-lo, e não consegue ler este arquivo. Ver RETENCAO_FOTO_DIAS.
   }
 };

@@ -8,6 +8,11 @@ const { podeVer } = require('./foto');
 
 /* As regras moram num módulo só, compartilhado com o navegador. É ESM e isto aqui é
    CommonJS, então entra por import dinâmico, cacheado na primeira vez. */
+let _nomes = null;
+/* Mesma ponte de regras.mjs: CommonJS não importa um .js como módulo ES, mas importa
+   um .mjs por import dinâmico. */
+const nomes = async () => _nomes || (_nomes = await import('../assets/js/nomes.mjs'));
+
 let _regras = null;
 const regras = async () => _regras || (_regras = await import('../assets/js/regras.mjs'));
 const { ErroApi } = A;
@@ -66,6 +71,8 @@ async function estado(){
 }
 
 async function configurar(d, res){
+  const { tituloNome: tn } = await nomes();
+  d = { ...d, nome: tn(d.nome) };
   const existe = await uma(`SELECT 1 FROM contas WHERE papel='gestao' AND status='ativo' LIMIT 1`);
   if(existe) throw new ErroApi('Já existe uma conta de gestão. Peça o acesso a ela.', 'ja_configurado');
 
@@ -89,6 +96,8 @@ async function configurar(d, res){
 
 async function criarConta(d){
   A.validaLogin(d.login);
+  const { tituloNome } = await nomes();
+  d = { ...d, nome: tituloNome(d.nome) };
   if(!d.nome || String(d.nome).trim().split(/\s+/).length < 2)
     throw new ErroApi('Informe o nome completo.', 'nome');
   if(await uma('SELECT 1 FROM contas WHERE login=$1', [d.login]))
@@ -175,7 +184,7 @@ async function atualizarConta(eu, d){
   const por = (col, v) => { campos.push(`${col} = $${campos.length + 1}`); vals.push(v); };
   /* O nome faltava: a gestão podia corrigir turma, papel e funções, mas não um nome
      digitado errado no cadastro. */
-  if(p.nome && String(p.nome).trim()) por('nome', String(p.nome).trim());
+  if(p.nome && String(p.nome).trim()) por('nome', (await nomes()).tituloNome(p.nome));
   if(p.papel) por('papel', p.papel === 'gestao' ? 'gestao' : 'miss');
   if('turma' in p) por('turma', p.turma || null);
   if(p.funcoes) por('funcoes', listaFuncoes(p.funcoes));
@@ -203,6 +212,10 @@ async function redefinirSenha(eu, d){
 /* ---------- alunos e turmas ---------- */
 
 async function salvarAluno(eu, d){
+  /* A tela já normaliza, mas quem não passa pela tela também grava aqui. Uma regra,
+     dois lados — como quemVe e a cadeia de ciência. */
+  const { tituloNome } = await nomes();
+  if(d && d.aluno && d.aluno.nome) d = { ...d, aluno: { ...d.aluno, nome: tituloNome(d.aluno.nome) } };
   const a = d.aluno;
   if(!a || !a.id) throw new ErroApi('Aluno sem identificador.', 'dados');
   const existe = await uma('SELECT * FROM alunos WHERE id=$1', [a.id]);
@@ -238,6 +251,8 @@ async function salvarAluno(eu, d){
 async function salvarTurma(eu, d){
   const t = d.turma;
   if(!t || !t.nome) throw new ErroApi('Turma sem nome.', 'dados');
+  const { tituloNome } = await nomes();
+  t.nome = tituloNome(t.nome, { romanos:true });
   const existe = await uma('SELECT * FROM turmas WHERE id=$1', [t.id]);
   if(existe){
     await consultar('UPDATE turmas SET nome=$1, faixa=$2, miss_responsavel=$3, demo=false WHERE id=$4',
@@ -444,6 +459,10 @@ async function salvarOcorrencia(eu, d){
     oc.autorLogin = eu.login;
     oc.autor = eu.nome;
     oc.autorPapel = eu.papel;
+    if(oc.informante && oc.informante.nome){
+      const { tituloNome } = await nomes();
+      oc.informante = { ...oc.informante, nome: tituloNome(oc.informante.nome) };
+    }
     const agora = new Date();
     if(eu.papel === 'gestao'){
       oc.chain = [{ nivel:'Gestão', st:'ok', quandoISO: agora.toISOString(),
