@@ -300,6 +300,19 @@ textarea.input{min-height:96px;resize:vertical;line-height:1.55;font-size:14.5px
 .heat .canto{position:sticky;left:0;z-index:2;background:var(--surface)}
 .bars{display:flex;flex-direction:column;gap:8px}
 .bar-row{display:grid;grid-template-columns:1fr 38px;gap:9px;align-items:center;font-size:12px;min-width:0}
+/* A linha da categoria é botão: abre os tipos dela. 44px porque é o mínimo que um
+   polegar acerta — e porque a varredura de toque reprova qualquer alvo menor. */
+.bar-row.abre{grid-template-columns:1fr 38px 14px;width:100%;text-align:left;
+  min-height:44px;padding:5px 0;background:none;border:0}
+.bar-row.abre .seta{color:var(--muted);font-size:17px;line-height:1;
+  transition:transform .15s;transform:rotate(0)}
+.bar-row.abre[aria-expanded="true"] .seta{transform:rotate(90deg)}
+.bar-row.abre .bar-track{grid-column:1/-1}
+/* Os tipos, recuados e mais finos: a hierarquia precisa se ver sem legenda. */
+.tipos{padding:2px 0 8px 13px;display:flex;flex-direction:column;gap:7px}
+.tipos .bar-row.fina{font-size:11.5px;gap:7px}
+.tipos .bar-track{height:4px}
+.tipos .bar-fill{opacity:.62}
 .bar-row .lab{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bar-track{grid-column:1/-1;height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden}
 .bar-fill{height:100%;background:var(--accent);border-radius:3px}

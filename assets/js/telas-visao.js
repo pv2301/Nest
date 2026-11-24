@@ -56,12 +56,22 @@ registrarTela('calendario', () => { S.visaoGuia = 'calendario'; return telaVisao
 /* ---------------------------------------------------------------- painel */
 app.periodo = p => { S.periodo = p; render(); };
 
+/* Os tipos de uma categoria, do mais comum ao menos. */
+const tiposDe = (ocs, cat) =>
+  contaPor(ocs.filter(o => o.categoria === cat), o => tipoDe(o), 8);
+
+/* Uma aberta por vez: num celular, duas ou três abertas empurram o resto da tela
+   para fora de vista, e a comparação entre categorias — que é o ponto do cartão —
+   se perde. */
+app.abrirCategoria = cat => {
+  S.catAberta = S.catAberta === cat ? null : cat;
+  render();
+};
+
 function corpoPainel(){
   const ocs = filtraPorPeriodo(S.ocs, S.periodo);
   const r = resumo(ocs);
   const grade = agregaPorHoraLocal(ocs);
-  const tipos = contaPor(ocs, o => tipoDe(o), 6);
-  const maxTipo = tipos.length ? tipos[0][1] : 1;
   const cats = contaPor(ocs, 'categoria', 5);
   const maxCat = cats.length ? cats[0][1] : 1;
   const rec = recorrencia(ocs).slice(0, 4);
@@ -103,19 +113,36 @@ function corpoPainel(){
     </div>
 
     <div class="card">
-      <p class="sec-label">Por categoria</p>
-      <!-- Cada barra no matiz da sua categoria: assim o painel vira, de graça, a
-           chave de leitura dos pontos do calendário. -->
-      <div class="bars">${cats.map(([t, n]) => `
-        <div class="cat-${catId(t) || 'sem'}"><div class="bar-row"><span class="lab">${esc(t)}</span><span class="bar-n">${n}</span>
-          <div class="bar-track"><div class="bar-fill cor-cat" style="width:${Math.round(n/maxCat*100)}%"></div></div></div></div>`).join('')}</div>
-    </div>
+      <p class="sec-label">O que acontece</p>
+      <!-- Eram dois cartões: um de categorias e outro de tipos, listas de barras
+           quase idênticas uma embaixo da outra. Tipo é subdivisão de categoria, então
+           agora são um nível só: a categoria na linha, os tipos dela ao toque.
 
-    <div class="card">
-      <p class="sec-label">Tipos mais frequentes</p>
-      <div class="bars">${tipos.map(([t, n]) => `
-        <div><div class="bar-row"><span class="lab">${esc(t)}</span><span class="bar-n">${n}</span>
-          <div class="bar-track"><div class="bar-fill" style="width:${Math.round(n/maxTipo*100)}%"></div></div></div></div>`).join('')}</div>
+           Cada barra no matiz da sua categoria — assim este cartão vira, de graça, a
+           chave de leitura dos pontos do calendário. -->
+      <div class="bars">${cats.map(([cat, n]) => {
+        const aberta = S.catAberta === cat;
+        const dentro = aberta ? tiposDe(ocs, cat) : [];
+        return `<div class="cat-${catId(cat) || 'sem'}">
+          <button class="bar-row abre" aria-expanded="${aberta}"
+            aria-controls="tipos-${esc(catId(cat) || 'sem')}"
+            onclick="app.abrirCategoria('${esc(cat)}')">
+            <span class="lab">${esc(cat)}</span>
+            <span class="bar-n">${n}</span>
+            <span class="seta" aria-hidden="true">&rsaquo;</span>
+            <div class="bar-track"><div class="bar-fill cor-cat"
+              style="width:${Math.round(n / maxCat * 100)}%"></div></div>
+          </button>
+          <div class="tipos" id="tipos-${esc(catId(cat) || 'sem')}"${aberta ? '' : ' hidden'}>
+            ${dentro.map(([tp, qt]) => `<div class="bar-row fina">
+              <span class="lab">${esc(tp)}</span><span class="bar-n">${qt}</span>
+              <div class="bar-track"><div class="bar-fill cor-cat"
+                style="width:${Math.round(qt / n * 100)}%"></div></div>
+            </div>`).join('') ||
+              '<p class="fs11 muted" style="margin:0 0 4px">Sem tipo registrado.</p>'}
+          </div>
+        </div>`;
+      }).join('')}</div>
     </div>
 
     ${rec.length ? `<div class="card">

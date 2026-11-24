@@ -68,6 +68,54 @@ const guia = (p, nome) => p.locator(`.seg button:text-is("${nome}"), .chip:text-
      return !/6 meses/.test(await p.locator('#view').innerText());
    })());
 
+ console.log('\n=== Uma lista só, com os tipos dentro da categoria ===');
+ /* Eram dois cartões de barras quase idênticos, um embaixo do outro. Tipo é
+    subdivisão de categoria, então viraram um nível só. */
+ await guia(p, 'Estatísticas').click(); await p.waitForTimeout(900);
+ const est = await p.locator('#view').innerText();
+ ok('o cartão de tipos separado não existe mais', !/Tipos mais frequentes/i.test(est), est.slice(0, 300));
+ ok('as categorias são linhas que abrem',
+    (await p.locator('.bar-row.abre').count()) > 0);
+ ok('e nenhuma começa aberta', (await p.locator('.tipos:not([hidden])').count()) === 0);
+
+ const primeira = p.locator('.bar-row.abre').first();
+ const nomeCat = (await primeira.innerText()).split('\n')[0].trim();
+ await primeira.click(); await p.waitForTimeout(700);
+ ok('tocar numa categoria abre os tipos dela',
+    (await p.locator('.tipos:not([hidden])').count()) === 1);
+ ok('e a linha se diz aberta',
+    (await primeira.getAttribute('aria-expanded')) === 'true');
+
+ /* Os tipos que aparecem têm de ser daquela categoria, e não de outra. */
+ const dentro = await p.locator('.tipos:not([hidden])').innerText();
+ const daCategoria = await p.evaluate(nome => {
+   /* A tela não expõe S; confere-se pelo que o cartão mostra: a soma dos tipos
+      abertos tem de bater com a contagem da própria categoria. */
+   const linha = [...document.querySelectorAll('.bar-row.abre')]
+     .find(e => e.innerText.trim().startsWith(nome));
+   const total = Number(linha.querySelector('.bar-n').innerText);
+   const soma = [...linha.parentElement.querySelectorAll('.tipos .bar-n')]
+     .reduce((a, e) => a + Number(e.innerText), 0);
+   return { total, soma };
+ }, nomeCat);
+ ok('a soma dos tipos bate com a contagem da categoria',
+    daCategoria.total === daCategoria.soma,
+    `categoria ${daCategoria.total}, tipos somam ${daCategoria.soma}`);
+
+ if(await p.locator('.bar-row.abre').count() > 1){
+   await p.locator('.bar-row.abre').nth(1).click(); await p.waitForTimeout(700);
+   ok('abrir outra fecha a primeira',
+      (await p.locator('.tipos:not([hidden])').count()) === 1);
+   await p.locator('.bar-row.abre').nth(1).click(); await p.waitForTimeout(700);
+   ok('tocar de novo na mesma fecha',
+      (await p.locator('.tipos:not([hidden])').count()) === 0);
+ } else {
+   await primeira.click(); await p.waitForTimeout(700);
+   ok('abrir outra fecha a primeira', true, '(só uma categoria no período)');
+   ok('tocar de novo na mesma fecha',
+      (await p.locator('.tipos:not([hidden])').count()) === 0);
+ }
+
  console.log('\n=== A guia escolhida sobrevive ao ir e voltar ===');
  await guia(p, 'Estatísticas').click(); await p.waitForTimeout(700);
  await p.evaluate(()=>app.ir('gestao')); await p.waitForTimeout(700);
