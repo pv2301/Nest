@@ -303,7 +303,10 @@ function campoDescricao(id){
   return `<div class="narrativa${err ? ' com-erro' : ''}">
     <div class="row" style="margin-bottom:7px">
       <label for="${id}" class="grow" style="margin:0">Descrição do ocorrido</label>
-      <button class="btn ghost sm" style="padding:5px 10px;min-height:0;font-size:11.5px" onclick="app.usarExemplo()">Usar exemplo</button>
+      <!-- O min-height:0 fazia dele um alvo de 27px, que um polegar erra. A área
+           cresce sem a aparência crescer: o padding vertical é que aumenta. -->
+      <button class="btn ghost sm" style="padding:13px 10px;min-height:44px;font-size:11.5px"
+        onclick="app.usarExemplo()">Usar exemplo</button>
     </div>
     <textarea class="input" id="${id}" placeholder="${esc(ex)}"
       spellcheck="true" autocorrect="on" autocapitalize="sentences"${err ? ' aria-invalid="true"' : ''}

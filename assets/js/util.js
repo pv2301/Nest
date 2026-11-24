@@ -174,6 +174,33 @@ export function novoId(agora = new Date()){
   return d + '-' + sufixo;
 }
 
+/** Código de recuperação de senha.
+
+    Dezesseis caracteres do mesmo alfabeto de 34 de novoId — sem I e O, que à mão
+    viram 1 e 0 — em quatro grupos, para dar para copiar num papel sem errar. São
+    cerca de 81 bits: não é um número de seis dígitos que se adivinha, é um segredo.
+
+    Quem tem este código troca a senha de quem a esqueceu, sem a gestão no meio. Por
+    isso ele é mostrado uma vez só: o servidor guarda apenas o hash, e não tem como
+    mostrá-lo de novo nem para quem o gerou. */
+export function novoCodigoRecuperacao(){
+  const letras = '0123456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const c = globalThis.crypto;
+  const bytes = c && c.getRandomValues ? c.getRandomValues(new Uint8Array(16)) : null;
+  let fora = '';
+  for(let i = 0; i < 16; i++){
+    const n = bytes ? bytes[i] : Math.floor(Math.random() * 256);
+    if(i && i % 4 === 0) fora += '-';
+    fora += letras[n % letras.length];
+  }
+  return fora;
+}
+
+/** Como a pessoa digita e como o sistema confere são coisas diferentes: espaço a
+    mais, minúscula, hífen esquecido. Tudo isso é a mesma chave. */
+export const normalizaCodigo = v =>
+  String(v || '').toUpperCase().replace(/[^0-9A-HJ-NP-Z]/g, '');
+
 export const agoraHora = () => new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
 export const agoraData = () => new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
 export const carimbo = () => new Date().toISOString();

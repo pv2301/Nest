@@ -114,7 +114,7 @@ t('gestão aprova', r.ok && r.dados.status === 'ativo');
 cookieAtual = '';
 r = await chamar('entrar', { login:'carolina.mendes', chave:CHAVE_M });
 t('aprovada entra', r.ok && r.dados.conta.papel === 'miss');
-const cookieMiss = cookieAtual;
+let cookieMiss = cookieAtual;
 
 console.log('\n=== Permissões ===');
 r = await chamar('contas');
@@ -307,6 +307,84 @@ t('passada a vez, ela passa a receber', r.ok && r.dados.some(o => o.id === '9003
 r = await chamar('salvarOcorrencia', { ocorrencia: { ...ocFila, desc:'agora pode',
   chain:[ { ...cadeia[0], st:'ok' }, { ...cadeia[1], st:'now' }, cadeia[2] ] } });
 t('e passa a poder escrever nele', r.ok === true, JSON.stringify(r));
+
+console.log('\n=== Recuperar a senha sem a gestão ===');
+/* A tela de login dizia "Fale com a gestão", e numa sexta à noite isso trancava a
+   pessoa fora. Com o código que ela guardou, ela se vira — e esta parte prova que
+   ninguém mais se vira com ele. */
+const CODIGO = 'K7M2-Q9XT-4BNR-P3WH';
+const OUTRO_CODIGO = 'AAAA-BBBB-CCCC-DDDD';
+const CHAVE_NOVA = '9'.repeat(64);
+
+cookieAtual = '';
+r = await chamar('entrar', { login:'carolina.mendes', chave:CHAVE_M });
+t('a Miss entra com a senha de hoje', r.ok === true);
+const cookieAntigo = cookieAtual;
+
+r = await chamar('gerarRecuperacao', { codigo: CODIGO });
+t('ela gera o próprio código', r.ok === true, JSON.stringify(r));
+
+r = await chamar('eu');
+t('o perfil passa a dizer que existe um código',
+  r.ok && !!r.dados.recuperacaoEm, JSON.stringify(r.dados && r.dados.recuperacaoEm));
+t('mas o código em si nunca volta do servidor',
+  !JSON.stringify(r.dados).includes('K7M2') && !JSON.stringify(r.dados).includes('Q9XT'),
+  JSON.stringify(r.dados));
+
+cookieAtual = '';
+r = await chamar('recuperarSenha', { login:'carolina.mendes', codigo:OUTRO_CODIGO, chave:CHAVE_NOVA });
+const recusaCodigoErrado = r.erro;
+t('código errado é recusado', !r.ok && r.http === 401, JSON.stringify(r));
+
+r = await chamar('recuperarSenha', { login:'ninguem.existe', codigo:CODIGO, chave:CHAVE_NOVA });
+t('login inexistente dá a MESMA recusa', !r.ok && r.erro === recusaCodigoErrado,
+  `${r.erro} vs ${recusaCodigoErrado}`);
+
+r = await chamar('recuperarSenha', { login:'bianca.rocha', codigo:CODIGO, chave:CHAVE_NOVA });
+t('conta sem código dá a MESMA recusa também', !r.ok && r.erro === recusaCodigoErrado,
+  `${r.erro} vs ${recusaCodigoErrado}`);
+
+/* As três recusas acima já contam como tentativas: o limite dispara na quinta, então
+   a recuperação boa precisa de um login que ainda não falhou. */
+r = await chamar('recuperarSenha', { login:'carolina.mendes', codigo:CODIGO, chave:CHAVE_NOVA });
+t('com o código certo, a senha troca', r.ok === true, JSON.stringify(r));
+
+cookieAtual = cookieAntigo;
+r = await chamar('ocorrencias');
+t('a sessão aberta com a senha antiga foi encerrada',
+  !r.ok && r.codigo === 'sessao', JSON.stringify(r));
+
+cookieAtual = '';
+r = await chamar('entrar', { login:'carolina.mendes', chave:CHAVE_NOVA });
+t('ela entra com a senha nova', r.ok === true, JSON.stringify(r));
+
+r = await chamar('recuperarSenha', { login:'carolina.mendes', codigo:CODIGO, chave:CHAVE_M });
+t('o código usado não serve de novo', !r.ok && r.http === 401, JSON.stringify(r));
+
+console.log('\n=== Limite de tentativas ===');
+/* Não havia limite nenhum: dava para tentar senha indefinidamente. */
+cookieAtual = '';
+const alvo = 'alvo.do.limite';
+let ultima = null;
+for(let i = 0; i < 6; i++) ultima = await chamar('entrar', { login:alvo, chave:'0'.repeat(64) });
+t('a sexta tentativa seguida é barrada',
+  !ultima.ok && ultima.codigo === 'excesso' && ultima.http === 429, JSON.stringify(ultima));
+t('e a recusa diz quanto esperar', /minuto/.test(ultima.erro || ''), ultima.erro);
+
+r = await chamar('recuperarSenha', { login:alvo, codigo:CODIGO, chave:CHAVE_NOVA });
+t('o limite vale para a recuperação também',
+  !r.ok && r.codigo === 'excesso', JSON.stringify(r));
+
+/* Limpa as tentativas, senão as suítes seguintes herdam o bloqueio. */
+await _db.consultar(`DELETE FROM log WHERE acao IN ('entrada_negada','recuperacao_negada')`);
+
+/* A recuperação encerrou as sessões da Miss de propósito, e a senha dela mudou. O
+   resto da suíte continua usando essa conta, então a sessão é refeita aqui — a
+   alternativa seria espalhar o conserto por cinco asserções distantes. */
+cookieAtual = '';
+await chamar('entrar', { login:'carolina.mendes', chave:CHAVE_NOVA });
+cookieMiss = cookieAtual;
+cookieAtual = cookieGestao;
 
 console.log('\n=== Maiúscula de nome, no servidor ===');
 /* A tela já normaliza; o servidor também, porque quem não passa pela tela — um

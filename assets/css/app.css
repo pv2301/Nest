@@ -181,6 +181,10 @@ textarea.input{min-height:96px;resize:vertical;line-height:1.55;font-size:14.5px
 .erromsg{font-size:12px;color:var(--g4);margin:5px 0 0;font-weight:500}
 
 .chips{display:flex;flex-wrap:wrap;gap:7px}
+/* 44px é o mínimo que um polegar acerta — a medida que Apple e Material usam. Uma
+   varredura com toque de verdade encontrou vinte e três alvos abaixo disso: errar um
+   chip de 40px na vertical não acerta nada, e errar na horizontal acerta o chip
+   vizinho, o que se sente como "toquei num e marcou outro". */
 .chip{padding:0 15px;border-radius:var(--r-pill);border:0;background:var(--surface-2);
   font-size:13.5px;font-weight:500;min-height:44px;display:flex;align-items:center;gap:7px;transition:background .12s}
 .chip[aria-pressed="true"]{background:var(--cta-bg);color:var(--cta-fg);font-weight:600}
@@ -344,6 +348,13 @@ textarea.input{min-height:96px;resize:vertical;line-height:1.55;font-size:14.5px
 .previa p:last-child{white-space:pre-wrap}
 @media print{ .previa{display:none} }
 
+/* ---------- código de recuperação ---------- */
+/* Monoespaçado e grande: é para ser copiado à mão num papel sem errar caractere. */
+.codigo{font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:19px;
+  font-weight:700;letter-spacing:.08em;text-align:center;margin:0;padding:14px 8px;
+  background:var(--surface-2);border-radius:var(--r-sm);word-break:break-all;
+  user-select:all;-webkit-user-select:all}
+
 /* ---------- auditoria ---------- */
 /* Lista densa de propósito: o valor dela é poder correr o olho por muitas linhas.
    A hora fica numa coluna fixa para as linhas se alinharem. */
@@ -418,7 +429,7 @@ textarea.input{min-height:96px;resize:vertical;line-height:1.55;font-size:14.5px
 .cal-mes{font-family:var(--font-display);font-size:20px;font-weight:800}
 .cal-ano-n{color:var(--muted);font-weight:600;font-size:15px;margin-left:4px}
 .cal-nav{margin-left:auto;display:flex;gap:6px}
-.cal-nav button{width:38px;height:38px;border-radius:50%;background:var(--surface-2);color:var(--muted);
+.cal-nav button{width:44px;height:44px;border-radius:50%;background:var(--surface-2);color:var(--muted);
   font-size:18px;line-height:1;display:grid;place-items:center}
 .cal-sem{display:grid;grid-template-columns:repeat(7,1fr)}
 .cal-sem span{text-align:center;font-size:10.5px;font-weight:700;color:var(--muted);letter-spacing:.04em}
@@ -471,11 +482,13 @@ textarea.input{min-height:96px;resize:vertical;line-height:1.55;font-size:14.5px
 .cl-seta{color:var(--muted);font-size:13px;flex:none}
 .cl-lista{background:var(--surface);border-radius:0 0 var(--r) var(--r);overflow:hidden;
   box-shadow:var(--shadow);border-top:1px solid var(--line)}
-.cl-busca{display:flex;align-items:center;gap:10px;padding:12px 15px;border-bottom:1px solid var(--line)}
+.cl-busca{display:flex;align-items:center;gap:10px;padding:4px 15px;border-bottom:1px solid var(--line);min-height:52px}
 .cl-busca .ic{color:var(--muted);display:grid;place-items:center;flex:none}
 .cl-busca .ic svg{width:17px;height:17px;display:block}
 .tok .x{cursor:pointer;padding:0 2px}
-.cl-busca input{border:0;outline:0;background:transparent;font:inherit;font-size:16px;width:100%;color:var(--fg)}
+/* O campo ocupa a altura toda da faixa: antes o alvo tinha 28px e o resto da
+   faixa não respondia ao toque, o que num celular parece campo que não abre. */
+.cl-busca input{border:0;outline:0;background:transparent;font:inherit;font-size:16px;width:100%;color:var(--fg);min-height:44px}
 .cl-ops{max-height:46vh;overflow-y:auto;overscroll-behavior:contain}
 .cl-op{display:flex;align-items:center;gap:11px;width:100%;text-align:left;min-height:52px;
   padding:9px 15px;border:0;background:transparent;font-size:14.5px;color:var(--fg)}
@@ -511,7 +524,7 @@ textarea.input{min-height:96px;resize:vertical;line-height:1.55;font-size:14.5px
 .busca .input{padding-left:40px;background:var(--surface);box-shadow:var(--shadow)}
 .busca .ic{left:14px}
 
-.chip.sm{min-height:40px;padding:0 13px;font-size:13px}
+.chip.sm{min-height:44px;padding:0 13px;font-size:13px}
 .chip.kid .fs11{margin-left:2px}
 
 /* ---------- ficha para impressão ---------- */

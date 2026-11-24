@@ -32,6 +32,42 @@ async function hashSenha(chave){
 
 const conferirSenha = (chave, hash) => bcrypt.compare(String(chave || ''), String(hash || ''));
 
+/* ---------- código de recuperação ----------
+
+   O código tem ~81 bits de acaso, então o hash é SHA-256 e não bcrypt: bcrypt existe
+   para tornar lenta a adivinhação de senha humana, que é curta e previsível. Aqui não
+   há o que adivinhar, e o mesmo hashToken já guarda o token de sessão pelo mesmo
+   motivo. */
+const normalizaCodigo = v => String(v || '').toUpperCase().replace(/[^0-9A-HJ-NP-Z]/g, '');
+const hashCodigo = c => hashToken(normalizaCodigo(c));
+
+/* ---------- limite de tentativas ----------
+
+   Não havia limite nenhum no app, nem no login: dava para tentar senha
+   indefinidamente. A contagem sai da tabela `log`, que já registra cada falha e já
+   tem índice por `quando` — não precisa de tabela nova, e a auditoria ganha uma
+   função operacional além da de prestar contas.
+
+   O bloqueio é por login tentado e não por conta: não mexe em `status`, não precisa
+   da gestão para destravar, expira sozinho, e protege também logins que não existem
+   sem revelar quais são. */
+const FALHAS_ATE_TRAVAR = 5;
+const JANELA_MIN = 10;
+
+async function conferirLimite(login){
+  const r = await uma(
+    `SELECT count(*)::int AS n, max(quando) AS ultima FROM log
+     WHERE login = $1 AND acao IN ('entrada_negada','recuperacao_negada')
+       AND quando > now() - interval '${JANELA_MIN} minutes'`,
+    [String(login || '')]);
+  if(!r || r.n < FALHAS_ATE_TRAVAR) return;
+  const faltam = Math.max(1, Math.ceil(
+    (new Date(r.ultima).getTime() + JANELA_MIN * 60000 - Date.now()) / 60000));
+  throw new ErroApi(
+    `Muitas tentativas. Espere ${faltam} minuto${faltam > 1 ? 's' : ''} e tente de novo.`,
+    'excesso', 429);
+}
+
 /* ---------- cookie ---------- */
 function lerCookie(req, nome){
   const bruto = req.headers && req.headers.cookie;
@@ -111,7 +147,10 @@ function contaPublica(c){
     criadoEm: c.criado_em ? new Date(c.criado_em).toISOString() : '',
     aprovadoPor: c.aprovado_por || '',
     aprovadoEm: c.aprovado_em ? new Date(c.aprovado_em).toISOString() : '',
-    trocarSenha: !!c.trocar_senha
+    trocarSenha: !!c.trocar_senha,
+    /* A data, nunca o código: o perfil precisa saber se existe um e desde quando,
+       e o hash não sai daqui. */
+    recuperacaoEm: c.recuperacao_em ? new Date(c.recuperacao_em).toISOString() : ''
   };
 }
 
@@ -124,6 +163,7 @@ function validaLogin(login){
 module.exports = {
   ErroApi, COOKIE,
   hashSenha, conferirSenha, hashToken,
+  normalizaCodigo, hashCodigo, conferirLimite,
   abrirSessao, fecharSessao, exigeSessao, exigeGestao,
   lerCookie, limparCookie,
   contaPublica, validaLogin, registrar

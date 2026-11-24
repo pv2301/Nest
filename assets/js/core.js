@@ -40,7 +40,7 @@ export function registrarTela(nome, fn){ TELAS[nome] = fn; }
 /* Ganchos rodados depois de cada render (ex.: pintar o heatmap). */
 export const posRender = [];
 
-const SEM_CHROME = new Set(['entrada','entrar','criar','criado','biometria','configurar','trocarSenha','desbloquear']);
+const SEM_CHROME = new Set(['entrada','entrar','criar','criado','biometria','configurar','trocarSenha','desbloquear','recuperar']);
 
 /* ---------- navegação ----------
    O histórico do navegador acompanha a navegação interna, para o gesto de voltar do
@@ -333,6 +333,7 @@ function barraSuperior(){
     conta:'Minha conta', alunos:'Alunos e turmas', aluno:'Aluno', ficha:'Gerar relatório',
     ajuda:'Como funciona', gestao:'Gestão', calendario:'Calendário',
     visao:'Visão geral', auditoria:'Auditoria', removidos:'Registros removidos',
+    recuperar:'Recuperar senha',
     turma:'Turma' + (S.turmaSel && S.turmaSel.nome ? ' ' + S.turmaSel.nome : '')
   };
   const comVoltar = ['detalhe','novo','rapido','wizard','usuario','conta','aluno','ficha','ajuda',

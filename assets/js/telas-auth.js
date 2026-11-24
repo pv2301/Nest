@@ -7,7 +7,7 @@ import { Store } from './store.js';
 import {
   esc, RINGBG, SEAL, ICON, svgIc,
   validaLogin, validaSenha, requisitosSenha, normalizaLogin, sugereLogin, senhaTemporaria,
-  criptoDisponivel
+  criptoDisponivel, soData
 } from './util.js';
 import { tituloNome } from './nomes.mjs';
 import { RETENCAO_FOTO_DIAS } from './regras.mjs';
@@ -67,7 +67,8 @@ registrarTela('entrar', () => `
         <button class="btn" type="submit" ${S.ocupado ? 'disabled' : ''}>${S.ocupado ? 'Entrando…' : 'Entrar'}</button>
         <button class="btn ghost sm" type="button" style="width:100%" onclick="app.voltar()">Voltar</button>
       </form>
-      <p class="fs11 muted center" style="margin:0">Esqueceu a senha? Fale com a gestão.</p>
+      <button class="btn ghost sm" type="button" style="width:100%"
+        onclick="app.ir('recuperar')">Esqueceu a senha?</button>
       ${rodape()}
     </div>
   </div>`);
@@ -399,6 +400,26 @@ registrarTela('conta', () => {
       </button>
       ${S.modo === 'api' ? '' : `<div class="notice info">Sem servidor configurado: os
         registros ficam guardados só neste aparelho e ninguém mais os vê.</div>`}
+
+      ${S.codigoNovo ? `<div class="card lift stack s8" style="border-color:var(--accent-text)">
+        <p class="sec-label" style="margin:0">Guarde este código</p>
+        <p class="codigo">${esc(S.codigoNovo)}</p>
+        <p class="fs12 muted" style="margin:0">É o que permite você mesma trocar a senha
+          se esquecê-la. Não será mostrado de novo — anote, fotografe ou guarde no seu
+          gerenciador de senhas.</p>
+        <div class="row" style="gap:8px">
+          <button class="btn soft sm" style="flex:1" onclick="app.copiarCodigo()">Copiar</button>
+          <button class="btn ghost sm" style="flex:1" onclick="app.fecharCodigo()">Já guardei</button>
+        </div>
+      </div>` : `<button class="urow" onclick="app.gerarRecuperacao()">
+        <span class="grow">
+          <span class="lin-t">Código de recuperação</span>
+          <span class="fs11 muted">${c.recuperacaoEm
+            ? 'Criado em ' + esc(soData(c.recuperacaoEm)) + ' · gerar outro invalida o anterior'
+            : 'Para trocar a senha sozinha, sem a gestão'}</span>
+        </span>
+        <span class="fs11 muted">${c.recuperacaoEm ? 'trocar' : 'criar'}</span>
+      </button>`}
     </div>
 
     <div class="stack s8">
@@ -419,6 +440,93 @@ registrarTela('conta', () => {
     ${rodape()}
   </div>`;
 });
+
+app.gerarRecuperacao = async () => {
+  try {
+    S.codigoNovo = await Store.gerarRecuperacao();
+    /* A data vem do servidor na próxima sincronização; aqui basta não mentir. */
+    S.conta = { ...S.conta, recuperacaoEm: new Date().toISOString() };
+    render();
+  } catch(e){ toast('Não consegui gerar: ' + e.message); }
+};
+
+app.copiarCodigo = async () => {
+  try {
+    await navigator.clipboard.writeText(S.codigoNovo);
+    toast('Código copiado');
+  } catch { toast('Copie o código à mão — este navegador não deixa copiar sozinho.'); }
+};
+
+app.fecharCodigo = () => { S.codigoNovo = null; render(); };
+
+/* ---------------------------------------------------------------- recuperar senha
+
+   A tela de login dizia "Fale com a gestão", e numa sexta à noite isso trancava a
+   pessoa fora. Com o código que ela guardou, ela se vira. */
+registrarTela('recuperar', () => `
+  <div class="loginwrap">
+    <div class="stack s18">
+      ${cabecalhoMarca()}
+      ${erroBloco()}
+      <form class="card lift stack" onsubmit="app.submeterRecuperar(event)">
+        <div class="field">
+          <label for="r-login">Login</label>
+          <input class="input" id="r-login" autocomplete="username" inputmode="text"
+                 placeholder="nome.sobrenome" oninput="app.normaliza('r-login')">
+        </div>
+        <div class="field">
+          <label for="r-codigo">Código de recuperação</label>
+          <input class="input" id="r-codigo" autocomplete="one-time-code"
+                 placeholder="XXXX-XXXX-XXXX-XXXX" spellcheck="false" autocapitalize="characters">
+        </div>
+        <div class="field">
+          <label for="r-senha">Nova senha</label>
+          <input class="input" id="r-senha" type="password" autocomplete="new-password"
+                 oninput="app.checarSenhaR()">
+          <div class="reqs" id="r-reqs">${listaReqs('')}</div>
+        </div>
+        <div class="field">
+          <label for="r-senha2">Repetir a nova senha</label>
+          <input class="input" id="r-senha2" type="password" autocomplete="new-password">
+        </div>
+        <button class="btn" type="submit" ${S.ocupado ? 'disabled' : ''}>${
+          S.ocupado ? 'Trocando…' : 'Trocar a senha'}</button>
+        <button class="btn ghost sm" type="button" style="width:100%"
+          onclick="app.ir('entrar')">Voltar</button>
+      </form>
+      <p class="fs11 muted center" style="margin:0">Sem o código, a gestão redefine a senha
+        pela tela de Usuários.</p>
+      ${rodape()}
+    </div>
+  </div>`);
+
+app.checarSenhaR = () => {
+  const el = document.getElementById('r-reqs');
+  if(el) el.innerHTML = listaReqs(val('r-senha'));
+};
+
+app.submeterRecuperar = async ev => {
+  ev.preventDefault();
+  const login = normalizaLogin(val('r-login'));
+  const codigo = val('r-codigo'), senha = val('r-senha'), senha2 = val('r-senha2');
+  const erroSenha = validaSenha(senha);
+  if(!login || !codigo) return erro('Informe o login e o código de recuperação.');
+  if(erroSenha) return erro(erroSenha);
+  if(senha !== senha2) return erro('As senhas não são iguais.');
+
+  S.ocupado = true; S.formErro = ''; render();
+  try {
+    await Store.recuperarSenha(login, codigo, senha);
+    S.ocupado = false;
+    /* A mensagem vem depois do ir(), que limpa S.formErro ao trocar de tela — sem
+       isto a pessoa trocava a senha e a tela voltava ao login sem dizer nada. */
+    ir('entrar', { guardar:false });
+    S.formErro = 'Senha trocada. Entre com a senha nova.';
+    render();
+  } catch(e){
+    erro(e.message);
+  }
+};
 
 /* Guardado no aparelho e aplicado na raiz. O index.html relê a mesma chave antes da
    pintura, para a próxima abertura já nascer no tema certo. */

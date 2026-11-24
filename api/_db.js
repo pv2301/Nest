@@ -106,6 +106,11 @@ const ESQUEMA = [
    )`,
   /* Marca explícita de demonstração. Antes a limpeza adivinhava pelo formato do id,
      o que um dia apagaria dado real. */
+  /* Código de recuperação de senha: só o hash, como o token de sessão. Nem quem o
+     gerou consegue vê-lo de novo — por isso a tela o mostra uma vez só. */
+  `ALTER TABLE contas ADD COLUMN IF NOT EXISTS recuperacao_hash TEXT`,
+  `ALTER TABLE contas ADD COLUMN IF NOT EXISTS recuperacao_em TIMESTAMPTZ`,
+
   `ALTER TABLE alunos ADD COLUMN IF NOT EXISTS demo BOOLEAN NOT NULL DEFAULT false`,
   `ALTER TABLE turmas ADD COLUMN IF NOT EXISTS demo BOOLEAN NOT NULL DEFAULT false`,
   `ALTER TABLE contas ADD COLUMN IF NOT EXISTS demo BOOLEAN NOT NULL DEFAULT false`,

@@ -179,6 +179,18 @@ t('o sufixo não usa I nem O, que se confundem com 1 e 0',
 t('o id antigo de quatro dígitos repetiria',
   new Set(Array.from({length:50}, () => String(Date.now()).slice(-4))).size < 50);
 
+console.log('\n=== Código de recuperação ===');
+const cods = Array.from({ length: 2000 }, () => U.novoCodigoRecuperacao());
+t('o formato é quatro grupos de quatro', /^[0-9A-HJ-NP-Z]{4}(-[0-9A-HJ-NP-Z]{4}){3}$/.test(cods[0]), cods[0]);
+t('dois mil sorteios, nenhum repetido', new Set(cods).size === 2000,
+  `${2000 - new Set(cods).size} repetidos`);
+t('sem I e sem O, que à mão viram 1 e 0', cods.every(c => !/[IO]/.test(c)));
+t('digitado torto é a mesma chave',
+  U.normalizaCodigo(' k7m2 q9xt-4bnr p3wh ') === U.normalizaCodigo('K7M2-Q9XT-4BNR-P3WH'),
+  U.normalizaCodigo(' k7m2 q9xt-4bnr p3wh '));
+t('e a chave normalizada tem 16 caracteres',
+  U.normalizaCodigo(cods[0]).length === 16, U.normalizaCodigo(cods[0]));
+
 console.log(falhas
   ? `\n=== ${falhas} de ${total} FALHARAM ===`
   : `\n=== ${total} TESTES DE NOMES PASSARAM ===`);

@@ -115,6 +115,8 @@ async function criarConta(d){
 }
 
 async function entrar(d, res){
+  /* Antes disto não havia limite nenhum: dava para tentar senha indefinidamente. */
+  await A.conferirLimite(d.login);
   const c = await uma('SELECT * FROM contas WHERE login=$1', [d.login]);
   /* Mesma mensagem para login inexistente e senha errada: não revela quem existe. */
   const ok = c && await A.conferirSenha(d.chave, c.senha_hash);
@@ -315,6 +317,55 @@ async function removerAluno(eu, d){
   await registrar(eu.login, 'remove_aluno',
     a.nome + (tocados ? ` — nome preservado em ${tocados} registro(s)` : ''));
   return (await todas('SELECT * FROM alunos ORDER BY nome')).map(alunoPublico);
+}
+
+/* ---------- recuperação de senha ----------
+
+   A tela de login dizia "Esqueceu a senha? Fale com a gestão", e numa sexta à noite
+   isso trancava a pessoa fora. Agora ela guarda um código e se vira sozinha.
+
+   Sem e-mail de propósito: a escola não tem domínio próprio, e mensagem de troca de
+   senha vinda de um domínio estranho é o formato exato de um golpe — ensinaria a
+   equipe a clicar justamente no que não deve. */
+
+async function gerarRecuperacao(eu, d){
+  const codigo = String((d || {}).codigo || '');
+  if(A.normalizaCodigo(codigo).length !== 16)
+    throw new ErroApi('Código inválido.', 'dados', 422);
+
+  /* Quem gera é quem está logado, para si. Guardar só o hash é o que impede alguém
+     com acesso ao banco — ou a este código — de usar o código de outra pessoa. */
+  await consultar('UPDATE contas SET recuperacao_hash=$1, recuperacao_em=now() WHERE login=$2',
+    [A.hashCodigo(codigo), eu.login]);
+  await registrar(eu.login, 'gera_recuperacao', '');
+  return { em: new Date().toISOString() };
+}
+
+async function recuperarSenha(d){
+  const login = String((d || {}).login || '').trim();
+  await A.conferirLimite(login);
+
+  const c = await uma('SELECT login, recuperacao_hash FROM contas WHERE login=$1', [login]);
+  const bate = c && c.recuperacao_hash &&
+    c.recuperacao_hash === A.hashCodigo((d || {}).codigo);
+
+  /* Mesma recusa para login inexistente, código errado e conta sem código: senão
+     esta tela vira uma forma de descobrir quem trabalha na escola. */
+  if(!bate){
+    await registrar(login || '?', 'recuperacao_negada', '');
+    throw new ErroApi('Login ou código de recuperação incorretos.', 'credenciais', 401);
+  }
+
+  await consultar(
+    `UPDATE contas SET senha_hash=$1, recuperacao_hash=NULL, recuperacao_em=NULL,
+            trocar_senha=false WHERE login=$2`,
+    [await A.hashSenha(d.chave), login]);
+
+  /* Quem entrou com a senha antiga tem de ser expulso: trocar a senha sem fechar as
+     sessões deixaria a porta velha aberta. */
+  await consultar('DELETE FROM sessoes WHERE login=$1', [login]);
+  await registrar(login, 'recuperacao_usada', '');
+  return true;
 }
 
 /* ---------- auditoria ----------
@@ -613,6 +664,9 @@ async function despachar(acao, dados, req, res){
     case 'restaurarOcorrencia': return restaurarOcorrencia(await A.exigeGestao(req), dados);
     case 'ocorrenciasRemovidas':return ocorrenciasRemovidas(await A.exigeGestao(req));
     case 'auditoria':           return auditoria(await A.exigeGestao(req), dados);
+    case 'gerarRecuperacao':    return gerarRecuperacao(await A.exigeSessao(req), dados);
+    /* Sem sessão de propósito: é o ponto da coisa — quem a usa não consegue entrar. */
+    case 'recuperarSenha':      return recuperarSenha(dados);
     case 'contas':           return (await A.exigeGestao(req)) &&
                                     (await todas('SELECT * FROM contas ORDER BY nome')).map(A.contaPublica);
     case 'atualizarConta':   return atualizarConta(await A.exigeGestao(req), dados);

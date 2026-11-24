@@ -10,7 +10,8 @@
 import { CONFIG } from '../../config.js';
 import { tituloNome } from './nomes.mjs';
 import { RETENCAO_FOTO_DIAS } from './regras.mjs';
-import { derivarChave, resumoLocal, carimbo, iniciais, primeiroNome } from './util.js';
+import { derivarChave, resumoLocal, carimbo, iniciais, primeiroNome,
+         novoCodigoRecuperacao, normalizaCodigo } from './util.js';
 import { DEMO_CONTAS, DEMO_OCORRENCIAS, SEMENTE_ALUNOS, SEMENTE_TURMAS } from './demonstracao.js';
 
 const K = { contas:'reg.contas', ocs:'reg.ocorrencias', sessao:'reg.sessao',
@@ -170,6 +171,40 @@ export const Store = {
       const c = contasLocais().find(x => x.login === s.login && x.status === 'ativo');
       return c ? publica(c) : null;
     } catch { return null; }
+  },
+
+  /* ---------- recuperação de senha ----------
+     O código é sorteado aqui, mostrado uma vez à pessoa e mandado ao servidor, que
+     guarda só o hash. Depois disto nem este código nem o servidor conseguem
+     mostrá-lo de novo — é o que faz dele um segredo e não uma formalidade. */
+  async gerarRecuperacao(){
+    const codigo = novoCodigoRecuperacao();
+    if(temApi()) await api('gerarRecuperacao', { codigo });
+    else {
+      const cs = contasLocais();
+      const sess = LS.ler(K.sessao, null);
+      const c = cs.find(x => x.login === (sess && sess.login));
+      if(!c) throw new ErroStore('Conta não encontrada.', 'inexistente');
+      c.recuperacao = await resumoLocal(normalizaCodigo(codigo));
+      c.recuperacaoEm = carimbo();
+      gravarContasLocais(cs);
+    }
+    return codigo;
+  },
+
+  async recuperarSenha(login, codigo, senhaNova){
+    const chave = await derivarChave(senhaNova, login);
+    if(temApi()) return await api('recuperarSenha', { login, codigo, chave });
+    const cs = contasLocais();
+    const c = cs.find(x => x.login === login);
+    const bate = c && c.recuperacao && c.recuperacao === await resumoLocal(normalizaCodigo(codigo));
+    /* Mesma recusa dos dois lados, pelo mesmo motivo. */
+    if(!bate) throw new ErroStore('Login ou código de recuperação incorretos.', 'credenciais');
+    c.resumo = await resumoLocal(chave);
+    delete c.recuperacao; delete c.recuperacaoEm; delete c.trocarSenha;
+    gravarContasLocais(cs);
+    LS.apagar(K.sessao);
+    return true;
   },
 
   async trocarSenha(login, senhaNova){
