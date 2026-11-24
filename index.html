@@ -58,7 +58,12 @@
        que abriu o app continuou rodando o JavaScript daquele dia, com um bug de
        toque já corrigido, sem que recarregar resolvesse. Hoje js e css saem com
        'no-cache' — guardados, mas revalidados — em vercel.json. Se um dia entrar
-       uma etapa de compilação com nome versionado, aí sim 'immutable' volta. -->
+       uma etapa de compilação com nome versionado, aí sim 'immutable' volta.
+
+       Detalhe medido no ar: quando duas regras de cabeçalho casam com o mesmo
+       endereço, a última vence. Por isso a regra ampla de /assets/ vem antes das
+       específicas de js e css, e não depois — invertido, ela sobrescrevia o
+       'no-cache' que acabara de ser posto. -->
   <script type="module" src="assets/js/app.js"></script>
 </body>
 </html>
