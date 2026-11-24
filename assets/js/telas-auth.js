@@ -594,7 +594,11 @@ registrarTela('ajuda', () => `
         <dt>Fotos</dt><dd>Apagadas em ${RETENCAO_FOTO_DIAS} dias. Visíveis à cadeia de ciência e à gestão; todo acesso fica em log.</dd>
         <dt>Contas</dt><dd>A gestão aprova cada conta nova e define função e turma.</dd>
         <dt>Relatório</dt><dd>Três versões: sem identificar (padrão), para a família e de uso interno.</dd>
+        <dt>Senha</dt><dd>Esqueceu? Use o código de recuperação do seu perfil. Sem ele, a gestão redefine.</dd>
       </dl>
     </div>
+    ${S.versao ? `<p class="fs11 muted center" style="margin:0">
+      Versão publicada em ${esc(soData(S.versao.publicado))}
+      ${S.versao.publicado.slice(11, 16) ? 'às ' + esc(S.versao.publicado.slice(11, 16)) : ''}</p>` : ''}
     ${rodape()}
   </div>`);

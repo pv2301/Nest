@@ -17,6 +17,7 @@
   },
   "scripts": {
     "test": "node testes/executar.mjs",
-    "test:navegador": "node testes/navegador.mjs"
+    "test:navegador": "node testes/navegador.mjs",
+    "versao": "node testes/carimbar-versao.mjs"
   }
 }

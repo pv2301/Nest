@@ -20,8 +20,22 @@ function aplicarIdentidade(){
   document.title = nome ? `Registros ${nome}` : 'Registro de ocorrências';
 }
 
+/* Qual versão está rodando neste aparelho.
+
+   Existe porque "será que é cache?" era adivinhação dos dois lados. Com a data na
+   tela, a primeira pergunta diante de um problema deixa de ser essa.
+
+   Falhar aqui não pode atrapalhar nada: sem o arquivo, a tela só não mostra a data. */
+async function lerVersao(){
+  try {
+    const r = await fetch('assets/versao.json', { cache:'no-store' });
+    if(r.ok) S.versao = await r.json();
+  } catch {}
+}
+
 async function iniciar(){
   S.modo = Store.modo();
+  lerVersao();
   aplicarIdentidade();
   render();
   ligarPuxar();

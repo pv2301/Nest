@@ -49,6 +49,16 @@
     </div>
   </noscript>
 
+  <!-- Estes dois endereços nunca mudam de nome: não há etapa de compilação que
+       gere app.a3f9c1.js, e isso é escolha do projeto — editar um arquivo e
+       publicar, sem ferramenta no meio.
+
+       O preço é que o cache não pode prometer imutabilidade. Por um tempo
+       prometeu: /assets/* saía com max-age de um ano e 'immutable', e um celular
+       que abriu o app continuou rodando o JavaScript daquele dia, com um bug de
+       toque já corrigido, sem que recarregar resolvesse. Hoje js e css saem com
+       'no-cache' — guardados, mas revalidados — em vercel.json. Se um dia entrar
+       uma etapa de compilação com nome versionado, aí sim 'immutable' volta. -->
   <script type="module" src="assets/js/app.js"></script>
 </body>
 </html>
