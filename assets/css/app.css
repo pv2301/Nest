@@ -266,11 +266,38 @@ textarea.input{min-height:96px;resize:vertical;line-height:1.55;font-size:14.5px
 .tile small{font-size:11px;color:var(--muted);display:block;margin-top:3px;line-height:1.3}
 .tile.mark{border-top:3px solid var(--g2-mark)}
 .tile.mark3{border-top:3px solid var(--g3-mark)}
-.heat{display:grid;grid-template-columns:70px repeat(6,1fr);gap:3px;font-variant-numeric:tabular-nums}
-.heat .hh{font-size:8.5px;color:var(--muted);text-align:center;font-weight:600;padding-bottom:2px}
-.heat .rl{font-size:10px;color:var(--muted);display:flex;align-items:center;min-width:0;overflow:hidden;
-  text-overflow:ellipsis;white-space:nowrap;font-weight:500}
-.heat .cell{aspect-ratio:1/1;border-radius:4px;display:grid;place-items:center;font-size:9.5px;font-weight:700}
+/* ---------- quando e onde acontece ----------
+
+   As colunas eram 1fr, isto é, dividiam o que houvesse. Num dia escolar inteiro —
+   das 7h às 18h, doze colunas — isso dava células de 20x20px com número de 9,5px e
+   rótulo de hora maior que a própria coluna. Não transbordava da tela: espremia até
+   ficar ilegível, que é pior, porque parece que está tudo certo.
+
+   Agora a coluna tem largura fixa e a tabela rola na horizontal quando não cabe. O
+   nome do lugar fica grudado na esquerda enquanto se arrasta, senão as células
+   perdem a referência de qual linha são. */
+/* O véu na borda direita é o que avisa que há mais a ver. Sem ele, uma coluna
+   cortada no meio parece defeito, não convite para arrastar — foi assim que o
+   problema chegou até mim. Some quando a tabela acaba. */
+.heat-cx{position:relative}
+.heat-cx::after{content:"";position:absolute;top:0;right:0;bottom:0;width:34px;
+  pointer-events:none;opacity:0;transition:opacity .15s;
+  background:linear-gradient(to right,transparent,var(--surface))}
+.heat-cx.tem-mais::after{opacity:1}
+/* Sem padding lateral: com ele, sobrava uma fresta de 2px à esquerda por onde as
+   células passavam por baixo da coluna de nomes. */
+.heat-rolagem{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch}
+.heat{display:grid;gap:3px;font-variant-numeric:tabular-nums;width:max-content;min-width:100%}
+.heat .hh{font-size:9.5px;color:var(--muted);text-align:center;font-weight:600;padding-bottom:2px}
+/* Grudado na esquerda: sem isto, arrastar até as 18h deixa as linhas sem nome. O
+   fundo é opaco porque as células passam por baixo. */
+.heat .rl{font-size:11px;color:var(--muted);display:flex;align-items:center;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;
+  position:sticky;left:0;z-index:1;background:var(--surface);padding-right:7px}
+.heat .cell{width:34px;height:34px;border-radius:5px;display:grid;place-items:center;
+  font-size:11px;font-weight:700}
+/* O canto de cima à esquerda também gruda, senão desliza por cima dos nomes. */
+.heat .canto{position:sticky;left:0;z-index:2;background:var(--surface)}
 .bars{display:flex;flex-direction:column;gap:8px}
 .bar-row{display:grid;grid-template-columns:1fr 38px;gap:9px;align-items:center;font-size:12px;min-width:0}
 .bar-row .lab{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

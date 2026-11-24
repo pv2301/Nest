@@ -83,13 +83,20 @@ function corpoPainel(){
     <div class="card">
       <p class="sec-label">Quando e onde acontece</p>
       ${grade.linhas.length ? `
-      <div class="heat" id="heat" style="grid-template-columns:76px repeat(${grade.horas.length},1fr)">
-        <div></div>${grade.horas.map(h => `<div class="hh">${h}h</div>`).join('')}
-        ${grade.linhas.map(l => `<div class="rl" title="${esc(l.local)}">${esc(l.local)}</div>` +
-          l.celulas.map(n => `<div class="cell" data-n="${n}" data-max="${grade.max}">${n || ''}</div>`).join('')).join('')}
-      </div>
+      <!-- Largura fixa por coluna e rolagem horizontal quando não couber. Com 1fr,
+           um dia escolar inteiro espremia as células a 20px. -->
+      <div class="heat-cx"><div class="heat-rolagem">
+        <div class="heat" id="heat"
+             style="grid-template-columns:108px repeat(${grade.horas.length},34px)">
+          <div class="canto"></div>${grade.horas.map(h => `<div class="hh">${h}h</div>`).join('')}
+          ${grade.linhas.map(l => `<div class="rl" title="${esc(l.local)}">${esc(l.local)}</div>` +
+            l.celulas.map(n => `<div class="cell" data-n="${n}" data-max="${grade.max}">${n || ''}</div>`).join('')).join('')}
+        </div>
+      </div></div>
+      <!-- Com máximo 2, "poucos" ficava entre 0 e 2 querendo dizer exatamente 1. -->
       <div class="legend" style="margin-top:10px"><span><i style="background:var(--surface-2)"></i>0</span>
-        <span><i style="background:color-mix(in srgb,var(--teal) 44%,var(--surface))"></i>poucos</span>
+        <span><i style="background:color-mix(in srgb,var(--teal) 44%,var(--surface))"></i>${
+          grade.max <= 2 ? '1' : 'poucos'}</span>
         <span><i style="background:var(--teal)"></i>${grade.max}</span></div>
       `
       : '<p class="fs12 muted" style="margin:0">Sem horário registrado no período.</p>'}
@@ -130,6 +137,16 @@ function corpoPainel(){
 }
 
 posRender.push(() => {
+  /* Liga e desliga o véu da borda conforme ainda haja coluna por ver. */
+  const rol = document.querySelector('.heat-rolagem');
+  if(rol){
+    const cx = rol.parentElement;
+    const avaliar = () =>
+      cx.classList.toggle('tem-mais', rol.scrollLeft + rol.clientWidth < rol.scrollWidth - 2);
+    avaliar();
+    rol.addEventListener('scroll', avaliar, { passive:true });
+  }
+
   document.querySelectorAll('#heat .cell').forEach(c => {
     const n = +c.dataset.n, max = +c.dataset.max || 1;
     const pct = n === 0 ? 0 : Math.round(24 + (n / max) * 70);
