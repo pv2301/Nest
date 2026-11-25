@@ -107,6 +107,15 @@ function opcoesHTML(cfg, q){
   }).join('');
 }
 
+/* A lista de escolha múltipla NÃO fecha a cada toque — é o que permite escolher
+   várias. O problema é que sem uma saída explícita ela vira uma armadilha no
+   celular: ela ocupa 46vh com rolagem própria e overscroll-behavior:contain, então
+   quem tenta rolar para alcançar o campo seguinte rola a lista por dentro e a página
+   não anda. Com duas crianças escolhidas, medido num Pixel 7, "Papel nesta
+   ocorrência" ficava em y=975 numa tela de 915 — fora de alcance.
+
+   Tocar fora fecha, mas os campos de baixo estão dentro de um .esc, e o handler de
+   fora ignora o que está dentro de um. Daí o botão Pronto: a saída que faltava. */
 function campoLista(cfg){
   const lista = normaliza(cfg.opcoes);
   const aberto = S.listaAberta === cfg.id;
@@ -144,6 +153,8 @@ function campoLista(cfg){
       <div class="cl-ops" id="ops-${esc(cfg.id)}" role="listbox"
            ${cfg.multipla ? 'aria-multiselectable="true"' : ''}>${opcoesHTML(cfg, '')}</div>
       ${cfg.rodape || ''}
+      ${cfg.multipla ? `<button type="button" class="cl-pronto"
+        onclick="app.fecharLista()">Pronto${marcadas.length ? ` · ${marcadas.length}` : ''}</button>` : ''}
     </div>` : ''}
     ${erroHTML(cfg)}
   </div>`;
