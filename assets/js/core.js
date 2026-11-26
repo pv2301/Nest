@@ -27,7 +27,8 @@ export const S = {
   rascunho: null, passo: 1, modoRegistro: null,
   detalhe: null, usuarioSel: null,
   formErro: null, ocupado: false, toastMsg: null,
-  sincronizando: false, salvando: false, contagemDemo: null, confirmarLimpeza: false
+  sincronizando: false, salvando: false, contagemDemo: null, confirmarLimpeza: false,
+  heatCheio: false
 };
 
 /* Ações chamadas pelos onclick dos templates. Cada módulo de tela acrescenta as suas. */
@@ -82,7 +83,9 @@ export function avancarPasso(){
 /** Navegação real. Chamada pelo popstate — e diretamente só quando não há histórico. */
 export function voltar(){
   /* Com uma lista aberta, voltar fecha a lista em vez de sair da tela — é o que o
-     voltar nativo do Android faz com qualquer menu aberto. */
+     voltar nativo do Android faz com qualquer menu aberto. A tabela em tela cheia
+     entra na mesma cadeia, e antes: ela cobre tudo. */
+  if(S.heatCheio){ S.heatCheio = false; return render(); }
   if(S.listaAberta){ S.listaAberta = null; return render(); }
   if(S.tela === 'wizard' && S.passo > 1){
     S.passo--;

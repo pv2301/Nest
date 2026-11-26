@@ -101,6 +101,13 @@ async function entrarComo(p, login, senha){
  ok('e aceita qualquer imagem', !!foto && foto.accept === 'image/*', JSON.stringify(foto));
  ok('o rótulo diz que dá para escolher da galeria',
     !!foto && /galeria/i.test(foto.rotulo), foto && foto.rotulo);
+ /* Sem `capture`, a documentação promete um menu com câmera e galeria; no aparelho da
+    escola vai direto para a galeria. O rótulo não pode prometer o que não acontece. */
+ ok('e NÃO promete tirar foto, que o aparelho não oferece',
+    !!foto && !/tirar foto/i.test(foto.rotulo), foto && foto.rotulo);
+ ok('o aviso sobre o que fotografar fica',
+    !!foto && /região da lesão/i.test(foto.rotulo) && /sem rosto/i.test(foto.rotulo),
+    foto && foto.rotulo);
 
  await p.fill('#w-desc','Texto origihal com erro de digitacao.'); await p.waitForTimeout(400);
  await p.evaluate(()=>app.irPasso(4)); await p.waitForTimeout(600);

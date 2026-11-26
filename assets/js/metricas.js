@@ -78,6 +78,57 @@ export function agregaPorHoraLocal(ocs, limiteLocais = 6){
   return { horas, linhas, max, total: lista.length };
 }
 
+/* ---------- tamanho da grade na tela cheia ----------
+
+   O cartão usa célula fixa de 34px e rola quando não cabe: com `1fr`, um dia escolar
+   inteiro espremia a célula a 20px. Na tela cheia o problema se inverte — sobra
+   espaço —, e a célula tem de crescer com a tela.
+
+   Só com CSS não dá, e isto foi medido: `minmax(34px,1fr)` enche mas não tem teto, e
+   com 6 horas e 3 locais num monitor a célula ia a 192x212px — um dígito perdido num
+   quadrado. `minmax(34px,72px)` tem teto, mas a etapa de maximizar trilhas do grid
+   leva TODA trilha ao teto, e aí o telefone passava a rolar nos dois eixos. E um teto
+   na caixa não vale, porque o `min-width:100%` de que o `1fr` precisa vence
+   `max-width`.
+
+   Então aqui sai um número, da área que a tela mediu. Quadrado, que é como um mapa de
+   calor se lê. */
+
+/** Piso: mínimo medido para a célula ficar legível e acertável com o dedo. */
+export const CELULA_MIN = 34;
+/** Teto: acima disto a célula vira um quadrado vazio em volta de um dígito. */
+export const CELULA_MAX = 72;
+
+/** O lado da célula para uma área disponível.
+
+    `largura` e `altura` são a área da rolagem. `colunaNomes` é a coluna dos locais e
+    `linhaHoras` a faixa com "8h, 9h…": as duas são descontadas aqui porque não são
+    célula. `folga` é o vão entre células — são `horas` vãos na largura (um depois da
+    coluna de nomes) e `locais` na altura (um depois da linha das horas).
+
+    Esquecer a linha das horas fazia a grade sair 65px mais alta que a área e rolar na
+    vertical sem precisar. Medido.
+
+    Devolve o piso quando não cabe — e aí quem chama rola, que é melhor que encolher
+    abaixo do que se lê. */
+export function ladoDaCelula({ largura, altura, horas, locais,
+                               colunaNomes = 0, linhaHoras = 0, folga = 3,
+                               min = CELULA_MIN, max = CELULA_MAX }){
+  const h = Math.max(1, Number(horas) || 0);
+  const l = Math.max(1, Number(locais) || 0);
+  const porLargura = ((Number(largura) || 0) - colunaNomes - h * folga) / h;
+  const porAltura  = ((Number(altura)  || 0) - linhaHoras - l * folga) / l;
+  const cabe = Math.floor(Math.min(porLargura, porAltura));
+  return Math.max(min, Math.min(max, Number.isFinite(cabe) ? cabe : min));
+}
+
+/** Altura da faixa com as horas. Não é célula: só cabeçalho. */
+export const LINHA_HORAS = 20;
+
+/** A coluna dos nomes de local: cresce com a tela, entre 96 e 140px. */
+export const colunaDeNomes = largura =>
+  Math.max(96, Math.min(140, Math.round((Number(largura) || 0) * 0.18)));
+
 /** Contagem por chave, já ordenada do maior para o menor. */
 export function contaPor(ocs, chave, limite = 8){
   const mapa = new Map();

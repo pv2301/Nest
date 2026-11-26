@@ -294,10 +294,48 @@ textarea.input{min-height:96px;resize:vertical;line-height:1.55;font-size:14.5px
 .heat .rl{font-size:11px;color:var(--muted);display:flex;align-items:center;min-width:0;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;
   position:sticky;left:0;z-index:1;background:var(--surface);padding-right:7px}
-.heat .cell{width:34px;height:34px;border-radius:5px;display:grid;place-items:center;
+/* A célula enche a trilha, em vez de medir 34px por conta própria: quem manda no
+   tamanho é a grade. Com os 34px cravados aqui, a tela cheia desenhava trilhas de
+   65px com quadradinhos de 34 dentro. */
+.heat .cell{width:100%;height:100%;border-radius:5px;display:grid;place-items:center;
   font-size:11px;font-weight:700}
 /* O canto de cima à esquerda também gruda, senão desliza por cima dos nomes. */
 .heat .canto{position:sticky;left:0;z-index:2;background:var(--surface)}
+/* ---------- a tabela em tela cheia ----------
+
+   Um dia escolar inteiro deixa 172px da tabela fora da tela de um telefone: dá para
+   arrastar, mas arrastar derrota o propósito de um mapa de calor, que existe para se
+   ver o padrão de uma vez.
+
+   O palco ocupa a janela e, no RETRATO, gira 90° — aí a tabela usa o lado longo da
+   tela. Em paisagem a regra não se aplica: se a pessoa virar o aparelho, a tela
+   desgira em vez de girar duas vezes.
+
+   Por que não a API de tela cheia do navegador: o Safari não abre elemento comum em
+   tela cheia nem trava orientação, e daria dois comportamentos por aparelho. Isto é
+   CSS, e vale igual nos dois.
+
+   O tamanho da célula NÃO está aqui: vem medido, de metricas.js, porque CSS não
+   expressa "enche a tela, nunca abaixo de 34px nem acima de 72px, e quadrada". */
+.heat-cheio{position:fixed;inset:0;z-index:70;background:var(--surface);overflow:hidden}
+.hc-palco{position:absolute;top:0;left:0;width:100vw;height:100vh;
+  display:flex;flex-direction:column;gap:8px;padding:10px}
+@media (orientation:portrait){
+  .hc-palco{width:100vh;height:100vw;transform-origin:top left;
+    transform:translateX(100vw) rotate(90deg)}
+}
+.hc-topo{display:flex;align-items:center;gap:10px;flex:none}
+.hc-topo .sec-label{margin:0}
+/* `safe center` centra quando sobra espaço e NÃO corta quando falta — com `center`
+   puro, uma grade maior que a área perde o cabeçalho para fora da rolagem. */
+.hc-rol{flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;
+  display:flex;align-items:safe center;justify-content:safe center}
+/* Sem o `min-width:100%` de `.heat`: aqui ele esticaria a caixa da grade além das
+   trilhas, e o `safe center` não teria o que centrar. */
+.hc-rol .heat{flex:none;min-width:0;width:auto}
+.hc-rol .heat .cell{font-size:clamp(11px,1.9vmin,16px)}
+.hc-rol .heat .rl{font-size:clamp(11px,1.7vmin,14px)}
+
 .bars{display:flex;flex-direction:column;gap:8px}
 .bar-row{display:grid;grid-template-columns:1fr 38px;gap:9px;align-items:center;font-size:12px;min-width:0}
 /* A linha da categoria é botão: abre os tipos dela. 44px porque é o mínimo que um
@@ -398,7 +436,8 @@ textarea.input{min-height:96px;resize:vertical;line-height:1.55;font-size:14.5px
 /* ---------- auditoria ---------- */
 /* Lista densa de propósito: o valor dela é poder correr o olho por muitas linhas.
    A hora fica numa coluna fixa para as linhas se alinharem. */
-.aud{list-style:none;display:flex;flex-direction:column;gap:1px}
+/* Mesmo reset dos destaques: sem ele a lista inteira nasce 40px adentro. */
+.aud{list-style:none;display:flex;flex-direction:column;gap:1px;padding:0;margin:0}
 .aud-l{display:flex;gap:11px;align-items:baseline;background:var(--surface);
   padding:10px 14px;font-size:12.5px;line-height:1.45}
 .aud-l:first-child{border-radius:var(--r) var(--r) 0 0}
@@ -412,8 +451,15 @@ textarea.input{min-height:96px;resize:vertical;line-height:1.55;font-size:14.5px
 /* ---------- destaques ---------- */
 /* Lista de frases, não de cartões: são leituras curtas e a pessoa lê de cima a baixo.
    O ícone fica numa coluna fixa para que as linhas se alinhem mesmo com duas linhas
-   de texto. */
-.destaques{list-style:none;display:flex;flex-direction:column;gap:2px}
+   de texto.
+
+   `padding` e `margin` em zero é reset que faltava, não ajuste de gosto: o navegador
+   dá a toda `<ul>` 40px de recuo — espaço da bolinha — e 1em de margem, e
+   `list-style:none` tira a bolinha mas NÃO devolve o espaço dela. Os cartões nasciam
+   40px adentro enquanto o rótulo começava na borda, com uma margem que não exibia
+   nada. Os 14px também venciam o `gap:8px` do `.stack` em volta. O projeto só tem
+   `*{box-sizing:border-box}` de reset, então cada lista precisa zerar o seu. */
+.destaques{list-style:none;display:flex;flex-direction:column;gap:2px;padding:0;margin:0}
 .dest{display:flex;gap:11px;align-items:flex-start;background:var(--surface);
   border-radius:var(--r);padding:14px 16px;font-size:13px;line-height:1.5;
   box-shadow:var(--shadow)}

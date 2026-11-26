@@ -7,10 +7,10 @@
    período, dentro das outras duas. Cada controle governa o seu pedaço. */
 
 import { S, app, registrarTela, render, rodape, posRender, aluno } from './core.js';
-import { esc } from './util.js';
+import { esc, ICON, svgIc } from './util.js';
 import { PERIODOS, catId } from './vocabulario.js';
 import { filtraPorPeriodo, agregaPorHoraLocal, contaPor, recorrencia, paresRecorrentes,
-         resumo } from './metricas.js';
+         resumo, ladoDaCelula, colunaDeNomes, LINHA_HORAS } from './metricas.js';
 import { tipoDe, vazio } from './telas-comum.js';
 import { escolha } from './escolha.js';
 import { corpoCalendario } from './telas-calendario.js';
@@ -49,9 +49,20 @@ function telaVisao(){
 registrarTela('visao', telaVisao);
 
 /* Painel e Calendário continuam respondendo pelo nome: quem tiver o endereço antigo
-   na memória — ou um atalho antigo — cai na guia certa em vez de numa tela que sumiu. */
-registrarTela('painel', () => { S.visaoGuia = 'estatisticas'; return telaVisao(); });
-registrarTela('calendario', () => { S.visaoGuia = 'calendario'; return telaVisao(); });
+   na memória — ou um atalho antigo — cai na guia certa em vez de numa tela que sumiu.
+
+   Só ao ENTRAR, e não a cada desenho. Fixando a cada desenho, quem chegasse por um
+   destes dois endereços ficava preso na guia: tocar em Destaques mudava S.visaoGuia, o
+   redesenho passava por aqui e punha 'estatisticas' de volta antes de desenhar. Pela
+   aba de baixo — 'visao' — as guias sempre funcionaram; por 'painel' e 'calendario',
+   não trocavam. Medido. Era eu que tinha escrito assim, ao consertar outra coisa:
+   antes estas telas mexiam em S.tela no meio do desenho, o que não redesenha.
+
+   `telaDesenhada` é a tela do desenho anterior, então diferente dela significa "acabei
+   de chegar" — e aí o endereço antigo continua levando à guia certa. */
+const aoEntrar = (tela, guia) => { if(S.telaDesenhada !== tela) S.visaoGuia = guia; };
+registrarTela('painel', () => { aoEntrar('painel', 'estatisticas'); return telaVisao(); });
+registrarTela('calendario', () => { aoEntrar('calendario', 'calendario'); return telaVisao(); });
 
 /* ---------------------------------------------------------------- painel */
 app.periodo = p => { S.periodo = p; render(); };
@@ -91,17 +102,23 @@ function corpoPainel(){
 
     ${!ocs.length ? vazio('Nenhum registro no período', 'Escolha um período maior, ou carregue os dados de demonstração na aba Alunos.') : `
     <div class="card">
-      <p class="sec-label">Quando e onde acontece</p>
+      <div class="row" style="margin-bottom:8px">
+        <p class="sec-label grow" style="margin:0">Quando e onde acontece</p>
+        <!-- 44 nos DOIS lados. Só com min-height o botão saía 24px de largura — um
+             ícone sem texto não empurra nada — e a varredura de toque reprovou, com
+             razão: um polegar erra um alvo de 24px. -->
+        ${grade.linhas.length ? `<button class="btn ghost sm"
+          style="min-height:44px;min-width:44px;padding:0 10px;flex:none"
+          aria-label="Ver a tabela em tela cheia" title="Ver em tela cheia"
+          onclick="app.heatCheio(true)">${svgIc(ICON.expandir)}</button>` : ''}
+      </div>
       ${grade.linhas.length ? `
       <!-- Largura fixa por coluna e rolagem horizontal quando não couber. Com 1fr,
-           um dia escolar inteiro espremia as células a 20px. -->
+           um dia escolar inteiro espremia as células a 20px. Na tela cheia a conta é
+           outra, porque lá sobra espaço: quem decide é ladoDaCelula. -->
       <div class="heat-cx"><div class="heat-rolagem">
-        <div class="heat" id="heat"
-             style="grid-template-columns:108px repeat(${grade.horas.length},34px)">
-          <div class="canto"></div>${grade.horas.map(h => `<div class="hh">${h}h</div>`).join('')}
-          ${grade.linhas.map(l => `<div class="rl" title="${esc(l.local)}">${esc(l.local)}</div>` +
-            l.celulas.map(n => `<div class="cell" data-n="${n}" data-max="${grade.max}">${n || ''}</div>`).join('')).join('')}
-        </div>
+        ${gradeHTML(grade, { id:'heat', colunas:'108px repeat(' + grade.horas.length + ',34px)',
+                             linhaHoras:LINHA_HORAS, linhas:'34px' })}
       </div></div>
       <!-- Com máximo 2, "poucos" ficava entre 0 e 2 querendo dizer exatamente 1. -->
       <div class="legend" style="margin-top:10px"><span><i style="background:var(--surface-2)"></i>0</span>
@@ -163,6 +180,109 @@ function corpoPainel(){
   </div>`;
 }
 
+/* ---------------------------------------------------------------- a tabela inteira
+
+   O cartão mostra os 6 locais com mais registros e rola na horizontal quando o dia é
+   longo: num telefone de 412px, um dia escolar de 12 horas deixa 172px da tabela fora
+   da tela. Dá para arrastar, mas arrastar derrota o propósito de um mapa de calor,
+   que existe para se ver o padrão de uma vez.
+
+   Em tela cheia, girada no retrato, a mesma tabela cabe inteira — e aí mostra TODOS
+   os locais, porque o corte nos 6 era falta de espaço, não escolha. */
+
+/** A grade, desenhada igual nos dois lugares. Só os tamanhos mudam.
+
+    A primeira linha é a das horas e tem altura própria, menor: ela só carrega "8h". As
+    seguintes vêm de `grid-auto-rows`. */
+function gradeHTML(grade, { id = '', colunas = '', linhas = '', linhaHoras = 0 } = {}){
+  return `<div class="heat"${id ? ` id="${id}"` : ''}
+       style="grid-template-columns:${colunas}${
+         linhaHoras ? ';grid-template-rows:' + linhaHoras + 'px' : ''}${
+         linhas ? ';grid-auto-rows:' + linhas : ''}">
+    <div class="canto"></div>${grade.horas.map(h => `<div class="hh">${h}h</div>`).join('')}
+    ${grade.linhas.map(l => `<div class="rl" title="${esc(l.local)}">${esc(l.local)}</div>` +
+      l.celulas.map(n => `<div class="cell" data-n="${n}" data-max="${grade.max}">${n || ''}</div>`)
+        .join('')).join('')}
+  </div>`;
+}
+
+/** A tinta das células. Por classe, e não por `#heat`, para valer na tela cheia. */
+function pintarCelulas(raiz){
+  (raiz || document).querySelectorAll('.heat .cell').forEach(c => {
+    const n = +c.dataset.n, max = +c.dataset.max || 1;
+    const pct = n === 0 ? 0 : Math.round(24 + (n / max) * 70);
+    c.style.background = n === 0 ? 'var(--surface-2)'
+      : `color-mix(in srgb, var(--teal) ${pct}%, var(--surface))`;
+    c.style.color = pct >= 70 ? 'var(--accent-ink)' : 'var(--fg)';
+  });
+}
+
+app.heatCheio = abrir => { S.heatCheio = !!abrir; render(); };
+
+/* O painel mora no document.body, e NÃO dentro de #view. Não é detalhe: puxar.js põe
+   `transform` em #view enquanto a pessoa puxa para atualizar, e um ancestral
+   transformado passa a ser a referência de `position:fixed` — o painel sairia de
+   lugar. O toast já vive assim, pelo mesmo motivo. */
+function desenharHeatCheio(){
+  const velho = document.getElementById('heat-cheio');
+  if(velho) velho.remove();
+  if(!S.heatCheio) return null;
+
+  const ocs = filtraPorPeriodo(S.ocs, S.periodo);
+  /* Sem limite de locais: o corte nos 6 do cartão era falta de espaço. */
+  const grade = agregaPorHoraLocal(ocs, Infinity);
+  if(!grade.linhas.length){ S.heatCheio = false; return null; }
+
+  const d = document.createElement('div');
+  d.id = 'heat-cheio';
+  d.className = 'heat-cheio naoimprime';
+  d.innerHTML = `<div class="hc-palco">
+    <div class="hc-topo">
+      <p class="sec-label grow">Quando e onde acontece</p>
+      <button class="btn ghost sm" style="min-height:44px;min-width:44px;padding:0 12px"
+        aria-label="Fechar a tela cheia" onclick="app.heatCheio(false)">${svgIc(ICON.encolher)}</button>
+    </div>
+    <div class="hc-rol">${gradeHTML(grade, { linhaHoras:LINHA_HORAS })}</div>
+  </div>`;
+  document.body.appendChild(d);
+  dimensionarHeatCheio(grade);
+  pintarCelulas(d);
+  return d;
+}
+
+/** Mede a área e escreve o tamanho da célula. A conta mora em metricas.js. */
+function dimensionarHeatCheio(grade){
+  const rol = document.querySelector('#heat-cheio .hc-rol');
+  const g = rol && rol.querySelector('.heat');
+  if(!g) return;
+  /* clientWidth/clientHeight são lógicos — já vêm com os eixos do palco girado. */
+  const largura = rol.clientWidth, altura = rol.clientHeight;
+  const nomes = colunaDeNomes(largura);
+  const lado = ladoDaCelula({ largura, altura, horas: grade.horas.length,
+    locais: grade.linhas.length, colunaNomes: nomes, linhaHoras: LINHA_HORAS });
+  g.style.gridTemplateColumns = `${nomes}px repeat(${grade.horas.length},${lado}px)`;
+  g.style.gridTemplateRows = `${LINHA_HORAS}px`;
+  g.style.gridAutoRows = `${lado}px`;
+}
+
+/* Virar o aparelho troca os dois eixos: a célula tem de ser recalculada, senão fica
+   dimensionada para a tela de antes. O ouvinte é único e só faz algo com a tela
+   aberta. */
+if(typeof window !== 'undefined'){
+  const remedir = () => {
+    if(!S.heatCheio) return;
+    const ocs = filtraPorPeriodo(S.ocs, S.periodo);
+    dimensionarHeatCheio(agregaPorHoraLocal(ocs, Infinity));
+  };
+  window.addEventListener('resize', remedir, { passive:true });
+  window.addEventListener('orientationchange', remedir, { passive:true });
+  /* Esc fecha. Fica aqui, com quem abre, em vez de em escolha.js, que não tem nada a
+     ver com a tabela. O voltar do Android fecha pelo caminho de core.js. */
+  document.addEventListener('keydown', ev => {
+    if(ev.key === 'Escape' && S.heatCheio){ ev.preventDefault(); app.heatCheio(false); }
+  });
+}
+
 posRender.push(() => {
   /* Liga e desliga o véu da borda conforme ainda haja coluna por ver. */
   const rol = document.querySelector('.heat-rolagem');
@@ -174,11 +294,10 @@ posRender.push(() => {
     rol.addEventListener('scroll', avaliar, { passive:true });
   }
 
-  document.querySelectorAll('#heat .cell').forEach(c => {
-    const n = +c.dataset.n, max = +c.dataset.max || 1;
-    const pct = n === 0 ? 0 : Math.round(24 + (n / max) * 70);
-    c.style.background = n === 0 ? 'var(--surface-2)'
-      : `color-mix(in srgb, var(--teal) ${pct}%, var(--surface))`;
-    c.style.color = pct >= 70 ? 'var(--accent-ink)' : 'var(--fg)';
-  });
+  pintarCelulas(document.getElementById('view'));
+
+  /* Sai de cena junto com a tabela: trocar de guia ou de tela fecha a tela cheia, em
+     vez de deixar um painel órfão por cima do resto. */
+  if(S.heatCheio && !document.getElementById('heat')) S.heatCheio = false;
+  desenharHeatCheio();
 });

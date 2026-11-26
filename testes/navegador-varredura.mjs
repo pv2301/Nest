@@ -101,7 +101,11 @@ const TELAS_FORA = {
    um botão morto passaria despercebido —, mas o cenário é remontado depois. */
 const DESFAZ = new Set(['sair','usarOutra','limparDemo','confirmarLimpeza','demo',
   'descartarRascunho','removerAluno','removerTurma','confirmarRemocao','arquivarAluno',
-  'desativar','restaurar','reiniciar','revogarAparelho']);
+  'desativar','restaurar','reiniciar','revogarAparelho',
+  /* A tabela em tela cheia cobre a janela de propósito: sem desfazer, todo elemento
+     tocado depois dela aparece "coberto" — e o relatado seria a varredura, não o app.
+     Reabrir a tela não basta, porque a tabela continua lá e a tela cheia com ela. */
+  'heatCheio']);
 
 /* Não se toca: abriria um seletor de arquivo do sistema, que trava a página. */
 const PULA = el => el.tag === 'input' && el.tipo === 'file';

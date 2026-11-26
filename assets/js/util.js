@@ -19,6 +19,10 @@ export const ICON = {
   horario:'<circle cx="12" cy="12" r="8.6"/><path d="M12 7.2V12l3.2 2"/>',
   alunos:'<circle cx="12" cy="7.4" r="3.4"/><path d="M4.6 20.4c0-3.9 3.3-6.4 7.4-6.4s7.4 2.5 7.4 6.4"/>',
   busca:'<circle cx="10.8" cy="10.8" r="6.4"/><path d="m15.6 15.6 5 5"/>',
+  /* Quatro cantos apontando para fora: abrir em tela cheia. O par dele, `encolher`,
+     fecha. */
+  expandir:'<path d="M9 4H4v5"/><path d="M15 4h5v5"/><path d="M15 20h5v-5"/><path d="M9 20H4v-5"/>',
+  encolher:'<path d="M4 9h5V4"/><path d="M20 9h-5V4"/><path d="M20 15h-5v5"/><path d="M4 15h5v5"/>',
   exportar:'<path d="M12 3.6v10.2"/><path d="M8.2 10.2 12 14l3.8-3.8"/><path d="M4.4 15.4v3.4a1.6 1.6 0 0 0 1.6 1.6h12a1.6 1.6 0 0 0 1.6-1.6v-3.4"/>',
   mais:'<path d="M12 5v14"/><path d="M5 12h14"/>',
   relacoes:'<circle cx="6" cy="6.6" r="2.8"/><circle cx="18" cy="6.6" r="2.8"/><circle cx="12" cy="17.6" r="2.8"/><path d="M8.6 7.8 10.6 15"/><path d="M15.4 7.8 13.4 15"/>',

@@ -20,6 +20,7 @@ const SUITES = ['navegador-busca.mjs', 'navegador-relatorio.mjs', 'navegador-reg
                 'navegador-visao.mjs', 'navegador-perfil.mjs', 'navegador-puxar.mjs',
                 'navegador-toque.mjs', 'navegador-envio.mjs', 'navegador-auditoria.mjs',
                 'navegador-recuperar.mjs', 'navegador-papel.mjs', 'navegador-citacoes.mjs',
+                'navegador-tabela.mjs',
                 'navegador-varredura.mjs',
                 'navegador-vocabulario.mjs'];
 
