@@ -88,6 +88,20 @@ async function entrarComo(p, login, senha){
  await escolher(p, 'kids', primeiro); await p.waitForTimeout(400);
  await escolher(p, 'papel-0', 'Sofreu'); await p.waitForTimeout(300);
  await p.evaluate(()=>app.irPasso(3)); await p.waitForTimeout(600);
+
+ /* A foto pode vir da galeria. Com `capture` o navegador abre a câmera direto e não
+    oferece o carretel — e a foto da lesão quase sempre já foi tirada na hora do
+    atendimento, por quem estava com a criança. */
+ const foto = await p.evaluate(() => {
+   const e = document.getElementById('w-foto');
+   return e && { capture: e.getAttribute('capture'), accept: e.getAttribute('accept'),
+                 rotulo: (document.querySelector('label[for="w-foto"]') || {}).textContent || '' };
+ });
+ ok('o campo de foto não força a câmera', !!foto && foto.capture === null, JSON.stringify(foto));
+ ok('e aceita qualquer imagem', !!foto && foto.accept === 'image/*', JSON.stringify(foto));
+ ok('o rótulo diz que dá para escolher da galeria',
+    !!foto && /galeria/i.test(foto.rotulo), foto && foto.rotulo);
+
  await p.fill('#w-desc','Texto origihal com erro de digitacao.'); await p.waitForTimeout(400);
  await p.evaluate(()=>app.irPasso(4)); await p.waitForTimeout(600);
  await p.click('button:text-is("Enviar registro")'); await p.waitForTimeout(2600);

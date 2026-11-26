@@ -403,8 +403,12 @@ registrarTela('wizard', () => {
       ${d.fotoPreview
         ? `<div class="fotobox"><img src="${esc(d.fotoPreview)}" alt="Foto anexada">
              <button class="btn ghost sm" style="width:100%;margin-top:8px" onclick="app.tirarFoto(true)">Remover foto</button></div>`
-        : `<label class="photo" for="w-foto" style="cursor:pointer">Tirar foto · só a região da lesão, sem rosto e sem outras crianças</label>
-           <input type="file" id="w-foto" accept="image/*" capture="environment" hidden onchange="app.escolherFoto(this)">`}
+        /* Sem `capture`. Com ele o navegador abre a câmera direto e não oferece a
+           galeria — e a foto da lesão quase sempre já foi tirada antes, na hora do
+           atendimento, por quem estava com a criança. Com `accept` sozinho, Android e
+           iOS mostram o menu com câmera e galeria, e quem registra escolhe. */
+        : `<label class="photo" for="w-foto" style="cursor:pointer">Tirar foto ou escolher da galeria · só a região da lesão, sem rosto e sem outras crianças</label>
+           <input type="file" id="w-foto" accept="image/*" hidden onchange="app.escolherFoto(this)">`}
       </div>
   </div>`;
 

@@ -60,7 +60,7 @@ t('virou tudo rótulo', (r.match(/criança C/gi) || []).length === 3, r);
 console.log('\n=== Onde NÃO pode trocar ===');
 r = troca('O paulista Paulinho e a paulada não são o Paulo.', [A]);
 t('não troca nome dentro de outra palavra',
-  r === 'O paulista Paulinho e a paulada não são o criança A.', r);
+  r === 'O paulista Paulinho e a paulada não são a criança A.', r);
 
 r = troca('A Lima da receita é fruta.', [B]);
 t('parte do sobrenome ainda é trocada quando aparece sozinha',
@@ -119,11 +119,114 @@ for(const [nome, entra, sai] of casos){
 r = troca('A Otto chorou.', [O]);
 t('"a" antes do nome não vira crase', r === 'A criança A chorou.', r);
 
+console.log('\n=== Gênero do determinante ===');
+/* "criança" é feminino. Antes saía "O criança A mordeu" e "o irmão do criança A": o
+   nome era trocado, mas a frase ainda dizia que ali havia um menino. */
+const L = { nome:'Luiz Felipe Costa', rotulo:'Criança A' };
+const M = { nome:'Miguel Santos',     rotulo:'Criança A' };
+const genero = [
+  ['o vira a',            'O Luiz Felipe mordeu.',        'A criança A mordeu.',        L],
+  ['o no meio da frase',  'Foi o Luiz que mordeu.',       'Foi a criança A que mordeu.', L],
+  ['do vira da',          'O irmão do Miguel chegou.',    'O irmão da criança A chegou.', M],
+  ['no vira na',          'Theo bateu no Miguel.',        'Theo bateu na criança A.',   M],
+  ['pelo vira pela',      'Foi levado pelo Miguel.',      'Foi levado pela criança A.',  M],
+  ['ao vira à',           'Entregou ao Miguel a bola.',   'Entregou à criança A a bola.', M],
+  ['um vira uma',         'Chamou um Miguel qualquer.',   'Chamou uma criança A qualquer.', M],
+  ['feminino fica',       'A Miguel? Não era ela.',       'A criança A? Não era ela.',  M]
+];
+for(const [nome, entra, sai, quem] of genero){
+  const saiu = troca(entra, [quem]);
+  t(nome, saiu === sai, saiu);
+}
+
+/* Ponto e vírgula e dois-pontos não abrem frase em português; a quebra de linha abre. */
+r = troca('Veio buscar; o Miguel chorou.', [M]);
+t('ponto e vírgula não sobe a inicial', r === 'Veio buscar; a criança A chorou.', r);
+r = troca('Eu vi tudo: o Miguel caiu.', [M]);
+t('dois-pontos também não', r === 'Eu vi tudo: a criança A caiu.', r);
+r = troca('Primeira linha\nMiguel caiu.', [M]);
+t('quebra de linha sobe', r === 'Primeira linha\nA criança A caiu.', r);
+
+console.log('\n=== Pedaço curto do nome ===');
+/* "Ana Lu Dias" saía como "A criança A Lu derrubou o copo": partes de até duas letras
+   eram descartadas e o "Lu" ficava no papel. Agora entram nas combinações, mas nunca
+   sozinhas — "Vi" é nome de gente e também verbo. */
+const AL = { nome:'Ana Lu Dias', rotulo:'Criança A' };
+r = troca('Ana Lu derrubou o copo.', [AL]);
+t('o pedaço curto sai junto, sem sobra', r === 'A criança A derrubou o copo.', r);
+t('e não sobrou "Lu"', !/\bLu\b/.test(r), r);
+r = troca('Ana Lu Dias chamou a Miss.', [AL]);
+t('nome inteiro também', r === 'A criança A chamou a Miss.', r);
+t('"Lu" sozinho não é forma', !U.formasDoNome('Ana Lu Dias').includes('Lu'),
+  JSON.stringify(U.formasDoNome('Ana Lu Dias')));
+r = troca('Eu vi tudo: a Ana Vi caiu.', [{ nome:'Ana Vi', rotulo:'Criança B' }]);
+t('o verbo "vi" sobrevive a uma criança chamada Vi',
+  r === 'Eu vi tudo: a criança B caiu.', r);
+t('nome de uma parte só ainda é forma, curto ou não',
+  U.formasDoNome('Lu').length === 1, JSON.stringify(U.formasDoNome('Lu')));
+
+console.log('\n=== Partícula no meio do nome ===');
+/* "Maria de Souza" saía "a criança A da criança A": a forma "Maria Souza" não achava
+   o "de" do texto, caíam as formas soltas, e o mesmo nome era rotulado duas vezes. */
+const MS = { nome:'Maria de Souza', rotulo:'Criança A' };
+r = troca('Maria de Souza empurrou o balde.', [MS]);
+t('nome com partícula vira um rótulo só', r === 'A criança A empurrou o balde.', r);
+r = troca('A Maria de Souza chorou.', [MS]);
+t('com determinante antes também', r === 'A criança A chorou.', r);
+r = troca('Maria dos Santos caiu.', [{ nome:'Maria dos Santos', rotulo:'Criança A' }]);
+t('"dos" também', r === 'A criança A caiu.', r);
+
+console.log('\n=== Quem a narrativa cita de verdade ===');
+/* O defeito que a escola viu: ao gerar o comunicado de uma família aparecia uma
+   terceira criança, de outra família, que não esteve na ocorrência — e a legenda
+   "Quem é quem" mostrava o nome real dela. */
+const cita = (texto, envolvidos, cadastro) =>
+  U.citadosNoTexto(texto, envolvidos, cadastro.map(n => ({ nome:n }))).map(x => x.nome);
+
+let c = cita('Helena Souza e Theo disputavam o carrinho. Theo mordeu a Helena.',
+  ['Helena Souza', 'Theo Martins'], ['Pedro Souza', 'Ana Clara Dias']);
+t('o irmão não entra pelo sobrenome', c.length === 0, JSON.stringify(c));
+
+c = cita('Ana Beatriz empurrou o balde.',
+  ['Ana Beatriz Lima'], ['Ana Clara Dias', 'Pedro Souza']);
+t('quem só divide o primeiro nome não entra', c.length === 0, JSON.stringify(c));
+
+c = cita('Helena caiu. Benício viu tudo e chamou a Miss.',
+  ['Helena Souza'], ['Benício Rocha', 'Pedro Souza']);
+t('a testemunha de verdade entra', c.join() === 'Benício Rocha', JSON.stringify(c));
+
+c = cita('Helena caiu e Pedro Souza ajudou a levantar.',
+  ['Helena Souza'], ['Pedro Souza']);
+t('citado pelo nome inteiro entra, irmão ou não',
+  c.join() === 'Pedro Souza', JSON.stringify(c));
+
+c = cita('Theo empurrou. Benício e a Cecília Rocha viram.',
+  ['Theo Martins'], ['Benício Rocha', 'Cecília Rocha']);
+t('duas testemunhas, na ordem em que aparecem',
+  c.join() === 'Benício Rocha,Cecília Rocha', JSON.stringify(c));
+
+c = cita('Ninguém mais estava por perto.', ['Helena Souza'], ['Pedro Souza', 'Theo Martins']);
+t('sem citação, ninguém entra', c.length === 0, JSON.stringify(c));
+
+c = cita('Helena caiu.', [], []);
+t('listas vazias não quebram', c.length === 0);
+
 console.log('\n=== Localizar citação ===');
 t('acha o nome citado', U.posicaoNome('Depois Helena chamou a Miss.', 'Helena Souza') === 6,
   String(U.posicaoNome('Depois Helena chamou a Miss.', 'Helena Souza')));
 t('devolve -1 quando não cita', U.posicaoNome('Ninguém viu.', 'Helena Souza') === -1);
 t('não confunde pedaço de palavra', U.posicaoNome('A helicóptero.', 'Hel Souza') === -1);
+
+/* `posicaoForma` pergunta por UMA forma; `posicaoNome` procura a pessoa por todas.
+   Usar a segunda no lugar da primeira foi o que trouxe o irmão para o relatório.
+
+   O índice cai na borda antes do nome, não na primeira letra: `regexNome` consome essa
+   borda. Mesma convenção de `posicaoNome`, e serve só para ordenar. */
+t('a forma pedida é achada',
+  U.posicaoForma('Helena Souza e Theo disputavam.', 'Souza') === 6,
+  String(U.posicaoForma('Helena Souza e Theo disputavam.', 'Souza')));
+t('e a que não está no texto, não',
+  U.posicaoForma('Helena Souza e Theo disputavam.', 'Pedro Souza') === -1);
 
 console.log('\n=== Maiúscula de nome próprio ===');
 const T = N.tituloNome;

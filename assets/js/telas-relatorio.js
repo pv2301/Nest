@@ -19,7 +19,8 @@
 import { S, app, registrarTela, ir, toast, render, aluno } from './core.js';
 import { Store } from './store.js';
 import { escolha } from './escolha.js';
-import { esc, SEAL, iniciais, dataCompleta, soData, posicaoNome, trocarNomes } from './util.js';
+import { esc, SEAL, iniciais, dataCompleta, soData,
+         citadosNoTexto, posicaoNome, trocarNomes } from './util.js';
 import { SEVL } from './vocabulario.js';
 import { tipoDe, localDe } from './telas-comum.js';
 
@@ -81,13 +82,11 @@ function mapaDeNomes(o){
                 nomeada: e.kid === nomeada, citada:false });
   }
 
-  const texto = textosDoRegistro(o);
-  (S.alunos || [])
-    .filter(a => a.id && !vistos.has(a.id) && a.nome)
-    .map(a => ({ a, pos: posicaoNome(texto, a.nome) }))
-    .filter(x => x.pos >= 0)
-    .sort((x, y) => x.pos - y.pos)
-    .forEach(({ a }) => {
+  /* Quem mais a narrativa cita — uma testemunha nomeada de passagem vazaria tanto
+     quanto um envolvido. A regra de quem conta mora em util.js, com o teste. */
+  citadosNoTexto(textosDoRegistro(o), mapa.map(p => p.nome),
+                 (S.alunos || []).filter(a => a.id && !vistos.has(a.id) && a.nome))
+    .forEach(a => {
       mapa.push({ kid:a.id, nome:a.nome, rotulo:rotuloPara(mapa.length),
                   nomeada:false, citada:true });
     });

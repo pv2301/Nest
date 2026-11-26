@@ -24,6 +24,7 @@ const escolher = (p, id, v) => p.evaluate(([i, x]) => app.escolherLista(i, x), [
 
 let f=[]; const ok=(n,c,x)=>{ if(c) console.log('  OK '+n); else { f.push(n); console.log('  XX '+n+(x?'\n       '+x:'')); } };
 const prim = n => n.split(' ')[0];
+const sobre = n => n.split(' ').slice(-1)[0];
 (async()=>{
  const b=await chromium.launch();
  const ctx=await b.newContext({viewport:{width:430,height:900}});
@@ -58,10 +59,25 @@ const prim = n => n.split(' ')[0];
  await escolher(p, 'papel-1', 'Causou'); await p.waitForTimeout(250);
 
  await p.evaluate(()=>app.irPasso(3)); await p.waitForTimeout(700);
- const DESC = `${prim(n1)} e ${prim(n2)} disputavam o balde. ${prim(n2)} mordeu a mão de ${prim(n1)}. ${prim(n3)} chamou a Miss.`;
+ /* A primeira criança entra com nome e sobrenome, como a Miss escreve de verdade no
+    primeiro parágrafo — e é o sobrenome escrito que arrastava o irmão dela para
+    dentro do relatório. */
+ const DESC = `${n1} e ${prim(n2)} disputavam o balde. ${prim(n2)} mordeu a mão de ${prim(n1)}. ${prim(n3)} chamou a Miss.`;
  await p.fill('#w-desc', DESC); await p.waitForTimeout(400);
  await p.evaluate(()=>app.irPasso(4)); await p.waitForTimeout(600);
  await p.click('button:text-is("Enviar registro")'); await p.waitForTimeout(2600);
+
+ /* Um irmão da primeira criança, cadastrado pela tela de verdade e sem nenhuma
+    ligação com esta ocorrência. Ele entra DEPOIS do registro, para não mexer na ordem
+    da lista de crianças de que o teste tira as três de cima. */
+ const IRMAO = 'Pedro ' + sobre(n1);
+ await p.evaluate(()=>app.ir('alunos')); await p.waitForTimeout(700);
+ await p.evaluate(()=>app.novoAluno()); await p.waitForTimeout(600);
+ await p.fill('#al-nome', IRMAO); await p.waitForTimeout(200);
+ await p.click('button:has-text("Adicionar aluno")'); await p.waitForTimeout(1800);
+ ok('o irmão foi cadastrado',
+    (await p.locator('#view').innerText()).includes(IRMAO),
+    'nao achei ' + IRMAO + ' na tela de alunos');
 
  await p.evaluate(()=>app.ir('lista')); await p.waitForTimeout(900);
  await p.click('.item'); await p.waitForTimeout(1300);
@@ -91,6 +107,18 @@ const prim = n => n.split(' ')[0];
  ok('a prévia não vai ao papel',
     await p.evaluate(()=>{ const e=document.querySelector('.previa');
       return !!e && getComputedStyle(e).display !== 'none'; }));
+
+ console.log('\n=== O irmão não entra no relatório ===');
+ /* O defeito que a escola viu: ao gerar o comunicado aparecia uma terceira criança,
+    de outra família, que não esteve na ocorrência — e a legenda mostrava o nome real
+    dela. Bastava o sobrenome bater. */
+ const quem = await p.evaluate(() =>
+   Array.from(document.querySelectorAll('.kv dt')).map(e => e.textContent.trim()));
+ ok('o irmão não está em Quem é quem', !quem.includes(IRMAO), JSON.stringify(quem));
+ ok('são três crianças: duas envolvidas e a citada', quem.length === 3, JSON.stringify(quem));
+ ok('e são exatamente estas três',
+    quem.includes(n1) && quem.includes(n2) && quem.includes(n3), JSON.stringify(quem));
+ ok('não há Criança D no documento', !/criança D/i.test(await p.locator('.ficha').innerText()));
 
  console.log('\n=== Legenda: na tela, nunca no papel ===');
  const leg = await p.locator('#view').innerText();

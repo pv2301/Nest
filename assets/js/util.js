@@ -245,13 +245,26 @@ export const soData = iso => {
 const VARIANTES = { a:'aáàâãä', e:'eéèêë', i:'iíìîï', o:'oóòôõö', u:'uúùûü', c:'cç', n:'nñ' };
 const LETRA = 'A-Za-zÀ-ÿ';
 
+/* Partículas de ligação. Não entram nas formas do nome — "de" e "da" sozinhos pegariam
+   meio texto —, mas o texto pode trazê-las entre duas partes que a forma já juntou: a
+   forma "Maria Souza" precisa achar "Maria de Souza" escrito na narrativa, e de uma
+   vez. Sem isso ela falhava, caíam as formas soltas "Maria" e "Souza", e o mesmo
+   nome saía rotulado duas vezes — "a criança A da criança A".
+
+   "e" fica de fora de propósito: em "Ana e Beatriz" são duas crianças, não uma. */
+const LIGACAO = ['de','da','do','das','dos','du','di'];
+const ENTRE_PARTES = `\\s+(?:(?:${LIGACAO.join('|')})\\s+)*`;
+
 export function padraoDoNome(nome){
-  return semAcento(String(nome)).toLowerCase().split('').map(ch => {
-    if(/\s/.test(ch)) return '\\s+';
-    const v = VARIANTES[ch] || (/[a-z0-9]/.test(ch) ? ch : null);
-    if(!v) return ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return '[' + v + v.toUpperCase() + ']';
-  }).join('');
+  return semAcento(String(nome)).trim().replace(/\s+/g, ' ').toLowerCase()
+    .split('')
+    .map(ch => {
+      if(ch === ' ') return ENTRE_PARTES;
+      const v = VARIANTES[ch] || (/[a-z0-9]/.test(ch) ? ch : null);
+      if(!v) return ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return '[' + v + v.toUpperCase() + ']';
+    })
+    .join('');
 }
 
 /** Formas de um nome, das que cobrem mais partes para as que cobrem menos.
@@ -261,15 +274,23 @@ export function padraoDoNome(nome){
     isso entram todas as combinações que preservam a ordem — "Paulo Victor", "Paulo
     Silva", "Victor Silva" —, e a mais abrangente é aplicada primeiro.
 
-    Partes de até duas letras ficam de fora: "de", "da" e afins pegariam meio texto. */
+    Partículas de ligação não entram como parte: ENTRE_PARTES já as atravessa.
+
+    Um pedaço curto de verdade — o "Lu" de "Ana Lu Dias" — entra nas combinações, mas
+    nunca sozinho. Antes ele era descartado, e a troca deixava "A criança A Lu
+    derrubou o copo" no papel. Sozinho também não serve: "Vi" é nome de gente e verbo,
+    e apagaria o "vi" de "eu vi tudo". Nome de uma parte só é a exceção — ali não há
+    resto a que juntar, e ficar sem forma nenhuma seria não anonimizar nada. */
 export function formasDoNome(nome){
-  const partes = String(nome || '').trim().split(/\s+/).filter(p => p.length > 2);
+  const partes = String(nome || '').trim().split(/\s+/)
+    .filter(p => p && !LIGACAO.includes(semAcento(p).toLowerCase()));
   if(!partes.length) return [];
   const formas = [];
   /* Cada bit de um contador binário diz se a parte entra na combinação. Nomes têm
      poucas partes, então o total é pequeno. */
   for(let mascara = 1; mascara < (1 << partes.length); mascara++){
     const grupo = partes.filter((_, i) => mascara & (1 << i));
+    if(grupo.length === 1 && grupo[0].length <= 2 && partes.length > 1) continue;
     formas.push({ texto: grupo.join(' '), n: grupo.length });
   }
   return formas
@@ -297,7 +318,13 @@ const CONTRAI = { de:'da', em:'na', por:'pela' };
 
 /* Palavras que já cumprem o papel do artigo: aqui não se acrescenta outro, só se
    troca o nome. "da Helena" vira "da criança A", e não "da a criança A". */
-const JA_DETERMINA = ['a','o','as','os','da','do','na','no','pela','pelo','à','um','uma'];
+const JA_DETERMINA = ['a','o','as','os','da','do','na','no','pela','pelo',
+                      'à','ao','um','uma'];
+
+/* "criança" é feminino, e o determinante que acompanhava o nome muda de gênero junto.
+   Sem isto saía "O criança A mordeu" e "o irmão do criança A" — o nome era trocado,
+   mas a frase denunciava que ali havia um menino. */
+const FEMININO = { o:'a', os:'as', do:'da', no:'na', pelo:'pela', ao:'à', um:'uma' };
 
 const PRE = Object.keys(CONTRAI).concat(JA_DETERMINA)
   .sort((x, y) => y.length - x.length).join('|');
@@ -307,30 +334,99 @@ const regexNomeComPre = forma =>
   new RegExp(`(^|[^${LETRA}])(?:(${PRE})([ \t]+))?(${padraoDoNome(forma)})(?![${LETRA}])`,
     'gi');
 
-/** Começa frase? Depois de pontuação final, de quebra de linha, ou no início. */
+/** Começa frase? Depois de pontuação final, de quebra de linha, ou no início.
+
+    Ponto e vírgula e dois-pontos não abrem frase em português: estavam na lista e
+    saía "veio buscar; A criança A chorou". A quebra de linha abre, e por isso é
+    testada antes de o espaço do fim ser aparado. */
 const abreFrase = antes => {
-  const t = String(antes).replace(/[\s]+$/u, '');
-  return t === '' || /[.!?:;…]$/.test(t);
+  const bruto = String(antes);
+  if(/\n[^\S\n]*$/.test(bruto)) return true;
+  const t = bruto.replace(/\s+$/u, '');
+  return t === '' || /[.!?…]$/.test(t);
 };
 
 /** "criança A" com o artigo e a contração que a frase pede. */
 function rotuloNaFrase(rotulo, anterior, inicio){
   const base = String(rotulo).charAt(0).toLocaleLowerCase('pt-BR') + String(rotulo).slice(1);
   const p = String(anterior || '').toLocaleLowerCase('pt-BR');
-  const saida = CONTRAI[p] ? CONTRAI[p] + ' ' + base
-    : p ? p + ' ' + base
-    : 'a ' + base;
+  const det = CONTRAI[p] || FEMININO[p] || p;
+  const saida = det ? det + ' ' + base : 'a ' + base;
   return inicio ? saida.charAt(0).toLocaleUpperCase('pt-BR') + saida.slice(1) : saida;
+}
+
+/** Posição de UMA forma do nome no texto, ou -1. Diferente de `posicaoNome`, que
+    procura a pessoa por todas as formas dela: aqui se pergunta por uma só.
+
+    A diferença importa no relatório. Para decidir se um aluno do cadastro foi citado
+    na narrativa era usada `posicaoNome`, que reexpande o nome — e bastava o sobrenome
+    bater para o irmão da criança envolvida entrar numa ocorrência que não teve. */
+export function posicaoForma(texto, forma){
+  const m = regexNome(forma).exec(String(texto || ''));
+  return m ? m.index : -1;
 }
 
 /** Posição da primeira citação do nome no texto, ou -1 se não houver. */
 export function posicaoNome(texto, nome){
   let menor = -1;
   for(const forma of formasDoNome(nome)){
-    const m = regexNome(forma).exec(String(texto || ''));
-    if(m && (menor < 0 || m.index < menor)) menor = m.index;
+    const i = posicaoForma(texto, forma);
+    if(i >= 0 && (menor < 0 || i < menor)) menor = i;
   }
   return menor;
+}
+
+/** Quem mais o texto cita, entre os alunos do cadastro.
+
+    `jaMapeados` são os nomes de quem já está no mapa do relatório — os envolvidos.
+    `candidatos` é [{nome, ...}]: devolve, na ordem em que aparecem no texto, os que
+    a narrativa cita de verdade. O resto do objeto volta intacto.
+
+    Aqui estava o pior defeito do relatório. Procurar o aluno do cadastro com
+    `posicaoNome` reexpande o nome dele em todas as formas, e bastava o sobrenome
+    bater: "Helena Souza e Theo disputavam" arrastava para dentro o Pedro Souza, irmão
+    da Helena, que nunca esteve ali — e "Ana Beatriz empurrou" arrastava a Ana Clara,
+    que só divide o primeiro nome. Numa escola, irmão e primeiro nome repetido são a
+    regra, não a exceção. E como a legenda mostra o nome real de quem está no mapa, o
+    comunicado de uma família exibia na tela o nome de uma criança de outra família.
+    Era vazamento, não só confusão.
+
+    A regra: só conta como citado quem aparece por uma forma do nome que não seja
+    também forma de alguém já no mapa. "Souza" é da Helena, "Ana" é da Ana Beatriz —
+    nenhuma das duas serve de prova. "Pedro Souza" inteiro e "Benício" não são de
+    ninguém mapeado, então quem for citado assim entra, como deve. */
+export function citadosNoTexto(texto, jaMapeados, candidatos){
+  const chave = f => semAcento(String(f)).toLowerCase().replace(/\s+/g, ' ');
+  const tomadas = new Set();
+  const tomar = nome => formasDoNome(nome).forEach(f => tomadas.add(chave(f)));
+  (jaMapeados || []).forEach(tomar);
+
+  /* A primeira forma própria, ou -1. */
+  const posPropria = nome => {
+    let menor = -1;
+    for(const forma of formasDoNome(nome)){
+      if(tomadas.has(chave(forma))) continue;
+      const i = posicaoForma(texto, forma);
+      if(i >= 0 && (menor < 0 || i < menor)) menor = i;
+    }
+    return menor;
+  };
+
+  const fora = [];
+  (candidatos || [])
+    .filter(c => c && c.nome)
+    .map(c => ({ c, pos: posPropria(c.nome) }))
+    .filter(x => x.pos >= 0)
+    .sort((x, y) => x.pos - y.pos)
+    /* Recalculado na segunda passagem: quem entrou antes passa a responder pelas
+       formas dele, e dois irmãos citados pelo mesmo sobrenome não viram duas
+       entradas. */
+    .forEach(({ c }) => {
+      if(posPropria(c.nome) < 0) return;
+      tomar(c.nome);
+      fora.push(c);
+    });
+  return fora;
 }
 
 /** Troca cada nome pelo seu rótulo. `pares` é [{nome, rotulo}]. */
