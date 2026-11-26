@@ -94,7 +94,10 @@ export function agregaPorHoraLocal(ocs, limiteLocais = 6){
    Então aqui sai um número, da área que a tela mediu. Quadrado, que é como um mapa de
    calor se lê. */
 
-/** Piso: mínimo medido para a célula ficar legível e acertável com o dedo. */
+/** Piso de legibilidade, não de toque: a célula não é botão, não tem onclick nem
+    papel, e por isso não entra na regra dos 44px. Os 34px vêm de uma medição anterior
+    num Pixel 7: com as colunas em `1fr`, um dia das 7h às 18h dava células de 20x20px
+    com número de 9,5px, ilegíveis. */
 export const CELULA_MIN = 34;
 /** Teto: acima disto a célula vira um quadrado vazio em volta de um dígito. */
 export const CELULA_MAX = 72;

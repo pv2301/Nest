@@ -110,6 +110,16 @@ const medir = p => p.evaluate(() => {
  ok('ocupa a janela sem sair dela', m.dentroDaJanela);
  ok('no retrato o palco está girado', m.girado);
  ok('as células estão pintadas', m.pintada);
+ /* Cobre a tela inteira, então tem de se anunciar: sem isto um leitor de tela seguiria
+    lendo o que está por baixo, invisível para quem vê. */
+ const aria = await p.evaluate(() => {
+   const d = document.getElementById('heat-cheio');
+   return { papel: d.getAttribute('role'), modal: d.getAttribute('aria-modal'),
+            rotulo: d.getAttribute('aria-label') };
+ });
+ ok('se anuncia como diálogo modal',
+    aria.papel === 'dialog' && aria.modal === 'true', JSON.stringify(aria));
+ ok('e diz o que é', !!aria.rotulo && /tela cheia/i.test(aria.rotulo), JSON.stringify(aria));
 
  console.log('\n=== Mostra mais do que o cartão ===');
  ok('mais locais que os 6 do cartão, ou todos os que houver',

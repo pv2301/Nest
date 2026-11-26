@@ -219,10 +219,14 @@ function pintarCelulas(raiz){
 
 app.heatCheio = abrir => { S.heatCheio = !!abrir; render(); };
 
-/* O painel mora no document.body, e NÃO dentro de #view. Não é detalhe: puxar.js põe
-   `transform` em #view enquanto a pessoa puxa para atualizar, e um ancestral
-   transformado passa a ser a referência de `position:fixed` — o painel sairia de
-   lugar. O toast já vive assim, pelo mesmo motivo. */
+/* O painel mora no document.body, e NÃO dentro de #view.
+
+   Dois motivos, os dois conferidos. Um: `render()` troca `view.innerHTML` inteiro, e
+   o que estivesse dentro morreria a cada desenho — é por isso que o toast também é
+   anexado ao body, em core.js. Dois: puxar.js põe `transform` em #view enquanto a
+   pessoa puxa para atualizar, e um ancestral transformado passa a ser a referência de
+   `position:fixed`. Medido: um `inset:0` dentro de um pai com `translateY` foi de
+   0,0,412,915 para 40,130,200,200 — o painel sairia de lugar. */
 function desenharHeatCheio(){
   const velho = document.getElementById('heat-cheio');
   if(velho) velho.remove();
@@ -236,6 +240,11 @@ function desenharHeatCheio(){
   const d = document.createElement('div');
   d.id = 'heat-cheio';
   d.className = 'heat-cheio naoimprime';
+  /* Cobre a tela inteira, então tem de se anunciar como tal: sem isto um leitor de
+     tela continuaria lendo o que está por baixo, invisível para quem vê. */
+  d.setAttribute('role', 'dialog');
+  d.setAttribute('aria-modal', 'true');
+  d.setAttribute('aria-label', 'Quando e onde acontece, em tela cheia');
   d.innerHTML = `<div class="hc-palco">
     <div class="hc-topo">
       <p class="sec-label grow">Quando e onde acontece</p>
