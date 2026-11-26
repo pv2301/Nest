@@ -97,6 +97,27 @@ t('completo não aponta nada',
   falta({ categoria:'c', tipo:'t', sev:2, envolvidos:[{kid:'a',papel:'p'}],
           desc:'x'.repeat(20), presenciou:true }).length === 0);
 
+/* Citação de nome ambígua. Quem acha as citações é citacoes.mjs e quem conhece o
+   cadastro é quem chama — por isso entra como contexto, e não como campo do rascunho.
+   Sem o contexto a regra é pulada, que é o que deixa um chamador sem cadastro à mão
+   usar o resto de oQueFalta. */
+const pronto = { categoria:'c', tipo:'t', sev:2, envolvidos:[{kid:'a',papel:'p'}],
+                 desc:'x'.repeat(20), presenciou:true };
+t('sem contexto, a regra das citações é pulada',
+  R.oQueFalta(pronto).length === 0);
+t('uma citação pendente trava o envio',
+  R.oQueFalta(pronto, { pendentes:1 }).some(f => f.campo === 'citacoes'));
+t('e diz no singular',
+  /de qual criança/.test(R.oQueFalta(pronto, { pendentes:1 })[0].texto),
+  R.oQueFalta(pronto, { pendentes:1 })[0].texto);
+t('duas pendentes dizem no plural, com o número',
+  /2 nomes/.test(R.oQueFalta(pronto, { pendentes:2 })[0].texto),
+  R.oQueFalta(pronto, { pendentes:2 })[0].texto);
+t('zero pendentes não trava',
+  R.oQueFalta(pronto, { pendentes:0 }).length === 0);
+t('e a citação é cobrada no passo da narrativa',
+  R.oQueFalta(pronto, { pendentes:1 })[0].passo === 3);
+
 console.log(falhas
   ? `\n=== ${falhas} de ${total} FALHARAM ===`
   : `\n=== ${total} TESTES DE REGRAS PASSARAM ===`);

@@ -15,6 +15,9 @@ const nomes = async () => _nomes || (_nomes = await import('../assets/js/nomes.m
 
 let _regras = null;
 const regras = async () => _regras || (_regras = await import('../assets/js/regras.mjs'));
+
+let _citacoes = null;
+const citacoes = async () => _citacoes || (_citacoes = await import('../assets/js/citacoes.mjs'));
 const { ErroApi } = A;
 
 /* ============================ ajudantes ============================ */
@@ -222,6 +225,15 @@ async function salvarAluno(eu, d){
   if(!a || !a.id) throw new ErroApi('Aluno sem identificador.', 'dados');
   const existe = await uma('SELECT * FROM alunos WHERE id=$1', [a.id]);
 
+  /* Criar e editar se distinguiam só por achar a linha. O id de aluno era o
+     milissegundo em base 36, então duas crianças cadastradas ao mesmo tempo nasciam
+     com o mesmo código — e esta função tratava a segunda como edição, apagando a
+     primeira em silêncio. O cliente agora diz qual é a intenção. Mesma correção dos
+     ids de ocorrência. */
+  if(existe && d.novo)
+    throw new ErroApi('Já existe um aluno com este código. Tente de novo.',
+      'id_ocupado', 409);
+
   /* Quem registra pode criar a criança que falta no cadastro — senão um cadastro
      ausente trava o registro na hora em que ele mais importa. Editar já cadastrado
      é só da gestão. */
@@ -386,6 +398,7 @@ const ACOES_ROTULO = {
   cria_aluno:'Cadastrou aluno', edita_aluno:'Editou aluno', remove_aluno:'Removeu aluno',
   salva_turma:'Salvou turma', remove_turma:'Removeu turma',
   cria_ocorrencia:'Criou registro', edita_ocorrencia:'Editou registro',
+  confirma_citacao:'Confirmou de quem era um nome citado',
   remove_ocorrencia:'Removeu registro', restaura_ocorrencia:'Restaurou registro',
   anexa_foto:'Anexou foto', ve_foto:'Abriu uma foto', remove_foto:'Removeu foto',
   retencao_foto:'Foto apagada pela retenção', limpeza_diaria:'Limpeza diária',
@@ -466,6 +479,44 @@ async function cadeiaDoServidor(eu, oc){
   }));
 }
 
+/* As citações de nome ainda sem resposta, pela conta do servidor.
+
+   Mesma função do navegador — citacoes.mjs —, pelo mesmo motivo de cadeiaDoServidor:
+   uma regra que decide o que vai ao papel sobre uma criança não pode existir só no
+   cliente. Se existisse, bastaria um registro gravado por fora para o relatório
+   depois não saber o que anonimizar, e seria tarde para perguntar.
+
+   Olha a descrição, que é o que a autora escreve e o que a tela cobra. O cadastro
+   inteiro entra porque é ele que cria a ambiguidade: três Souzas matriculadas são o
+   que torna "Souza" uma dúvida. */
+async function citacoesPendentesNoServidor(oc){
+  const texto = String((oc && oc.desc) || '');
+  if(!texto.trim()) return [];
+  const { indiceDePessoas, citacoesPendentes } = await citacoes();
+
+  const [als, cts] = await Promise.all([
+    todas('SELECT id, nome, turma, nascimento, ativo FROM alunos'),
+    /* Ativas, como o diretório que o navegador recebe: as duas contas têm de bater,
+       senão a tela cobra uma confirmação que o servidor não cobra, ou o contrário. */
+    todas(`SELECT nome FROM contas WHERE status = 'ativo'`)
+  ]);
+  const pessoas = als.map(a => ({ id:a.id, nome:a.nome, crianca:true,
+      turma:a.turma || '', nascimento:a.nascimento || '' }))
+    .concat(cts.map(c => ({ id:'u:' + c.nome, nome:c.nome, crianca:false })))
+    .concat([oc.autor, (oc.informante || {}).nome].filter(Boolean)
+      .map(n => ({ id:'x:' + n, nome:n, crianca:false })));
+
+  const guardadas = {};
+  for(const m of (oc.mencoes || []))
+    if(m && m.forma) guardadas[m.forma] = m.kid || '';
+
+  return citacoesPendentes(texto, indiceDePessoas(pessoas), {
+    envolvidos: (oc.envolvidos || []).map(e => e.kid).filter(Boolean),
+    turmas: [...new Set((oc.envolvidos || []).map(e => e.turma || '').filter(Boolean))],
+    guardadas
+  });
+}
+
 async function salvarOcorrencia(eu, d){
   const oc = d.ocorrencia;
   if(!oc || !oc.id) throw new ErroApi('Ocorrência sem identificador.', 'dados');
@@ -488,7 +539,8 @@ async function salvarOcorrencia(eu, d){
      A tela guarda o informante dentro de um objeto; a regra o espera solto. É a
      única diferença de forma entre o rascunho e o registro gravado. */
   const { oQueFalta } = await regras();
-  const falta = oQueFalta({ ...oc, informanteNome: (oc.informante || {}).nome });
+  const falta = oQueFalta({ ...oc, informanteNome: (oc.informante || {}).nome },
+    { pendentes: (await citacoesPendentesNoServidor(oc)).length });
   if(falta.length)
     throw new ErroApi('Registro incompleto: ' + falta.map(f => f.texto).join('; ') + '.',
       'incompleto', 422);
@@ -529,6 +581,21 @@ async function salvarOcorrencia(eu, d){
       [oc.id, oc, eu.login]);
   }
   await registrar(eu.login, existe ? 'edita_ocorrencia' : 'cria_ocorrencia', oc.id);
+
+  /* Confirmar de quem era um nome citado é decisão sobre dado de criança: muda quem
+     o relatório anonimiza e quem ele nomeia. "Editou registro" não diz isso.
+
+     Quem compara é o servidor, e não um aviso que o cliente mande junto: um cliente
+     que esqueça o aviso não pode fazer a decisão desaparecer da auditoria. */
+  const antesCit = {};
+  for(const m of (((existe || {}).dados || {}).mencoes || []))
+    if(m && m.forma) antesCit[m.forma] = m.kid || '';
+  const mudou = (oc.mencoes || []).filter(m => m && m.forma
+    && !(Object.prototype.hasOwnProperty.call(antesCit, m.forma)
+         && antesCit[m.forma] === (m.kid || '')));
+  for(const m of mudou)
+    await registrar(eu.login, 'confirma_citacao',
+      `${oc.id} "${m.forma}" = ${m.kid || 'não é criança'}`);
   return oc;
 }
 

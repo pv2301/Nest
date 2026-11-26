@@ -290,11 +290,21 @@ export const Store = {
     return LS.ler(K.alunos, []);
   },
 
-  async salvarAluno(aluno){
+  /* `opcoes.novo` diz a intenção: criar ou editar. Antes criar e editar se
+     distinguiam só por achar a linha, e com o id de aluno que dava a volta no mesmo
+     milissegundo uma criança nova sobrescrevia outra em silêncio. Mesma correção dos
+     ids de ocorrência. */
+  async salvarAluno(aluno, opcoes){
     if(aluno && aluno.nome) aluno = { ...aluno, nome: tituloNome(aluno.nome) };
-    if(temApi()) return await api('salvarAluno', { aluno });
+    const novo = !!(opcoes && opcoes.novo);
+    if(temApi()) return await api('salvarAluno', { aluno, novo });
     const as = LS.ler(K.alunos, []);
     const i = as.findIndex(a => a.id === aluno.id);
+    if(i >= 0 && novo){
+      const e = new Error('Já existe um aluno com este código. Tente de novo.');
+      e.codigo = 'id_ocupado';
+      throw e;
+    }
     if(i >= 0) as[i] = { ...as[i], ...aluno, demo:false, avulso:false }; else as.push(aluno);
     LS.gravar(K.alunos, as);
     return aluno;

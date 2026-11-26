@@ -145,6 +145,21 @@ t('Miss cria aluno em campo, marcado avulso', r.ok && r.dados.avulso === true);
 r = await chamar('salvarAluno', { aluno:{ id:'c1', nome:'Nome Trocado' } });
 t('Miss NÃO edita aluno já cadastrado', !r.ok && r.codigo === 'permissao');
 
+/* Id de aluno já ocupado num cadastro NOVO é erro, não edição. O id era o
+   milissegundo em base 36: duas crianças cadastradas ao mesmo tempo nasciam iguais, e
+   o servidor apagava a primeira em silêncio. */
+cookieAtual = cookieGestao;
+r = await chamar('salvarAluno', { novo:true, aluno:{ id:'c1', nome:'Outra Criança', turma:'Verde' } });
+t('cadastro novo com id ocupado é recusado',
+  !r.ok && r.codigo === 'id_ocupado' && r.http === 409, JSON.stringify(r));
+r = await chamar('alunos');
+t('e a criança de antes continua lá',
+  r.ok && r.dados.some(a => a.id === 'c1' && a.nome === 'Helena Souza'),
+  JSON.stringify(r.ok && r.dados.filter(a => a.id === 'c1')));
+r = await chamar('salvarAluno', { aluno:{ id:'c1', nome:'Helena Souza', turma:'Verde' } });
+t('mas editar o mesmo id segue valendo', r.ok && r.dados.nome === 'Helena Souza');
+cookieAtual = cookieMiss;
+
 console.log('\n=== Ocorrências e sigilo ===');
 /* Registros completos de propósito: o servidor confere o que recebe com a mesma
    oQueFalta da tela, então um dado de teste esquelético não representa nada que o
@@ -453,6 +468,74 @@ t('aluno sem registro é removido', r.ok && !r.dados.some(a => a.id === 'c9'),
 
 r = await chamar('removerAluno', { id:'nao-existe' });
 t('aluno inexistente responde 404', !r.ok && r.codigo === 'inexistente' && r.http === 404);
+
+console.log('\n=== Citação de nome ambígua ===');
+/* O servidor refaz a conta com o cadastro dele. Se esta regra existisse só no
+   cliente, bastaria um registro gravado por fora para o relatório depois não saber o
+   que anonimizar — e aí é tarde, o papel já foi à família. Mesma razão de a cadeia
+   de ciência ser recalculada aqui.
+
+   Fica no fim da suíte de propósito: grava registros, e as asserções de sigilo acima
+   contam quantos existem. */
+await chamar('salvarAluno', { aluno:{ id:'c20', nome:'Ricardo Souza', turma:'Verde' } });
+await chamar('salvarAluno', { aluno:{ id:'c21', nome:'Telma Souza',   turma:'Verde' } });
+await chamar('salvarAluno', { aluno:{ id:'c22', nome:'Theo Martins',  turma:'Verde' } });
+
+/* A envolvida não é nenhuma das Souzas — senão a regra "está entre as envolvidas"
+   resolveria a dúvida, e com razão. */
+const ocDuvida = { id:'9077', categoria:'Incidente', tipo:'Mordida', sev:2,
+  presenciou:true, envolvidos:[{ kid:'c22', papel:'Sofreu', turma:'Verde' }],
+  desc:'No fim do turno, Souza empurrou o balde de areia e foi preciso separar as duas.' };
+
+r = await chamar('salvarOcorrencia', { novo:true, ocorrencia: ocDuvida });
+t('registro com nome ambíguo é recusado',
+  !r.ok && r.codigo === 'incompleto' && r.http === 422, JSON.stringify(r));
+t('e a recusa diz que falta confirmar de qual criança é o nome',
+  !r.ok && /confirmar de qual crian/i.test(r.erro), r.erro);
+r = await chamar('ocorrencias');
+t('e o registro não ficou no banco', r.ok && !r.dados.some(o => o.id === '9077'));
+
+r = await chamar('salvarOcorrencia', { novo:true,
+  ocorrencia: { ...ocDuvida, mencoes:[{ forma:'souza', kid:'c20' }] } });
+t('com a confirmação, grava', r.ok && r.dados.id === '9077', JSON.stringify(r));
+t('e a confirmação fica gravada',
+  r.ok && (r.dados.mencoes || []).some(m => m.forma === 'souza' && m.kid === 'c20'),
+  JSON.stringify(r.ok && r.dados.mencoes));
+
+r = await chamar('salvarOcorrencia', { novo:true,
+  ocorrencia: { ...ocDuvida, id:'9078', mencoes:[{ forma:'souza', kid:'' }] } });
+t('"não é uma criança" também libera', r.ok && r.dados.id === '9078', JSON.stringify(r));
+
+r = await chamar('salvarOcorrencia', { novo:true, ocorrencia: { ...ocDuvida, id:'9079',
+  desc:'No fim do turno, a Telma Souza empurrou o balde e foi preciso separar as duas.' } });
+t('nome inteiro não dá margem a dúvida, e passa direto',
+  r.ok && r.dados.id === '9079', JSON.stringify(r));
+
+r = await chamar('salvarOcorrencia', { novo:true, ocorrencia: { ...ocDuvida, id:'9080',
+  desc:'No fim do turno, chamei a Miss Telma Souza, que separou as duas na hora.' } });
+t('a Miss citada pelo nome não é uma criança ambígua',
+  r.ok && r.dados.id === '9080', JSON.stringify(r));
+
+/* A auditoria tem de dizer O QUE foi decidido. "Editou registro" não diz: confirmar
+   de quem era um nome muda quem o relatório anonimiza e quem ele nomeia. E quem
+   compara é o servidor — um cliente que esqueça de avisar não faz a decisão
+   desaparecer do registro de ações. */
+r = await chamar('salvarOcorrencia', {
+  ocorrencia: { ...ocDuvida, mencoes:[{ forma:'souza', kid:'c21' }] } });
+t('trocar a confirmação é aceito', r.ok, JSON.stringify(r));
+r = await chamar('auditoria', { limite:30 });
+const cit = ((r.dados || {}).linhas || []).filter(x => x.acao === 'confirma_citacao');
+t('a decisão aparece na auditoria', cit.length >= 1,
+  JSON.stringify(((r.dados || {}).linhas || []).slice(0, 5).map(x => x.acao)));
+t('e diz qual nome e para qual criança',
+  cit.some(x => /"souza"/.test(x.detalhe || '') && /c21/.test(x.detalhe || '')),
+  JSON.stringify(cit.map(x => x.detalhe)));
+t('com rótulo legível, não o nome interno da ação',
+  cit.length >= 1 && cit.every(x => /de quem era um nome/i.test(x.rotulo || '')),
+  JSON.stringify(cit.map(x => x.rotulo)));
+t('e a ação entra na lista de filtros da tela',
+  ((r.dados || {}).acoes || []).some(a => a.id === 'confirma_citacao'),
+  JSON.stringify(((r.dados || {}).acoes || []).map(a => a.id)));
 
 console.log('\n=== Sincronizar: uma requisição só ===');
 r = await chamar('sincronizar');

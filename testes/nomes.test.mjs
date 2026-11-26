@@ -7,15 +7,25 @@
 
 import { readFileSync } from 'node:fs';
 
-/* util.js é módulo ES e o package é commonjs, então o Node não o importa pelo
-   caminho. Como ele não importa nada, carregá-lo como data URL resolve sem cópia
-   temporária nem mudança no projeto. */
-const fonte = readFileSync(new URL('../assets/js/util.js', import.meta.url), 'utf8');
-const U = await import('data:text/javascript;base64,' + Buffer.from(fonte).toString('base64'));
-
-/* nomes.mjs é .mjs justamente para o Node importá-lo pelo caminho, como regras.mjs.
-   Só util.js precisa do rodeio do data URL. */
+/* O maquinário de nomes mora em citacoes.mjs, que é .mjs justamente para o Node
+   importá-lo pelo caminho — como regras.mjs e nomes.mjs. Antes isto vinha de util.js
+   por data URL, porque um .js não é importável como módulo ES de dentro de um package
+   commonjs. */
+import * as Cit from '../assets/js/citacoes.mjs';
 import * as N from '../assets/js/nomes.mjs';
+
+/* util.js segue precisando do rodeio, e agora com um detalhe: ele importa
+   './citacoes.mjs', e um data URL não tem de onde resolver um caminho relativo. Por
+   isso o caminho é trocado pelo absoluto antes de codificar. Só o que é exclusivo de
+   util.js — id e código de recuperação — vem daqui. */
+const alvoCitacoes = new URL('../assets/js/citacoes.mjs', import.meta.url).href;
+const fonte = readFileSync(new URL('../assets/js/util.js', import.meta.url), 'utf8')
+  .replace(/'\.\/citacoes\.mjs'/g, JSON.stringify(alvoCitacoes));
+const Util = await import('data:text/javascript;base64,' + Buffer.from(fonte).toString('base64'));
+
+/* Reexportar de util.js é parte do contrato: quem importava de lá continua podendo.
+   Um `U` que junta os dois trava isso — se o reexport cair, o teste cai. */
+const U = { ...Cit, ...Util };
 
 let falhas = 0, total = 0;
 const t = (nome, cond, extra) => {
@@ -176,40 +186,12 @@ t('com determinante antes também', r === 'A criança A chorou.', r);
 r = troca('Maria dos Santos caiu.', [{ nome:'Maria dos Santos', rotulo:'Criança A' }]);
 t('"dos" também', r === 'A criança A caiu.', r);
 
-console.log('\n=== Quem a narrativa cita de verdade ===');
-/* O defeito que a escola viu: ao gerar o comunicado de uma família aparecia uma
-   terceira criança, de outra família, que não esteve na ocorrência — e a legenda
-   "Quem é quem" mostrava o nome real dela. */
-const cita = (texto, envolvidos, cadastro) =>
-  U.citadosNoTexto(texto, envolvidos, cadastro.map(n => ({ nome:n }))).map(x => x.nome);
-
-let c = cita('Helena Souza e Theo disputavam o carrinho. Theo mordeu a Helena.',
-  ['Helena Souza', 'Theo Martins'], ['Pedro Souza', 'Ana Clara Dias']);
-t('o irmão não entra pelo sobrenome', c.length === 0, JSON.stringify(c));
-
-c = cita('Ana Beatriz empurrou o balde.',
-  ['Ana Beatriz Lima'], ['Ana Clara Dias', 'Pedro Souza']);
-t('quem só divide o primeiro nome não entra', c.length === 0, JSON.stringify(c));
-
-c = cita('Helena caiu. Benício viu tudo e chamou a Miss.',
-  ['Helena Souza'], ['Benício Rocha', 'Pedro Souza']);
-t('a testemunha de verdade entra', c.join() === 'Benício Rocha', JSON.stringify(c));
-
-c = cita('Helena caiu e Pedro Souza ajudou a levantar.',
-  ['Helena Souza'], ['Pedro Souza']);
-t('citado pelo nome inteiro entra, irmão ou não',
-  c.join() === 'Pedro Souza', JSON.stringify(c));
-
-c = cita('Theo empurrou. Benício e a Cecília Rocha viram.',
-  ['Theo Martins'], ['Benício Rocha', 'Cecília Rocha']);
-t('duas testemunhas, na ordem em que aparecem',
-  c.join() === 'Benício Rocha,Cecília Rocha', JSON.stringify(c));
-
-c = cita('Ninguém mais estava por perto.', ['Helena Souza'], ['Pedro Souza', 'Theo Martins']);
-t('sem citação, ninguém entra', c.length === 0, JSON.stringify(c));
-
-c = cita('Helena caiu.', [], []);
-t('listas vazias não quebram', c.length === 0);
+/* O bloco "Quem a narrativa cita de verdade" mudou de arquivo. A regra de exclusão
+   que ele travava — `citadosNoTexto` — foi substituída pelo motor de citações, que
+   responde a mesma pergunta melhor: em vez de tirar quem só aparece por uma forma de
+   outra criança, ele lê o texto em trechos e, quando não sabe, pergunta. Os quatro
+   casos daquele bloco estão em citacoes.test.mjs, em "O bug original". Duas regras
+   para a mesma pergunta era justamente como o relatório tinha chegado a errar. */
 
 console.log('\n=== Localizar citação ===');
 t('acha o nome citado', U.posicaoNome('Depois Helena chamou a Miss.', 'Helena Souza') === 6,
@@ -281,6 +263,23 @@ t('o sufixo não usa I nem O, que se confundem com 1 e 0',
   ids.every(x => !/[IO]/.test(x.split('-')[1])));
 t('o id antigo de quatro dígitos repetiria',
   new Set(Array.from({length:50}, () => String(Date.now()).slice(-4))).size < 50);
+
+console.log('\n=== Identificador de aluno ===');
+/* Era `'a' + Date.now().toString(36)`: cinquenta cadastros seguidos num laço davam um
+   id só, e o servidor, achando a linha, fazia UPDATE — uma criança sobrescrevia a
+   outra em silêncio. */
+const idsAluno = new Set();
+for(let i = 0; i < 2000; i++) idsAluno.add(U.novoIdAluno());
+t('dois mil cadastros seguidos, nenhum repetido', idsAluno.size === 2000, String(idsAluno.size));
+t('o id antigo repetiria no mesmo milissegundo', (() => {
+  const velhos = new Set();
+  for(let i = 0; i < 50; i++) velhos.add('a' + Date.now().toString(36));
+  return velhos.size < 50;
+})());
+t('começa com a e traz a data', /^a\d{6}[0-9A-HJ-NP-Z]{6}$/.test(U.novoIdAluno()),
+  U.novoIdAluno());
+t('sem I e sem O no sufixo',
+  Array.from({ length: 300 }, () => U.novoIdAluno()).every(x => !/[IO]/.test(x)));
 
 console.log('\n=== Código de recuperação ===');
 const cods = Array.from({ length: 2000 }, () => U.novoCodigoRecuperacao());

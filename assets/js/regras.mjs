@@ -100,8 +100,18 @@ export function paraCadeia(destinos){
 /* ---------------------------------------------------------------- o que falta */
 
 /** O que impede o envio, e em qual passo. Cada item diz o campo, para o campo poder
-    se marcar em vez de a pessoa caçar na tela qual era. */
-export function oQueFalta(d){
+    se marcar em vez de a pessoa caçar na tela qual era.
+
+    `ctx` é opcional e leva `{ pendentes }`: quantas citações de nome ambíguas a
+    narrativa ainda deixa sem resposta. Quem acha as citações é citacoes.mjs, e quem
+    sabe o cadastro é quem chama — a tela e o servidor. Sem `ctx`, a regra é pulada:
+    é o que deixa um chamador que não conhece o cadastro usar o resto.
+
+    Travar o envio por isso é deliberado. Um registro gravado com citação ambígua
+    pendente é um registro cujo relatório não sabe o que anonimizar, e é tarde para
+    perguntar quando o papel vai à família. A saída de um toque é "não é uma
+    criança", no próprio bloco, então não há beco sem saída. */
+export function oQueFalta(d, ctx){
   const f = [];
   if(!d) return f;
   const OUTRO = 'Outro';
@@ -118,5 +128,10 @@ export function oQueFalta(d){
     f.push({ passo:3, campo:'descricao', texto:'Escrever a descrição do ocorrido' });
   if(!d.presenciou && !String(d.informanteNome || '').trim())
     f.push({ passo:3, campo:'informante', texto:'Informar quem relatou' });
+  const pendentes = ctx && Number(ctx.pendentes) || 0;
+  if(pendentes)
+    f.push({ passo:3, campo:'citacoes', texto: pendentes === 1
+      ? 'Confirmar de qual criança é o nome citado'
+      : `Confirmar de quais crianças são os ${pendentes} nomes citados` });
   return f;
 }

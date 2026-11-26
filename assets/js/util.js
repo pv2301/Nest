@@ -1,6 +1,10 @@
 /* Utilitários: escape, ícones, marca, criptografia e validações.
    As validações são funções puras de propósito — são testadas isoladamente. */
 
+/* O único import deste arquivo: `semAcento` é usado aqui e mora em citacoes.mjs,
+   junto do resto do maquinário de nomes que o servidor também precisa rodar. */
+import { semAcento } from './citacoes.mjs';
+
 export const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 /* ---------- ícones ---------- */
@@ -43,8 +47,6 @@ export const confRodape = nome =>
   `<div class="conf"><i></i>${esc(nome ? nome + ' · ' : '')}registro interno e confidencial<i></i></div>`;
 
 /* ---------- nomes ---------- */
-export function semAcento(s){ return String(s).normalize('NFD').replace(/[̀-ͯ]/g,''); }
-
 /** Normaliza o que a pessoa digita no campo de login, enquanto digita. */
 export function normalizaLogin(s){
   return semAcento(String(s)).toLowerCase()
@@ -161,17 +163,40 @@ export function senhaTemporaria(){
     O acaso vem do crypto quando existe; Math.random é só a rede de segurança para um
     navegador antigo. */
 export function novoId(agora = new Date()){
-  const d = [agora.getFullYear() % 100, agora.getMonth() + 1, agora.getDate()]
-    .map(n => String(n).padStart(2, '0')).join('');
-  const letras = '0123456789ABCDEFGHJKLMNPQRSTUVWXYZ';  /* sem I e O, que viram 1 e 0 */
-  let sufixo = '';
+  return carimboDoDia(agora) + '-' + sufixoAleatorio(6);
+}
+
+const LETRAS_ID = '0123456789ABCDEFGHJKLMNPQRSTUVWXYZ';  /* sem I e O, que viram 1 e 0 */
+
+/** `n` caracteres sorteados, do alfabeto de 34 sem I nem O. */
+export function sufixoAleatorio(n){
   const c = globalThis.crypto;
-  const bytes = c && c.getRandomValues ? c.getRandomValues(new Uint8Array(6)) : null;
-  for(let i = 0; i < 6; i++){
-    const n = bytes ? bytes[i] : Math.floor(Math.random() * 256);
-    sufixo += letras[n % letras.length];
+  const bytes = c && c.getRandomValues ? c.getRandomValues(new Uint8Array(n)) : null;
+  let fora = '';
+  for(let i = 0; i < n; i++){
+    const b = bytes ? bytes[i] : Math.floor(Math.random() * 256);
+    fora += LETRAS_ID[b % LETRAS_ID.length];
   }
-  return d + '-' + sufixo;
+  return fora;
+}
+
+/** AAMMDD: abre o id para dar para ler e ordenar. */
+const carimboDoDia = agora =>
+  [agora.getFullYear() % 100, agora.getMonth() + 1, agora.getDate()]
+    .map(x => String(x).padStart(2, '0')).join('');
+
+/** Id de aluno.
+
+    Era `'a' + Date.now().toString(36)`: duas crianças cadastradas no mesmo
+    milissegundo nasciam com o MESMO id, e o servidor, achando a linha, fazia UPDATE
+    — uma criança sobrescrevia a outra em silêncio. Medido: cinquenta cadastros
+    seguidos num laço deram um id só. Entre dois aparelhos é raro, mas é cadastro de
+    criança, e o estrago é perder o histórico de uma delas.
+
+    Mesmo conserto dos ids de ocorrência: data mais sufixo sorteado, e o servidor
+    recusa um id já ocupado em vez de sobrescrever. */
+export function novoIdAluno(agora = new Date()){
+  return 'a' + carimboDoDia(agora) + sufixoAleatorio(6);
 }
 
 /** Código de recuperação de senha.
@@ -234,215 +259,17 @@ export const soData = iso => {
 };
 
 /* ---------- nomes dentro de texto livre ----------
-   Usado para anonimizar a narrativa do relatório. Fica aqui, e não na tela, por ser
-   função pura: assim o Node consegue testá-la sem navegador, e é a parte do app onde
-   um erro passa despercebido com mais facilidade — um nome que escapa não quebra
-   nada, só vaza.
 
-   A comparação ignora acento e caixa SEM reescrever o texto: cada letra vira a classe
-   das suas variantes. Normalizar para comparar deslocaria as posições — "Cecília"
-   encolhe ao virar "Cecilia" — e o recorte sairia torto. */
-const VARIANTES = { a:'aáàâãä', e:'eéèêë', i:'iíìîï', o:'oóòôõö', u:'uúùûü', c:'cç', n:'nñ' };
-const LETRA = 'A-Za-zÀ-ÿ';
+   Mora em citacoes.mjs. Foi para lá porque o servidor precisa da mesma regra para
+   não aceitar registro com citação ambígua pendente, e um .js não é importável como
+   módulo ES de dentro do CommonJS — mesma razão de regras.mjs e nomes.mjs.
 
-/* Partículas de ligação. Não entram nas formas do nome — "de" e "da" sozinhos pegariam
-   meio texto —, mas o texto pode trazê-las entre duas partes que a forma já juntou: a
-   forma "Maria Souza" precisa achar "Maria de Souza" escrito na narrativa, e de uma
-   vez. Sem isso ela falhava, caíam as formas soltas "Maria" e "Souza", e o mesmo
-   nome saía rotulado duas vezes — "a criança A da criança A".
-
-   "e" fica de fora de propósito: em "Ana e Beatriz" são duas crianças, não uma. */
-const LIGACAO = ['de','da','do','das','dos','du','di'];
-const ENTRE_PARTES = `\\s+(?:(?:${LIGACAO.join('|')})\\s+)*`;
-
-export function padraoDoNome(nome){
-  return semAcento(String(nome)).trim().replace(/\s+/g, ' ').toLowerCase()
-    .split('')
-    .map(ch => {
-      if(ch === ' ') return ENTRE_PARTES;
-      const v = VARIANTES[ch] || (/[a-z0-9]/.test(ch) ? ch : null);
-      if(!v) return ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      return '[' + v + v.toUpperCase() + ']';
-    })
-    .join('');
-}
-
-/** Formas de um nome, das que cobrem mais partes para as que cobrem menos.
-
-    Não basta listar o nome inteiro e as partes soltas: "Paulo Victor Silva" escrito
-    como "Paulo Victor" trocaria parte por parte e sairia "Criança A Criança A". Por
-    isso entram todas as combinações que preservam a ordem — "Paulo Victor", "Paulo
-    Silva", "Victor Silva" —, e a mais abrangente é aplicada primeiro.
-
-    Partículas de ligação não entram como parte: ENTRE_PARTES já as atravessa.
-
-    Um pedaço curto de verdade — o "Lu" de "Ana Lu Dias" — entra nas combinações, mas
-    nunca sozinho. Antes ele era descartado, e a troca deixava "A criança A Lu
-    derrubou o copo" no papel. Sozinho também não serve: "Vi" é nome de gente e verbo,
-    e apagaria o "vi" de "eu vi tudo". Nome de uma parte só é a exceção — ali não há
-    resto a que juntar, e ficar sem forma nenhuma seria não anonimizar nada. */
-export function formasDoNome(nome){
-  const partes = String(nome || '').trim().split(/\s+/)
-    .filter(p => p && !LIGACAO.includes(semAcento(p).toLowerCase()));
-  if(!partes.length) return [];
-  const formas = [];
-  /* Cada bit de um contador binário diz se a parte entra na combinação. Nomes têm
-     poucas partes, então o total é pequeno. */
-  for(let mascara = 1; mascara < (1 << partes.length); mascara++){
-    const grupo = partes.filter((_, i) => mascara & (1 << i));
-    if(grupo.length === 1 && grupo[0].length <= 2 && partes.length > 1) continue;
-    formas.push({ texto: grupo.join(' '), n: grupo.length });
-  }
-  return formas
-    .sort((a, b) => b.n - a.n || b.texto.length - a.texto.length)
-    .map(f => f.texto);
-}
-
-/* A borda da frente é consumida; a de trás é só espiada, para dois nomes seguidos não
-   perderem o segundo. */
-const regexNome = forma =>
-  new RegExp(`(^|[^${LETRA}])(${padraoDoNome(forma)})(?![${LETRA}])`, 'g');
-
-/* ---------- artigo no lugar do nome ----------
-
-   Trocar "Otto" por "Criança A" seco deixa a frase capenga: "Otto fez e Raissa não
-   gostou" vira "Criança A fez e Criança B não gostou". Em português o rótulo pede
-   artigo — "A criança A fez e a criança B não gostou" —, e o artigo encontra a
-   preposição que vinha antes do nome.
-
-   Só estas três contraem. "a" de propósito fica de fora: em "entregou a Helena" a
-   crase caberia, mas em "a Helena chorou" não, e não há como distinguir as duas sem
-   entender a frase. Errar para o lado de não contrair deixa o texto simples; errar
-   para o outro deixa o texto errado. */
-const CONTRAI = { de:'da', em:'na', por:'pela' };
-
-/* Palavras que já cumprem o papel do artigo: aqui não se acrescenta outro, só se
-   troca o nome. "da Helena" vira "da criança A", e não "da a criança A". */
-const JA_DETERMINA = ['a','o','as','os','da','do','na','no','pela','pelo',
-                      'à','ao','um','uma'];
-
-/* "criança" é feminino, e o determinante que acompanhava o nome muda de gênero junto.
-   Sem isto saía "O criança A mordeu" e "o irmão do criança A" — o nome era trocado,
-   mas a frase denunciava que ali havia um menino. */
-const FEMININO = { o:'a', os:'as', do:'da', no:'na', pelo:'pela', ao:'à', um:'uma' };
-
-const PRE = Object.keys(CONTRAI).concat(JA_DETERMINA)
-  .sort((x, y) => y.length - x.length).join('|');
-
-/** O nome com a palavra anterior, quando ela muda o que sai. */
-const regexNomeComPre = forma =>
-  new RegExp(`(^|[^${LETRA}])(?:(${PRE})([ \t]+))?(${padraoDoNome(forma)})(?![${LETRA}])`,
-    'gi');
-
-/** Começa frase? Depois de pontuação final, de quebra de linha, ou no início.
-
-    Ponto e vírgula e dois-pontos não abrem frase em português: estavam na lista e
-    saía "veio buscar; A criança A chorou". A quebra de linha abre, e por isso é
-    testada antes de o espaço do fim ser aparado. */
-const abreFrase = antes => {
-  const bruto = String(antes);
-  if(/\n[^\S\n]*$/.test(bruto)) return true;
-  const t = bruto.replace(/\s+$/u, '');
-  return t === '' || /[.!?…]$/.test(t);
-};
-
-/** "criança A" com o artigo e a contração que a frase pede. */
-function rotuloNaFrase(rotulo, anterior, inicio){
-  const base = String(rotulo).charAt(0).toLocaleLowerCase('pt-BR') + String(rotulo).slice(1);
-  const p = String(anterior || '').toLocaleLowerCase('pt-BR');
-  const det = CONTRAI[p] || FEMININO[p] || p;
-  const saida = det ? det + ' ' + base : 'a ' + base;
-  return inicio ? saida.charAt(0).toLocaleUpperCase('pt-BR') + saida.slice(1) : saida;
-}
-
-/** Posição de UMA forma do nome no texto, ou -1. Diferente de `posicaoNome`, que
-    procura a pessoa por todas as formas dela: aqui se pergunta por uma só.
-
-    A diferença importa no relatório. Para decidir se um aluno do cadastro foi citado
-    na narrativa era usada `posicaoNome`, que reexpande o nome — e bastava o sobrenome
-    bater para o irmão da criança envolvida entrar numa ocorrência que não teve. */
-export function posicaoForma(texto, forma){
-  const m = regexNome(forma).exec(String(texto || ''));
-  return m ? m.index : -1;
-}
-
-/** Posição da primeira citação do nome no texto, ou -1 se não houver. */
-export function posicaoNome(texto, nome){
-  let menor = -1;
-  for(const forma of formasDoNome(nome)){
-    const i = posicaoForma(texto, forma);
-    if(i >= 0 && (menor < 0 || i < menor)) menor = i;
-  }
-  return menor;
-}
-
-/** Quem mais o texto cita, entre os alunos do cadastro.
-
-    `jaMapeados` são os nomes de quem já está no mapa do relatório — os envolvidos.
-    `candidatos` é [{nome, ...}]: devolve, na ordem em que aparecem no texto, os que
-    a narrativa cita de verdade. O resto do objeto volta intacto.
-
-    Aqui estava o pior defeito do relatório. Procurar o aluno do cadastro com
-    `posicaoNome` reexpande o nome dele em todas as formas, e bastava o sobrenome
-    bater: "Helena Souza e Theo disputavam" arrastava para dentro o Pedro Souza, irmão
-    da Helena, que nunca esteve ali — e "Ana Beatriz empurrou" arrastava a Ana Clara,
-    que só divide o primeiro nome. Numa escola, irmão e primeiro nome repetido são a
-    regra, não a exceção. E como a legenda mostra o nome real de quem está no mapa, o
-    comunicado de uma família exibia na tela o nome de uma criança de outra família.
-    Era vazamento, não só confusão.
-
-    A regra: só conta como citado quem aparece por uma forma do nome que não seja
-    também forma de alguém já no mapa. "Souza" é da Helena, "Ana" é da Ana Beatriz —
-    nenhuma das duas serve de prova. "Pedro Souza" inteiro e "Benício" não são de
-    ninguém mapeado, então quem for citado assim entra, como deve. */
-export function citadosNoTexto(texto, jaMapeados, candidatos){
-  const chave = f => semAcento(String(f)).toLowerCase().replace(/\s+/g, ' ');
-  const tomadas = new Set();
-  const tomar = nome => formasDoNome(nome).forEach(f => tomadas.add(chave(f)));
-  (jaMapeados || []).forEach(tomar);
-
-  /* A primeira forma própria, ou -1. */
-  const posPropria = nome => {
-    let menor = -1;
-    for(const forma of formasDoNome(nome)){
-      if(tomadas.has(chave(forma))) continue;
-      const i = posicaoForma(texto, forma);
-      if(i >= 0 && (menor < 0 || i < menor)) menor = i;
-    }
-    return menor;
-  };
-
-  const fora = [];
-  (candidatos || [])
-    .filter(c => c && c.nome)
-    .map(c => ({ c, pos: posPropria(c.nome) }))
-    .filter(x => x.pos >= 0)
-    .sort((x, y) => x.pos - y.pos)
-    /* Recalculado na segunda passagem: quem entrou antes passa a responder pelas
-       formas dele, e dois irmãos citados pelo mesmo sobrenome não viram duas
-       entradas. */
-    .forEach(({ c }) => {
-      if(posPropria(c.nome) < 0) return;
-      tomar(c.nome);
-      fora.push(c);
-    });
-  return fora;
-}
-
-/** Troca cada nome pelo seu rótulo. `pares` é [{nome, rotulo}]. */
-export function trocarNomes(texto, pares){
-  if(!texto) return texto;
-  let fora = String(texto);
-  for(const p of pares || []){
-    for(const forma of formasDoNome(p.nome)){
-      fora = fora.replace(regexNomeComPre(forma),
-        (_m, antes, pre, _esp, _nome, desloc, todo) =>
-          antes + rotuloNaFrase(p.rotulo, pre,
-            abreFrase(String(todo).slice(0, desloc) + antes)));
-    }
-  }
-  return fora;
-}
+   Reexportado aqui para quem já importava de util.js continuar importando de
+   util.js: a mudança é de arquitetura, não de comportamento. */
+export { semAcento, padraoDoNome, formasDoNome, posicaoForma, posicaoNome,
+         trocarNomes,
+         indiceDePessoas, mencoesNoTexto, resolverCitacoes, citacoesPendentes,
+         TITULOS } from './citacoes.mjs';
 
 /* A maiúscula de nome mora em nomes.mjs: a API precisa dela também, e um .js não é
    importável como módulo ES de dentro do CommonJS. Mesma razão de regras.mjs. */

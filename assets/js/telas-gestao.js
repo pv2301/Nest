@@ -5,7 +5,8 @@ import { S, app, registrarTela, ir, toast, render, recarregar, rodape, pendentes
          entradasGestao } from './core.js';
 import { Store } from './store.js';
 import { escolha } from './escolha.js';
-import { esc, ICON, svgIc, iniciais, quandoLegivel, senhaTemporaria, semAcento } from './util.js';
+import { esc, ICON, svgIc, iniciais, quandoLegivel, senhaTemporaria, semAcento,
+         novoIdAluno } from './util.js';
 import { tituloNome } from './nomes.mjs';
 import { PAPEIS_CONTA, FUNCOES } from './vocabulario.js';
 
@@ -503,7 +504,7 @@ app.renomearTurma = async () => {
   );
 };
 
-app.novoAluno = () => { S.alunoSel = { id:'a' + Date.now().toString(36), nome:'', turma:'', nascimento:'', saude:'', ativo:true, novo:true }; ir('aluno'); };
+app.novoAluno = () => { S.alunoSel = { id:novoIdAluno(), nome:'', turma:'', nascimento:'', saude:'', ativo:true, novo:true }; ir('aluno'); };
 app.abrirAluno = id => { S.alunoSel = { ...S.alunos.find(a => a.id === id) }; ir('aluno'); };
 
 registrarTela('aluno', () => {
@@ -579,7 +580,7 @@ app.salvarAlunoFicha = async () => {
       if(i >= 0) S.alunos[i] = { ...S.alunos[i], ...dados, avulso:false }; else S.alunos.push(dados);
       ir('alunos', { guardar:false });
     },
-    () => Store.salvarAluno(dados),
+    () => Store.salvarAluno(dados, { novo: !!a.novo }),
     a.novo ? 'Aluno adicionado.' : 'Aluno salvo.'
   );
 };

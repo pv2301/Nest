@@ -16,20 +16,21 @@
 
    O texto guardado no registro nunca muda: a substituição acontece ao desenhar. */
 
-import { S, app, registrarTela, ir, toast, render, aluno } from './core.js';
+import { S, app, registrarTela, ir, toast, render, aluno, otimista } from './core.js';
 import { Store } from './store.js';
 import { escolha } from './escolha.js';
 import { esc, SEAL, iniciais, dataCompleta, soData,
-         citadosNoTexto, posicaoNome, trocarNomes } from './util.js';
+         posicaoNome, trocarNomes } from './util.js';
 import { SEVL } from './vocabulario.js';
-import { tipoDe, localDe } from './telas-comum.js';
+import { tipoDe, localDe, citacoesDo, pendentesDo, contextoDeCitacoes,
+         blocoCitacoes } from './telas-comum.js';
 
 app.abrirFicha = id => {
   const o = S.ocs.find(x => x.id === id);
   /* Nasce anonimizado: identificar é escolha deliberada, não o padrão. */
   S.ficha = { id, destino:'interna', semIdentificar:true,
     focoKid: (o && o.envolvidos && o.envolvidos[0]) ? o.envolvidos[0].kid : null,
-    incluirFoto:false };
+    incluirFoto:false, mencoes:[] };
   ir('ficha');
 };
 
@@ -37,6 +38,26 @@ app.fichaDestino = d => { S.ficha.destino = d; render(); };
 app.fichaAnonima = () => { S.ficha.semIdentificar = !S.ficha.semIdentificar; render(); };
 app.fichaFoco = k => { S.ficha.focoKid = k; render(); };
 app.fichaFoto = () => { S.ficha.incluirFoto = !S.ficha.incluirFoto; render(); };
+
+/* Confirmar aqui, e não só no formulário, porque dois casos chegam a esta tela sem
+   resposta: o registro escrito antes desta versão, e o nome que era único quando foi
+   escrito e ficou ambíguo depois — basta uma criança nova se matricular. A resposta
+   fica no registro, e a troca entra na auditoria: quem gera um relatório decidiu de
+   quem era o nome, e isso é decisão sobre dado de criança. */
+app.fichaCitacao = async (forma, kid) => {
+  const o = S.ocs.find(x => x.id === S.ficha.id);
+  if(!o) return;
+  S.ficha.mencoes = (S.ficha.mencoes || []).filter(m => m.forma !== forma)
+    .concat([{ forma, kid: kid || '' }]);
+  render();
+  const mencoes = ((o.mencoes || []).filter(m => m.forma !== forma))
+    .concat(S.ficha.mencoes.filter(m => m.forma === forma));
+  await otimista(
+    () => { o.mencoes = mencoes; },
+    () => Store.salvarOcorrencia({ ...o, mencoes }, { novo:false }),
+    kid ? 'Citação confirmada.' : 'Marcada como não sendo criança.'
+  );
+};
 
 /** Protocolo legível: 20261117-4F3A. O id cru é base36 ("o1abc23de") e não diz nada a
     quem recebe o papel, nem permite referência por telefone. */
@@ -63,12 +84,16 @@ const textosDoRegistro = o => [
   ...(o.chain || []).map(c => c.parecer)
 ].filter(Boolean).join('\n');
 
-/** Quem vira o quê. Primeiro os envolvidos, na ordem do registro; depois qualquer
-    aluno do cadastro citado na narrativa, na ordem em que aparece — uma testemunha
-    nomeada de passagem vazaria tanto quanto um envolvido.
+/** Quem vira o quê. Primeiro os envolvidos, na ordem do registro; depois quem mais a
+    narrativa nomeia, na ordem em que aparece — uma testemunha citada de passagem
+    vazaria tanto quanto um envolvido.
 
     A letra é dada pela posição no registro, mesmo para quem sai nomeado, para a ficha
-    interna e o comunicado da mesma ocorrência não discordarem sobre quem é Criança B. */
+    interna e o comunicado da mesma ocorrência não discordarem sobre quem é Criança B.
+
+    Quem é citado sai de `citacoesDo`, o mesmo motor que o formulário usa: uma leitura
+    só do texto, e o que a Miss confirmou ao escrever vale aqui. Antes cada tela lia o
+    texto por conta própria, e era disso que vinha a terceira criança no relatório. */
 function mapaDeNomes(o){
   const f = S.ficha;
   const nomeada = f.destino === 'familia' ? f.focoKid : null;
@@ -82,20 +107,32 @@ function mapaDeNomes(o){
                 nomeada: e.kid === nomeada, citada:false });
   }
 
-  /* Quem mais a narrativa cita — uma testemunha nomeada de passagem vazaria tanto
-     quanto um envolvido. A regra de quem conta mora em util.js, com o teste. */
-  citadosNoTexto(textosDoRegistro(o), mapa.map(p => p.nome),
-                 (S.alunos || []).filter(a => a.id && !vistos.has(a.id) && a.nome))
-    .forEach(a => {
-      mapa.push({ kid:a.id, nome:a.nome, rotulo:rotuloPara(mapa.length),
-                  nomeada:false, citada:true });
-    });
+  for(const c of citacoesDo(textosDoRegistro(o), o, mencoesDa(o))){
+    if(!c.kid || vistos.has(c.kid)) continue;
+    vistos.add(c.kid);
+    mapa.push({ kid:c.kid, nome:aluno(c.kid).nome, rotulo:rotuloPara(mapa.length),
+                nomeada:false, citada:true, motivo:c.motivo });
+  }
 
   return mapa;
 }
 
+/** As respostas guardadas no registro, mais as dadas agora nesta tela.
+
+    A tela precisa das duas: o registro antigo não tem resposta nenhuma, e um nome que
+    era único quando foi escrito pode ter ficado ambíguo depois — basta uma criança
+    nova se matricular. O que for respondido aqui fica em S.ficha até ser gravado. */
+const mencoesDa = o => ((o && o.mencoes) || []).concat(
+  (S.ficha && S.ficha.mencoes) || []);
+
 /** Troca os nomes pelos rótulos. Quem sai nomeado é pulado. */
-const anonimizar = (texto, mapa) => trocarNomes(texto, (mapa || []).filter(p => !p.nomeada));
+/* O contexto vai junto: sem ele a troca escolheria sozinha entre duas crianças que
+   dividem um sobrenome, e a confirmação da pessoa não valeria nada no papel. */
+const anonimizar = (texto, mapa) => {
+  const o = S.ocs.find(x => x.id === S.ficha.id);
+  return trocarNomes(texto, (mapa || []).filter(p => !p.nomeada),
+    contextoDeCitacoes(o, mencoesDa(o)));
+};
 
 /** Texto como vai ao papel. */
 const comoSai = (txt, mapa) => S.ficha.semIdentificar ? anonimizar(txt, mapa) : txt;
@@ -147,13 +184,23 @@ app.checarFamilia = () => {
   const o = S.ocs.find(x => x.id === S.ficha.id);
   const campo = document.getElementById('f-familia');
   const alvo = document.getElementById('f-vaza');
-  /* Atualiza só o aviso e a prévia: re-renderizar apagaria o que está sendo
-     digitado — foi o que quebrou a busca de alunos no celular. */
+  /* Atualiza só os blocos vizinhos: re-renderizar apagaria o que está sendo digitado
+     — foi o que quebrou a busca de alunos no celular. */
   if(!o || !campo) return;
   if(alvo) alvo.innerHTML = avisoVazamento(o, campo.value);
   const previa = document.getElementById('f-previa');
   if(previa) previa.innerHTML = previaSemNomes(campo.value, mapaDeNomes(o));
+  /* O texto da família é reescrito aqui, e pode trazer um nome que o registro não
+     tinha. Sem este bloco a dúvida só apareceria no próximo desenho da tela — isto
+     é, depois de o papel já estar pronto. */
+  const duv = document.getElementById('f-nomes');
+  if(duv) duv.innerHTML = blocoDeDuvida(o, campo.value);
 };
+
+/** O bloco que pergunta, olhando também o texto que está sendo digitado agora. */
+const blocoDeDuvida = (o, textoAgora) => blocoCitacoes(
+  pendentesDo([textosDoRegistro(o), String(textoAgora || '')].join('\n'), o, mencoesDa(o)),
+  (forma, kid) => app.fichaCitacao(forma, kid));
 
 /** Quem é quem. Fica na tela e só na tela: impressa, devolveria tudo o que a
     anonimização tirou. */
@@ -164,7 +211,9 @@ function legenda(mapa){
     <div class="card flat"><dl class="kv">
       ${mapa.map(p => `<dt>${esc(p.nome)}</dt><dd>${p.nomeada
         ? 'nomeada no documento'
-        : esc(p.rotulo) + (p.citada ? ' · citada na narrativa' : '')}</dd>`).join('')}
+        : esc(p.rotulo) + (p.citada
+            ? ' · citada na narrativa' + (p.motivo ? ' · ' + esc(p.motivo) : '')
+            : '')}</dd>`).join('')}
     </dl></div>
   </div>`;
 }
@@ -361,6 +410,8 @@ registrarTela('ficha', () => {
             valor:f.focoKid, placeholder:'Escolher a criança',
             aoEscolher:k => { S.ficha.focoKid = k; } })
         : ''}
+
+      <div id="f-nomes">${blocoDeDuvida(o, f.destino === 'familia' ? textoFamilia(o) : '')}</div>
 
       ${legenda(mapa)}
 

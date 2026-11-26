@@ -15,10 +15,15 @@ import { tituloNome } from './nomes.mjs';
 import { CONFIG } from '../../config.js';
 import { CATS, OUTRO, EXEMPLOS, LOCAIS, PROVIDENCIAS, CONDICOES, REGIOES,
          PAPEIS_ENVOLVIDO, CANAIS_INFORME, SEVL, JULGAMENTO } from './vocabulario.js';
-import { sevTag, vazio } from './telas-comum.js';
+import { sevTag, vazio, pendentesDo, blocoCitacoes } from './telas-comum.js';
 
 /* ---------------------------------------------------------------- o que falta */
-const faltas = oQueFalta;
+
+/* A regra mora em regras.mjs e não conhece o cadastro; quem conhece é esta tela. Por
+   isso o número de citações pendentes entra como contexto, e não como mais um campo
+   do rascunho: o servidor faz a mesma conta com o cadastro dele, e as duas contas
+   têm de bater. */
+const faltas = d => oQueFalta(d, { pendentes: citacoesDoRascunho().length });
 
 /** Texto da falta daquele campo, ou vazio.
 
@@ -281,10 +286,44 @@ function checagemLinguagem(txt){
   return `<div class="notice info"><span class="ic">◆</span><div>Palavras de interpretação: <b>${achados.map(esc).join('</b>, <b>')}</b>. Descreva o que a criança fez ou disse.</div></div>`;
 }
 
+/* O rascunho visto como registro, para o motor de citações: ele precisa saber quem
+   está envolvido e em que turma, que é o que decide boa parte das dúvidas. */
+const registroDoRascunho = () => {
+  const d = S.rascunho || {};
+  return { envolvidos: (d.envolvidos || []).map(e => ({ kid:e.kid, turma:e.turma })),
+           autor: (S.conta || {}).nome, mencoes: d.mencoes || [],
+           informante: d.presenciou ? null : { nome: d.informanteNome } };
+};
+
+/** As perguntas que a narrativa do rascunho ainda deixa em aberto. */
+const citacoesDoRascunho = () => {
+  const d = S.rascunho || {};
+  const o = registroDoRascunho();
+  return pendentesDo(String(d.desc || ''), o, d.mencoes || []);
+};
+
+/** O bloco que pergunta de quem é o nome. Só existe quando há dúvida. */
+const blocoDuvidaDeNome = () => blocoCitacoes(citacoesDoRascunho(),
+  (forma, kid) => app.citacaoRascunho(forma, kid));
+
+app.citacaoRascunho = (forma, kid) => {
+  const d = S.rascunho;
+  d.mencoes = (d.mencoes || []).filter(m => m.forma !== forma)
+    .concat([{ forma, kid: kid || '' }]);
+  S.faltas = null;
+  render();
+};
+
+/* Dois blocos vizinhos se refazem a cada tecla, e a tela NÃO é redesenhada: redesenhar
+   destrói o campo em foco e derruba o teclado preditivo do celular — foi o que já
+   quebrou a busca de alunos. `escolha()` se registra ao desenhar, então injetar o HTML
+   por innerHTML também registra os handlers. */
 app.checarTexto = (campo, destino, v) => {
   S.rascunho[campo] = v;
   const el = document.getElementById(destino);
   if(el) el.innerHTML = checagemLinguagem(v);
+  const dn = document.getElementById(destino + '-nomes');
+  if(dn) dn.innerHTML = blocoDuvidaDeNome();
 };
 
 app.usarExemplo = () => {
@@ -312,6 +351,7 @@ function campoDescricao(id){
       spellcheck="true" autocorrect="on" autocapitalize="sentences"${err ? ' aria-invalid="true"' : ''}
       oninput="app.checarTexto('desc','${id}-chk',this.value)">${esc(d.desc)}</textarea>
     <div id="${id}-chk" style="margin-top:8px">${checagemLinguagem(d.desc)}</div>
+    <div id="${id}-chk-nomes" style="margin-top:8px">${blocoDuvidaDeNome()}</div>
     <p class="hint">Descreva o que foi observado, antes e depois.</p>
     ${err ? `<p class="erromsg">${esc(err)}</p>` : ''}
   </div>`;
@@ -527,6 +567,7 @@ app.corrigirRegistro = id => {
     informanteNome:(o.informante && o.informante.nome) || '',
     informanteCanal:(o.informante && o.informante.canal) || '',
     desc:o.desc || '', prov:(o.prov || []).slice(), foto:!!o.foto,
+    mencoes:(o.mencoes || []).slice(),
     cond, lesao
   };
   ir('wizard');
@@ -552,6 +593,9 @@ app.enviar = async () => {
       turma: e.turma || aluno(e.kid).turma || '',
       cond:d.cond[e.kid] || '—', lesao:d.lesao[e.kid] || '' })),
     desc:d.desc, prov:d.prov, foto:d.foto,
+    /* De quem é cada nome ambíguo da narrativa, confirmado por quem escreveu. Vai
+       gravado porque é o relatório, depois, que precisa saber — e quem sabe é ela. */
+    mencoes: (d.mencoes || []).filter(m => m && m.forma),
     fotoDias: d.foto ? RETENCAO_FOTO_DIAS : undefined,
     presenciou:d.presenciou,
     informante: d.presenciou ? null : { nome:tituloNome(d.informanteNome), canal:d.informanteCanal },
