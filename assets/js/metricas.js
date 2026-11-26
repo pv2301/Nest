@@ -128,9 +128,9 @@ export function ladoDaCelula({ largura, altura, horas, locais,
 /** Altura da faixa com as horas. Não é célula: só cabeçalho. */
 export const LINHA_HORAS = 20;
 
-/** A coluna dos nomes de local: cresce com a tela, entre 96 e 140px. */
-export const colunaDeNomes = largura =>
-  Math.max(96, Math.min(140, Math.round((Number(largura) || 0) * 0.18)));
+/* `colunaDeNomes` saiu: a coluna dos nomes era fixa entre 96 e 140px e deixava um
+   vazio à esquerda quando o nome era curto. Agora quem decide é o grid, com
+   `fit-content(26%)`, e a tela mede o resultado — exato em vez de estimado. */
 
 /** Contagem por chave, já ordenada do maior para o menor. */
 export function contaPor(ocs, chave, limite = 8){

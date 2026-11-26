@@ -2,7 +2,7 @@
    Visível apenas para quem tem papel 'gestao'. */
 
 import { S, app, registrarTela, ir, toast, render, recarregar, rodape, pendentes, otimista,
-         entradasGestao } from './core.js';
+         entradasGestao, voltarPara } from './core.js';
 import { Store } from './store.js';
 import { escolha } from './escolha.js';
 import { esc, ICON, svgIc, iniciais, quandoLegivel, senhaTemporaria, semAcento,
@@ -356,7 +356,7 @@ registrarTela('alunos', () => {
 
     <div>
       <div class="row" style="margin-bottom:8px">
-        <p class="sec-label grow" style="margin:0">Alunos · ${S.alunos.filter(a => a.ativo !== false).length}</p>
+        <p class="sec-label" style="margin:0">Alunos · ${S.alunos.filter(a => a.ativo !== false).length}</p><span class="grow"></span>
         <button class="btn sm" onclick="app.novoAluno()">+ Aluno</button>
       </div>
       <div class="stack s8">
@@ -432,7 +432,7 @@ app.removerTurma = async id => {
   await otimista(
     () => {
       S.turmas = S.turmas.filter(x => x.id !== id);
-      if(S.tela === 'turma'){ S.turmaSel = null; ir('alunos', { guardar:false }); }
+      if(S.tela === 'turma'){ S.turmaSel = null; voltarPara('alunos'); }
     },
     () => Store.removerTurma(id), 'Turma removida.');
 };
@@ -578,7 +578,7 @@ app.salvarAlunoFicha = async () => {
     () => {
       const i = S.alunos.findIndex(x => x.id === dados.id);
       if(i >= 0) S.alunos[i] = { ...S.alunos[i], ...dados, avulso:false }; else S.alunos.push(dados);
-      ir('alunos', { guardar:false });
+      voltarPara('alunos');
     },
     () => Store.salvarAluno(dados, { novo: !!a.novo }),
     a.novo ? 'Aluno adicionado.' : 'Aluno salvo.'
@@ -594,7 +594,7 @@ app.removerAluno = async () => {
   await otimista(
     () => {
       S.alunos = S.alunos.filter(x => x.id !== id);
-      ir('alunos', { guardar:false });
+      voltarPara('alunos');
     },
     () => Store.removerAluno(id),
     'Aluno removido do cadastro.'
@@ -606,7 +606,7 @@ app.arquivarAluno = async arquivar => {
   await otimista(
     () => {
       const a = S.alunos.find(x => x.id === id); if(a) a.ativo = !arquivar;
-      ir('alunos', { guardar:false });
+      voltarPara('alunos');
     },
     () => Store.arquivarAluno(id, arquivar),
     arquivar ? 'Aluno arquivado.' : 'Aluno reativado.'

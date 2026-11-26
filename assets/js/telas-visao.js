@@ -10,7 +10,7 @@ import { S, app, registrarTela, render, rodape, posRender, aluno } from './core.
 import { esc, ICON, svgIc } from './util.js';
 import { PERIODOS, catId } from './vocabulario.js';
 import { filtraPorPeriodo, agregaPorHoraLocal, contaPor, recorrencia, paresRecorrentes,
-         resumo, ladoDaCelula, colunaDeNomes, LINHA_HORAS } from './metricas.js';
+         resumo, ladoDaCelula, LINHA_HORAS, CELULA_MIN } from './metricas.js';
 import { tipoDe, vazio } from './telas-comum.js';
 import { escolha } from './escolha.js';
 import { corpoCalendario } from './telas-calendario.js';
@@ -38,7 +38,10 @@ function corpo(guia){
 function telaVisao(){
   const g = GUIAS.some(x => x.valor === S.visaoGuia) ? S.visaoGuia : 'destaques';
   return `<div class="stack s18">
-    ${escolha({ id:'visao-guia', opcoes:GUIAS, valor:g,
+    <!-- Segmentado de propósito: as três guias são navegação da tela, não um campo a
+         preencher, e aqui ver as três de uma vez é o valor. Todo campo de formulário
+         passou a ser lista; isto não é campo. -->
+    ${escolha({ id:'visao-guia', opcoes:GUIAS, valor:g, forcar:'segmentado',
       aoEscolher:v => { S.visaoGuia = v; } })}
     ${g === 'calendario' ? '' : filtroPeriodo()}
     ${corpo(g)}
@@ -103,7 +106,7 @@ function corpoPainel(){
     ${!ocs.length ? vazio('Nenhum registro no período', 'Escolha um período maior, ou carregue os dados de demonstração na aba Alunos.') : `
     <div class="card">
       <div class="row" style="margin-bottom:8px">
-        <p class="sec-label grow" style="margin:0">Quando e onde acontece</p>
+        <p class="sec-label" style="margin:0">Quando e Onde</p><span class="grow"></span>
         <!-- 44 nos DOIS lados. Só com min-height o botão saía 24px de largura — um
              ícone sem texto não empurra nada — e a varredura de toque reprovou, com
              razão: um polegar erra um alvo de 24px. -->
@@ -244,31 +247,50 @@ function desenharHeatCheio(){
      tela continuaria lendo o que está por baixo, invisível para quem vê. */
   d.setAttribute('role', 'dialog');
   d.setAttribute('aria-modal', 'true');
-  d.setAttribute('aria-label', 'Quando e onde acontece, em tela cheia');
-  d.innerHTML = `<div class="hc-palco">
-    <div class="hc-topo">
-      <p class="sec-label grow">Quando e onde acontece</p>
-      <button class="btn ghost sm" style="min-height:44px;min-width:44px;padding:0 12px"
-        aria-label="Fechar a tela cheia" onclick="app.heatCheio(false)">${svgIc(ICON.encolher)}</button>
+  d.setAttribute('aria-label', 'Quando e Onde, em tela cheia');
+  /* A barra em coordenadas normais de tela: título à esquerda, × no canto superior
+     direito, filtros na linha de baixo. Os filtros entram porque a tela cheia é onde
+     se fica olhando — trocar de período não devia obrigar a fechar e reabrir. */
+  d.innerHTML = `<div class="hc-topo">
+      <p class="sec-label">Quando e Onde</p><span class="grow"></span>
+      <button class="btn ghost sm" style="min-height:44px;min-width:44px;padding:0"
+        aria-label="Fechar a tela cheia" onclick="app.heatCheio(false)">${svgIc(ICON.fechar)}</button>
     </div>
-    <div class="hc-rol">${gradeHTML(grade, { linhaHoras:LINHA_HORAS })}</div>
-  </div>`;
+    <div class="hc-filtros">${filtroPeriodo()}</div>
+    <div class="hc-rol">${gradeHTML(grade, { linhaHoras:LINHA_HORAS, colunas:COLUNAS_PROVISORIAS(grade) })}</div>`;
   document.body.appendChild(d);
   dimensionarHeatCheio(grade);
   pintarCelulas(d);
   return d;
 }
 
-/** Mede a área e escreve o tamanho da célula. A conta mora em metricas.js. */
+/* A coluna dos nomes era fixa em 96–140px, e "Quadra" ocupa 38 — os outros cem
+   ficavam vazios à esquerda. `fit-content(26%)` resolve do jeito que foi pedido: a
+   coluna fica do tamanho do nome e para no limite, com as reticências que `.rl` já
+   tem. Medido: Quadra 38px, "Entrada / portaria" 91px, um nome comprido 104px. */
+const COLUNAS_PROVISORIAS = grade =>
+  `fit-content(26%) repeat(${grade.horas.length},${CELULA_MIN}px)`;
+
+/** Mede a área e escreve o tamanho da célula. A conta mora em metricas.js.
+
+    Duas passadas, e não uma: quem decide a largura da coluna de nomes agora é o grid,
+    com `fit-content`, então só dá para saber quanto sobra para as células DEPOIS do
+    primeiro layout. A primeira passada desenha com a célula no piso, esta mede a
+    coluna de verdade e escreve o tamanho final. É exato em vez de estimado, e as duas
+    acontecem antes do navegador pintar. */
 function dimensionarHeatCheio(grade){
   const rol = document.querySelector('#heat-cheio .hc-rol');
   const g = rol && rol.querySelector('.heat');
   if(!g) return;
-  /* clientWidth/clientHeight são lógicos — já vêm com os eixos do palco girado. */
+  const nome = g.querySelector('.rl');
+  if(!nome) return;
+
   const largura = rol.clientWidth, altura = rol.clientHeight;
-  const nomes = colunaDeNomes(largura);
+  const nomes = Math.ceil(nome.getBoundingClientRect().width);
   const lado = ladoDaCelula({ largura, altura, horas: grade.horas.length,
     locais: grade.linhas.length, colunaNomes: nomes, linhaHoras: LINHA_HORAS });
+  /* A coluna de nomes fica com a largura que ela mesma pediu: fixando-a em pixel, o
+     `fit-content` não volta a mudar de ideia quando as células crescem. */
   g.style.gridTemplateColumns = `${nomes}px repeat(${grade.horas.length},${lado}px)`;
   g.style.gridTemplateRows = `${LINHA_HORAS}px`;
   g.style.gridAutoRows = `${lado}px`;

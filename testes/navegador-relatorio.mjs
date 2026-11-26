@@ -41,7 +41,8 @@ const sobre = n => n.split(' ').slice(-1)[0];
  await p.evaluate(()=>app.iniciar('completo')); await p.waitForTimeout(700);
  await escolher(p, 'cat', 'Incidente'); await p.waitForTimeout(350);
  await escolher(p, 'tipo', 'Mordida'); await p.waitForTimeout(350);
- await p.click('.sevpick button[data-n="2"]'); await p.waitForTimeout(350);
+ /* A gravidade virou campo com lista, como todo campo de formulário. */
+ await p.evaluate(()=>app.escolherLista('sev','2')); await p.waitForTimeout(350);
  await p.evaluate(()=>app.irPasso(2)); await p.waitForTimeout(700);
 
  /* Os três primeiros alunos da lista, pelo id e pelo nome. */

@@ -1,17 +1,16 @@
-/* Seleção: um controle só, escolhido pelo número de opções.
+/* Seleção: um controle só para todo campo de formulário — o que abre lista.
 
-   A regra é a de Material 3 e do guia da Apple, e vive aqui — nenhuma tela decide
-   por conta própria:
+   Era por contagem de opções: até 3 segmentado, 4 chips, 5 ou mais campo com lista,
+   seguindo Material 3 e o guia da Apple. A escola pediu o contrário, e a razão é boa:
+   com controles diferentes a cada campo, o formulário parecia feito de pedaços, e
+   quem preenche de pé tem de reaprender onde tocar em cada passo. Um controle só se
+   aprende uma vez.
 
-     até 3 opções → segmentado, lado a lado   (trocar custa um toque)
-     4 opções     → chips visíveis
-     5 ou mais    → campo que abre lista, com busca
+   O preço, dito sem maquiar: "Presenciei / Fui informada" e a gravidade passam de um
+   toque para dois. Foi uma troca escolhida — uniformidade por um toque.
 
-   Esconder duas opções atrás de um campo transforma uma resposta de um toque em
-   duas, e este formulário é preenchido de pé, com pressa.
-
-   A contagem é feita ao desenhar: uma escola com doze turmas recebe campo onde a de
-   três recebe chips, sem ninguém decidir de novo.
+   Segmentado e chips continuam aqui, para quem pedir por `forcar`: as três guias da
+   Visão geral são navegação, não campo, e ali ver as três de uma vez é o valor.
 
    Regra que não se quebra: digitar na busca NÃO redesenha a tela, reescreve só as
    opções. Redesenhar destrói o campo em foco e derruba o teclado preditivo.
@@ -21,9 +20,6 @@
 
 import { S, app, render } from './core.js';
 import { esc, semAcento, ICON, svgIc } from './util.js';
-
-const ATE_SEGMENTADO = 3;
-const ATE_CHIPS = 4;
 
 /* Configuração de cada controle desenhado: os handlers globais só recebem strings
    pelo onclick, então precisam reencontrar o resto aqui. Recriado a cada render. */
@@ -99,7 +95,7 @@ function opcoesHTML(cfg, q){
       onclick="app.escolherLista('${esc(cfg.id)}','${esc(o.valor)}')">
       ${o.ini ? `<span class="avatar sm">${esc(o.ini)}</span>` : ''}
       <span class="grow">
-        <span class="cl-nome">${esc(o.nome)}</span>
+        <span class="cl-nome ${esc(o.classe || '')}">${esc(o.nome)}</span>
         ${o.sub ? `<span class="fs11 muted">${esc(o.sub)}</span>` : ''}
       </span>
       <span class="mk" aria-hidden="true"></span>
@@ -132,10 +128,15 @@ function campoLista(cfg){
               onclick="event.stopPropagation();app.escolherLista('${esc(cfg.id)}','${esc(o.valor)}')"
               >&times;</span></span>`).join('')
         : `<span class="cl-ph">${ph}</span>`)
-    : (marcadas.length ? `<span class="cl-val">${esc(marcadas[0].nome)}</span>`
-                       : `<span class="cl-ph">${ph}</span>`);
+    : (marcadas.length
+        ? `<span class="cl-val ${esc(marcadas[0].classe || '')}">${esc(marcadas[0].nome)}</span>`
+        : `<span class="cl-ph">${ph}</span>`);
 
-  return `<div class="esc cl${aberto ? ' aberto' : ''}${cfg.erro ? ' com-erro' : ''}">
+  /* `data-escolha` também aqui: o segmentado e os chips sempre tiveram, e sem ele no
+     campo com lista não havia como achar um campo pela estrutura — só pelo texto. Com
+     todo campo de formulário virando lista, isso deixaria os testes cegos. */
+  return `<div class="esc cl${aberto ? ' aberto' : ''}${cfg.erro ? ' com-erro' : ''}"
+       data-escolha="${esc(cfg.id)}">
     ${rotuloHTML(cfg)}
     <button type="button" class="cl-campo" id="cp-${esc(cfg.id)}"
       role="combobox" aria-haspopup="listbox" aria-expanded="${aberto}"
@@ -162,13 +163,17 @@ function campoLista(cfg){
 
 /* ---------------------------------------------------------------- porta de entrada */
 /** cfg: { id, rotulo, opcoes, valor, multipla, busca, placeholder, vazio, erro,
-           rodape, aoEscolher, forcar } */
+           rodape, aoEscolher, forcar }
+
+    Opção: { valor, nome, sub, ini, classe }. `classe` existe para a gravidade: ali a
+    COR é a informação — quatro tons de um matiz, do claro ao escuro — e virar texto
+    numa lista desfaria isso. A classe vai escapada e só nomeia estilo que já existe
+    na folha; nada de HTML cru vindo de fora. */
 export function escolha(cfg){
   CAMPOS[cfg.id] = cfg;
-  const n = normaliza(cfg.opcoes).length;
-  if(cfg.forcar === 'campo' || n > ATE_CHIPS) return campoLista(cfg);
-  if(n <= ATE_SEGMENTADO) return segmentado(cfg);
-  return chips(cfg);
+  if(cfg.forcar === 'segmentado') return segmentado(cfg);
+  if(cfg.forcar === 'chips') return chips(cfg);
+  return campoLista(cfg);
 }
 
 /* ---------------------------------------------------------------- handlers */

@@ -81,12 +81,20 @@ let f=[]; const ok=(n,c,x)=>{ if(c) console.log('  OK '+n); else { f.push(n); co
     await (async()=>{ await p.locator('.cl-op').first().click(); await p.waitForTimeout(700);
       return (await p.locator('.tok').count()) === 1; })());
 
- console.log('\n=== O controle segue o número de opções ===');
+ console.log('\n=== Um controle só para todo campo de formulário ===');
+ /* Era por contagem de opções: até 3 segmentado, 4 chips, 5 ou mais lista. A escola
+    pediu um controle só — com um por campo, o formulário parecia feito de pedaços e
+    quem preenche de pé reaprendia onde tocar a cada passo. */
  await p.evaluate(()=>app.irPasso(3)); await p.waitForTimeout(700);
- ok('2 opções vêm segmentadas, lado a lado',
-    (await p.locator('.seg [role=radio]').count()) === 2,
-    'segmentos: ' + await p.locator('.seg [role=radio]').count());
- ok('9 opções vêm como campo com lista',
+ ok('nenhum campo de formulário desenha segmentado',
+    (await p.locator('#view .seg [role=radio]').count()) === 0,
+    'segmentos: ' + await p.locator('#view .seg [role=radio]').count());
+ ok('nenhum desenha chip de escolha',
+    (await p.locator('#view .esc .chips .chip').count()) === 0,
+    'chips: ' + await p.locator('#view .esc .chips .chip').count());
+ ok('e as duas opções de "você presenciou" também vêm como campo com lista',
+    (await p.locator('[data-escolha="presenciou"] .cl-campo').count()) === 1);
+ ok('o campo de local, com nove opções, segue campo com lista',
     (await p.locator('.cl-campo').count()) >= 1);
 
  console.log('\n=== Teclado ===');

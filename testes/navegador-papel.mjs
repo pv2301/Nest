@@ -74,6 +74,8 @@ const marcado = (p, sel, i) => p.evaluate(([s, n]) => {
  const quantos = await p.locator('[data-escolha^="papel-"]').count();
  ok('há um campo de papel por criança', quantos === 2, String(quantos));
 
+ /* O papel virou campo com lista, como todo campo de formulário: abrir e escolher.
+    Antes era chip, e o toque ia direto no segundo botão do grupo. */
  for(let c = 0; c < quantos; c++){
    const id = await p.locator('[data-escolha^="papel-"]').nth(c).getAttribute('data-escolha');
    const dentroDaTela = await p.evaluate(x => {
@@ -85,10 +87,17 @@ const marcado = (p, sel, i) => p.evaluate(([s, n]) => {
    ok(`${id}: dá para chegar nele`, dentroDaTela);
 
    await zerar(p);
-   await t.tocarElemento(`[data-escolha="${id}"] button >> nth=1`);
+   await t.tocarElemento(`[data-escolha="${id}"] .cl-campo`);
    await p.waitForTimeout(600);
-   ok(`${id}: o toque dispara`, !!(await chamadas(p)).escolherLista);
-   ok(`${id}: e o papel fica marcado`, await marcado(p, `[data-escolha="${id}"]`, 1));
+   ok(`${id}: o toque abre a lista`, (await p.locator(`#ops-${id}`).count()) === 1);
+
+   await zerar(p);
+   await t.tocarElemento(`#ops-${id} [role=option] >> nth=0`);
+   await p.waitForTimeout(600);
+   ok(`${id}: escolher dispara`, !!(await chamadas(p)).escolherLista);
+   ok(`${id}: e o papel fica escrito no campo`,
+      (await p.locator(`[data-escolha="${id}"] .cl-val`).count()) === 1,
+      await p.locator(`[data-escolha="${id}"]`).innerText().catch(()=>''));
  }
 
  ok('a validação para de cobrar o papel',

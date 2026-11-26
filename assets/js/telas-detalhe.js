@@ -1,7 +1,8 @@
 /* O registro aberto: a ocorrência inteira, a foto, e as ações de quem a recebe —
    dar ciência, pedir complemento, mudar a gravidade, marcar a comunicação. */
 
-import { S, app, registrarTela, ir, rodape, otimista, filaDe, aluno } from './core.js';
+import { S, app, registrarTela, ir, rodape, otimista, filaDe, aluno,
+         voltarPara } from './core.js';
 import { Store } from './store.js';
 import { podeCorrigir, RETENCAO_FOTO_DIAS } from './regras.mjs';
 import { esc, quandoLegivel, iniciais, ICON, svgIc } from './util.js';
@@ -9,6 +10,7 @@ import { CONFIG } from '../../config.js';
 import { SEVL } from './vocabulario.js';
 import { localDe, quandoTexto, sevTag, statusPill, tipoDe, vazio } from './telas-comum.js';
 import { dialogoRemocao } from './telas-auditoria.js';
+import { escolha } from './escolha.js';
 
 /* ---------------------------------------------------------------- detalhe */
 function fotoBloco(o){
@@ -74,7 +76,16 @@ registrarTela('detalhe', () => {
     ${souDestino ? `<div class="card lift stack s8" style="border-color:var(--accent-text)">
       <p class="sec-label" style="margin:0">Sua ciência</p>
       <div><p class="fs12 muted" style="margin:0 0 6px">Confirme ou corrija a gravidade</p>
-        <div class="sevpick">${[1,2,3,4].map(n => `<button data-n="${n}" aria-pressed="${o.sev === n}" onclick="app.mudarSev('${esc(o.id)}',${n})"><b>${n}</b><small>${SEVL[n]}</small></button>`).join('')}</div></div>
+        <!-- Campo com lista, como todo campo de formulário desde que a escola pediu um
+             controle só. A escala de cor vai na classe de cada opção: aqui a cor é a
+             informação, e ler "3" sem o tom perderia o "quanto mais escuro, mais
+             sério". (Sem acento grave neste comentário: ele vive dentro de um template
+             literal, e um acento grave fecharia a string.) -->
+        ${escolha({ id:'sev-ciencia', placeholder:'Confirmar a gravidade', busca:false,
+          opcoes:[1,2,3,4].map(n => ({ valor:String(n), nome:`${n} · ${SEVL[n]}`,
+                                       classe:`sev n${n}` })),
+          valor:String(o.sev || ''),
+          aoEscolher:v => app.mudarSev(o.id, Number(v)) })}</div>
       <div class="field"><label for="d-par">Parecer ou orientação (opcional)</label>
         <textarea class="input" id="d-par" style="min-height:66px" placeholder="Volta visível para quem registrou." spellcheck="true" autocorrect="on" autocapitalize="sentences"></textarea></div>
       <button class="btn" onclick="app.darCiencia('${esc(o.id)}')">&check; Dar ciência</button>
@@ -95,9 +106,12 @@ registrarTela('detalhe', () => {
 
 /* O registro já está alterado em memória: basta gravá-lo. Buscar tudo de novo aqui
    custava mais de 12 segundos por causa das idas ao Apps Script. */
-function salvar(o, msg, voltarPara){
+/* O parâmetro se chamava `voltarPara`, o mesmo nome da função de navegação que agora
+   vem de core.js — e sombrearia o import aqui dentro. Ele guarda o NOME da tela, não a
+   ação, então passa a dizer isso. */
+function salvar(o, msg, telaDeVolta){
   return otimista(
-    () => { if(voltarPara){ S.detalhe = null; ir(voltarPara, { guardar:false }); } },
+    () => { if(telaDeVolta){ S.detalhe = null; voltarPara(telaDeVolta); } },
     () => Store.salvarOcorrencia(o),
     msg
   );

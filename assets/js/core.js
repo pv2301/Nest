@@ -108,6 +108,27 @@ export function voltarUI(){
   else voltar();
 }
 
+/** Voltar para uma tela de onde se veio — salvar um aluno e cair na lista, por exemplo.
+
+    Isto existia como `ir(tela, { guardar:false })`, e aquilo troca `S.tela` sem
+    desfazer nem a pilha nem o histórico. Medido: Gestão → Alunos → abrir um aluno →
+    Salvar, e o PRIMEIRO voltar não fazia nada — a pilha ainda tinha 'alunos' no topo
+    e o histórico ainda tinha a entrada de quando entramos em 'aluno', as duas
+    apontando para a tela onde a pessoa já estava.
+
+    Quando o topo da pilha já é o destino, a volta é de verdade: `history.back()`, o
+    popstate desempilha, e pilha e histórico seguem em passo. Só quando não é — um
+    atalho para uma tela que não está no caminho de volta — cai no comportamento
+    antigo. */
+export function voltarPara(tela){
+  /* Os guardas no topo de `voltar()` comeriam o toque fechando a lista ou a tela
+     cheia, e a pessoa teria de voltar duas vezes de novo. */
+  S.heatCheio = false;
+  S.listaAberta = null;
+  if(S.pilha[S.pilha.length - 1] === tela && profundidade > 0){ history.back(); return; }
+  ir(tela, { guardar:false });
+}
+
 if(typeof window !== 'undefined'){
   window.addEventListener('popstate', () => {
     if(profundidade > 0) profundidade--;
@@ -390,6 +411,11 @@ export function render(){
 
   faixa.innerHTML = faixaModo();
   chrome.innerHTML = logada ? barraSuperior() : '';
+  /* Qual tela está desenhada, dito no DOM. Sem isto, todo teste de navegação tinha de
+     adivinhar a tela por um trecho de texto — e adivinhar errado foi o que me fez
+     relatar como defeito do app o que era defeito do meu instrumento, mais de uma
+     vez. Custa um atributo e torna a pergunta "em que tela estou" respondível. */
+  view.dataset.tela = S.tela;
   view.innerHTML = fn ? fn() : '';
   tabs.innerHTML = logada ? barraInferior() : '';
 

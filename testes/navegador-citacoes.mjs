@@ -88,7 +88,8 @@ const duvida = p => p.evaluate(() => {
  await p.evaluate(() => app.irPasso(1)); await p.waitForTimeout(600);
  await escolher(p, 'cat', 'Incidente'); await p.waitForTimeout(300);
  await escolher(p, 'tipo', 'Mordida'); await p.waitForTimeout(300);
- await p.click('.sevpick button[data-n="2"]'); await p.waitForTimeout(300);
+ /* A gravidade virou campo com lista, como todo campo de formulário. */
+ await p.evaluate(()=>app.escolherLista('sev','2')); await p.waitForTimeout(300);
  await p.evaluate(() => app.irPasso(2)); await p.waitForTimeout(700);
 
  /* A envolvida NÃO é uma Souza: se fosse, a regra "está entre as envolvidas"

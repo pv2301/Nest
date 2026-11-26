@@ -207,9 +207,17 @@ app.turmaEnvolvido = (i, t) => {
   render();
 };
 
-const sevPicker = () => `<div class="sevpick">${[1,2,3,4].map(n => `
-  <button data-n="${n}" aria-pressed="${S.rascunho.sev === n}" onclick="app.campo('sev',${n})">
-    <b>${n}</b><small>${SEVL[n]}</small></button>`).join('')}</div>`;
+/* Era uma fileira de quatro botões coloridos; virou campo com lista, como todo campo
+   de formulário. A escala de cor vai junto, na `classe` de cada opção: é ela que diz
+   "quanto mais escuro, mais sério" sem precisar ler. */
+const sevPicker = () => escolha({
+  id:'sev', placeholder:'Escolher a gravidade', busca:false,
+  opcoes:[1,2,3,4].map(n => ({ valor:String(n), nome:`${n} · ${SEVL[n]}`,
+                               classe:`sev n${n}` })),
+  valor: S.rascunho.sev ? String(S.rascunho.sev) : '',
+  erro: erroDe('gravidade'),
+  aoEscolher:v => app.campo('sev', Number(v))
+});
 
 app.campo = (k, v) => { S.rascunho[k] = v; S.faltas = null; render(); };
 app.campoTxt = (k, v) => { S.rascunho[k] = v; };

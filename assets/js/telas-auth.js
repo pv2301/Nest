@@ -381,7 +381,13 @@ registrarTela('conta', () => {
 
     <div class="stack s8">
       <p class="sec-label" style="margin:0">Aparência</p>
-      ${escolha({ id:'tema', opcoes:[
+      <!-- Segmentado, e não campo com lista como os campos de formulário: aqui as
+           três opções têm ícone — sol, lua, sistema — e só o segmentado desenha ícone;
+           numa lista a marca competiria com o texto. Além disso isto não é campo de
+           registro: é uma preferência que se vira, e ver as três de uma vez é o valor.
+           É um juízo meu dentro do "lista para todo campo"; se a escola preferir
+           lista aqui também, é tirar esta linha. -->
+      ${escolha({ id:'tema', forcar:'segmentado', opcoes:[
           { valor:'claro',   nome:'Claro',   ic:'sol' },
           { valor:'escuro',  nome:'Escuro',  ic:'lua' },
           { valor:'sistema', nome:'Sistema', ic:'sistema' }

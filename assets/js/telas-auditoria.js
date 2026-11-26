@@ -8,7 +8,8 @@
    Junto vem a lista dos registros removidos, que é o outro lado da mesma ideia:
    remover tira de vista, não do banco, e a gestão pode olhar e restaurar. */
 
-import { S, app, registrarTela, ir, render, rodape, toast, recarregar } from './core.js';
+import { S, app, registrarTela, ir, render, rodape, toast, recarregar,
+         voltarPara } from './core.js';
 import { Store } from './store.js';
 import { esc, dataCompleta } from './util.js';
 import { escolha } from './escolha.js';
@@ -185,7 +186,7 @@ app.confirmarRemocao = async () => {
     S.remocao = null;
     S.ocs = S.ocs.filter(o => o.id !== r.id);
     S.removidos = null;
-    ir('lista', { guardar:false });
+    voltarPara('lista');
     toast('Registro removido');
   } catch(e){
     r.enviando = false;

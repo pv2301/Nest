@@ -152,7 +152,25 @@ input,textarea,select{font:inherit;color:inherit}
    sumia no fundo e os chips de dentro, que usam a mesma cor, perdiam a forma. */
 .card.flat{background:var(--surface);box-shadow:var(--shadow)}
 .card.lift{box-shadow:var(--shadow)}
-.sec-label{font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+/* O título de seção como tarjeta: uma pastilha que diz "daqui para baixo é isto".
+   Antes era texto solto em cinza, e num cartão cheio ele se perdia no meio do
+   conteúdo.
+
+   `width:max-content` para a pastilha abraçar o texto mesmo quando o rótulo está num
+   `.row` ao lado de um botão — sem isso, o `flex:1` do `.grow` esticaria a pastilha
+   pela linha toda. */
+.sec-label{display:flex;align-items:center;width:max-content;max-width:100%;
+  font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--accent-text);background:var(--surface-2);
+  border-radius:999px;padding:5px 11px;margin:0 0 9px}
+
+/* Rótulo de CAMPO não é título: ele nomeia o controle logo abaixo, e virar pastilha
+   ali encheria o formulário de pastilhas competindo entre si. A diferença é
+   estrutural — rótulo de campo vive dentro de um `.esc`, `.field` ou `.narrativa` —,
+   então dá para devolver o estilo antigo sem tocar em nenhuma tela. */
+.esc .sec-label, .field .sec-label, .narrativa .sec-label{
+  display:block;width:auto;background:none;border-radius:0;padding:0;
+  letter-spacing:.1em;color:var(--muted);margin:0 0 8px}
 .stack{display:flex;flex-direction:column;gap:12px;min-width:0}
 .stack.s6{gap:6px} .stack.s8{gap:8px} .stack.s18{gap:18px}
 .row{display:flex;gap:10px;align-items:center;min-width:0}
@@ -206,15 +224,9 @@ textarea.input{min-height:96px;resize:vertical;line-height:1.55;font-size:14.5px
    mensagem de erro junto com a de gravidade. */
 .sev.n1{background:var(--sev1);color:var(--sev1-t)} .sev.n2{background:var(--sev2);color:var(--sev2-t)}
 .sev.n3{background:var(--sev3);color:var(--sev3-t)} .sev.n4{background:var(--sev4);color:var(--sev4-t)}
-.sevpick{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
-.sevpick button{border:0;border-radius:var(--r-sm);padding:10px 4px;text-align:center;background:var(--surface-2);min-height:56px}
-.sevpick b{display:block;font-family:var(--font-display);font-size:16px;line-height:1.2}
-.sevpick small{font-size:9.5px;font-weight:600}
-.sevpick button[aria-pressed="true"]{border-width:2px;border-style:solid;padding:8px 3px}
-.sevpick button[data-n="1"][aria-pressed="true"]{background:var(--sev1);border-color:var(--sev);color:var(--sev1-t)}
-.sevpick button[data-n="2"][aria-pressed="true"]{background:var(--sev2);border-color:var(--sev);color:var(--sev2-t)}
-.sevpick button[data-n="3"][aria-pressed="true"]{background:var(--sev3);border-color:var(--sev);color:var(--sev3-t)}
-.sevpick button[data-n="4"][aria-pressed="true"]{background:var(--sev4);border-color:var(--sev);color:var(--sev4-t)}
+/* `.sevpick` saiu com o controle: a gravidade virou campo com lista, como todo campo
+   de formulário, e a escala de cor foi para a `classe` de cada opção — as regras
+   `.sev.n1`…`.n4` acima continuam sendo quem pinta. */
 
 .pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:99px;
   background:var(--surface-2);border:0;color:var(--muted);white-space:nowrap}
@@ -303,31 +315,30 @@ textarea.input{min-height:96px;resize:vertical;line-height:1.55;font-size:14.5px
 .heat .canto{position:sticky;left:0;z-index:2;background:var(--surface)}
 /* ---------- a tabela em tela cheia ----------
 
-   Um dia escolar inteiro deixa 172px da tabela fora da tela de um telefone: dá para
-   arrastar, mas arrastar derrota o propósito de um mapa de calor, que existe para se
-   ver o padrão de uma vez.
+   Um dia escolar inteiro deixa um terço da tabela fora da tela de um telefone: dá
+   para arrastar, mas arrastar derrota o propósito de um mapa de calor, que existe para
+   se ver o padrão de uma vez.
 
-   O palco ocupa a janela e, no RETRATO, gira 90° — aí a tabela usa o lado longo da
-   tela. Em paisagem a regra não se aplica: se a pessoa virar o aparelho, a tela
-   desgira em vez de girar duas vezes.
+   NÃO gira. A primeira versão girava o painel inteiro 90° no retrato, e o giro
+   estragava tudo o que não é tabela — medido no aparelho: a barra de cima virava uma
+   tira vertical na borda direita, o botão de fechar caía em y=861 (canto INFERIOR
+   direito) e o título era lido de lado. Para ver na horizontal, vira-se o aparelho.
 
-   Por que não a API de tela cheia do navegador: o Safari não abre elemento comum em
-   tela cheia nem trava orientação, e daria dois comportamentos por aparelho. Isto é
-   CSS, e vale igual nos dois.
-
-   O tamanho da célula NÃO está aqui: vem medido, de metricas.js, porque CSS não
-   expressa "enche a tela, nunca abaixo de 34px nem acima de 72px, e quadrada". */
-.heat-cheio{position:fixed;inset:0;z-index:70;background:var(--surface);overflow:hidden}
-.hc-palco{position:absolute;top:0;left:0;width:100vw;height:100vh;
-  display:flex;flex-direction:column;gap:8px;padding:10px}
-@media (orientation:portrait){
-  .hc-palco{width:100vh;height:100vw;transform-origin:top left;
-    transform:translateX(100vw) rotate(90deg)}
-}
+   `dvh`/`dvw`, e não `vh`/`vw`: no celular `100vh` é a altura da janela SEM a barra do
+   navegador, então o painel passava do que se vê e o fim dele — a última coluna de
+   hora e o botão de fechar — ficava fora, e fora do que rola. `dvh` é a altura de
+   agora, com a barra onde ela estiver. */
+.heat-cheio{position:fixed;inset:0;z-index:70;background:var(--surface);
+  width:100dvw;height:100dvh;display:flex;flex-direction:column;gap:8px;padding:10px}
+/* A barra fica em coordenadas normais de tela: título à esquerda, × no canto superior
+   direito, filtros na linha de baixo. */
 .hc-topo{display:flex;align-items:center;gap:10px;flex:none}
 .hc-topo .sec-label{margin:0}
+.hc-filtros{flex:none;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch}
+.hc-filtros .chips{flex-wrap:nowrap;width:max-content}
 /* `safe center` centra quando sobra espaço e NÃO corta quando falta — com `center`
-   puro, uma grade maior que a área perde o cabeçalho para fora da rolagem. */
+   puro, uma grade maior que a área perde o cabeçalho para fora da rolagem. Medido:
+   com `center`, o topo ficava 100px acima da área com o scroll já em zero. */
 .hc-rol{flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;
   display:flex;align-items:safe center;justify-content:safe center}
 /* Sem o `min-width:100%` de `.heat`: aqui ele esticaria a caixa da grade além das
@@ -552,7 +563,7 @@ textarea.input{min-height:96px;resize:vertical;line-height:1.55;font-size:14.5px
 /* Campo obrigatório que ficou em branco: antes o aviso vinha só no topo da tela e a
    pessoa tinha de caçar qual era. */
 .esc.com-erro .cl-campo,.esc.com-erro .seg{box-shadow:inset 0 0 0 1.5px var(--g4)}
-.esc.com-erro .chips,.esc.com-erro .sevpick{outline:1.5px solid var(--g4);outline-offset:4px;border-radius:var(--r-sm)}
+.esc.com-erro .chips{outline:1.5px solid var(--g4);outline-offset:4px;border-radius:var(--r-sm)}
 .narrativa.com-erro{box-shadow:var(--shadow),inset 0 0 0 1.5px var(--g4)}
 .narrativa.com-erro textarea[aria-invalid],.narrativa.com-erro .input{background:var(--g4-soft)}
 
@@ -564,6 +575,11 @@ textarea.input{min-height:96px;resize:vertical;line-height:1.55;font-size:14.5px
 .cl.aberto .cl-campo{border-bottom-left-radius:0;border-bottom-right-radius:0}
 .cl-resumo{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-width:0}
 .cl-val{font-weight:500}
+/* A gravidade leva a escala de cor para dentro da lista: a opção e o valor escolhido
+   usam as mesmas `.sev.n1`…`.n4` do resto do app, então "quanto mais escuro, mais
+   sério" continua sendo lido sem precisar ler. */
+.cl-nome.sev, .cl-val.sev{display:inline-flex;align-items:center;padding:3px 9px;
+  border-radius:99px;font-size:11.5px;font-weight:700}
 .cl-ph{color:var(--muted)}
 .cl-seta{color:var(--muted);font-size:13px;flex:none}
 .cl-lista{background:var(--surface);border-radius:0 0 var(--r) var(--r);overflow:hidden;

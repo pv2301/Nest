@@ -37,16 +37,20 @@ const TELAS = {
   'tablet':            { largura: 1008, altura: 724 },
   'monitor':           { largura: 1424, altura: 856 }
 };
-const lado = (tela, horas, locais) => {
+/* A largura da coluna de nomes vem medida do DOM — o grid a decide com
+   `fit-content(26%)`. Aqui ela entra como número, que é o contrato da função: 96px é
+   mais ou menos o que "Entrada / portaria" ocupa no telefone. */
+const NOMES = 96;
+const lado = (tela, horas, locais, nomes = NOMES) => {
   const a = TELAS[tela];
   return M.ladoDaCelula({ largura: a.largura, altura: a.altura, horas, locais,
-    colunaNomes: M.colunaDeNomes(a.largura), linhaHoras: M.LINHA_HORAS });
+    colunaNomes: nomes, linhaHoras: M.LINHA_HORAS });
 };
 /** A grade inteira cabe na área, ou vai rolar? A conta é a de montar a grade: a
     coluna de nomes e a linha das horas, mais `n` células com um vão cada. */
 const cabe = (tela, horas, locais) => {
   const a = TELAS[tela], x = lado(tela, horas, locais);
-  return M.colunaDeNomes(a.largura) + horas * (x + 3) <= a.largura + 1
+  return NOMES + horas * (x + 3) <= a.largura + 1
       && M.LINHA_HORAS + locais * (x + 3) <= a.altura + 1;
 };
 
@@ -90,11 +94,20 @@ t('com muitas horas manda a largura',
 t('com muitos locais manda a altura',
   M.ladoDaCelula({ largura: 4000, altura: 400, horas: 2, locais: 10, colunaNomes: 100 }) < 40);
 
-console.log('\n=== A coluna dos nomes ===');
-t('não encolhe abaixo de 96px', M.colunaDeNomes(300) === 96, String(M.colunaDeNomes(300)));
-t('cresce com a tela', M.colunaDeNomes(899) > 96 && M.colunaDeNomes(899) <= 140,
-  String(M.colunaDeNomes(899)));
-t('e para em 140px', M.colunaDeNomes(4000) === 140, String(M.colunaDeNomes(4000)));
+console.log('\n=== Uma coluna de nomes mais larga aperta as células ===');
+/* Quem decide a largura dela é o grid, com `fit-content(26%)`; o que esta função
+   precisa garantir é que o espaço tomado por ela saia do espaço das células. */
+/* Com 8 locais a ALTURA é que aperta, e aí a largura do nome não muda nada — foi o
+   que o primeiro teste pegou. Com poucos locais e muitas horas, quem aperta é a
+   largura, e só aí a coluna de nomes conta. */
+t('onde a largura é que aperta, nome comprido deixa a célula menor',
+  lado('telefone', 15, 3, 220) < lado('telefone', 15, 3, 60),
+  lado('telefone', 15, 3, 220) + ' vs ' + lado('telefone', 15, 3, 60));
+t('onde a altura é que aperta, a coluna de nomes não muda a célula',
+  lado('telefone', 12, 8, 220) === lado('telefone', 12, 8, 60),
+  lado('telefone', 12, 8, 220) + ' vs ' + lado('telefone', 12, 8, 60));
+t('e nem assim abaixo do piso',
+  lado('telefone estreito', 16, 10, 240) === M.CELULA_MIN);
 
 console.log('\n=== Bordas ===');
 t('zero hora não divide por zero',
